@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser) {
         // Obtener datos adicionales del usuario desde Firestore
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid))
+        const userDoc = await getDoc(doc(db, "apps/controld/users", firebaseUser.uid))
         if (userDoc.exists()) {
           setUser({ id: firebaseUser.uid, ...userDoc.data() } as User)
         } else {
@@ -62,11 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user = result.user
 
     // Verificar si el usuario ya existe en Firestore
-    const userDoc = await getDoc(doc(db, "users", user.uid))
+    const userDoc = await getDoc(doc(db, "apps/controld/users", user.uid))
     
     if (!userDoc.exists()) {
       // Crear documento de usuario en Firestore con el rol especificado
-      await setDoc(doc(db, "users", user.uid), {
+      await setDoc(doc(db, "apps/controld/users", user.uid), {
         email: user.email,
         name: user.displayName || user.email?.split("@")[0] || "Usuario",
         role,
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newUser = userCredential.user
 
     // Crear documento de usuario en Firestore
-    await setDoc(doc(db, "users", newUser.uid), {
+    await setDoc(doc(db, "apps/controld/users", newUser.uid), {
       email: newUser.email,
       name,
       role,

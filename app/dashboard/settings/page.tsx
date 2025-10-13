@@ -45,7 +45,7 @@ function SettingsContent() {
 
   const fetchBranches = async () => {
     try {
-      const q = query(collection(db, "branches"), where("active", "==", true))
+      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
       setBranches(branchesData)
@@ -66,7 +66,7 @@ function SettingsContent() {
 
     try {
       if (editingBranch) {
-        await updateDoc(doc(db, "branches", editingBranch.id), {
+        await updateDoc(doc(db, "apps/controld/branches", editingBranch.id), {
           name: formData.name,
           address: formData.address,
           type: formData.type,
@@ -76,7 +76,7 @@ function SettingsContent() {
           description: "La sucursal se actualizó correctamente",
         })
       } else {
-        await addDoc(collection(db, "branches"), {
+        await addDoc(collection(db, "apps/controld/branches"), {
           ...formData,
           createdAt: new Date(),
           active: true,
@@ -115,7 +115,7 @@ function SettingsContent() {
     if (!confirm("¿Estás seguro de que deseas eliminar esta sucursal?")) return
 
     try {
-      await updateDoc(doc(db, "branches", branchId), { active: false })
+      await updateDoc(doc(db, "apps/controld/branches", branchId), { active: false })
       toast({
         title: "Sucursal eliminada",
         description: "La sucursal se eliminó correctamente",

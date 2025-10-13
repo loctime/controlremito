@@ -50,7 +50,7 @@ function UsersContent() {
 
   const fetchUsers = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "users"))
+      const snapshot = await getDocs(collection(db, "apps/controld/users"))
       const usersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as User[]
       setUsers(usersData.filter((u) => u.active))
     } catch (error) {
@@ -65,7 +65,7 @@ function UsersContent() {
 
   const fetchBranches = async () => {
     try {
-      const q = query(collection(db, "branches"), where("active", "==", true))
+      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
       setBranches(branchesData)
@@ -84,7 +84,7 @@ function UsersContent() {
     try {
       if (editingUser) {
         // Actualizar usuario existente
-        await updateDoc(doc(db, "users", editingUser.id), {
+        await updateDoc(doc(db, "apps/controld/users", editingUser.id), {
           name: formData.name,
           role: formData.role,
           branchId: formData.role === "branch" || formData.role === "factory" ? formData.branchId : null,
@@ -162,7 +162,7 @@ function UsersContent() {
     if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return
 
     try {
-      await updateDoc(doc(db, "users", userId), { active: false })
+      await updateDoc(doc(db, "apps/controld/users", userId), { active: false })
       toast({
         title: "Usuario eliminado",
         description: "El usuario se eliminó correctamente",

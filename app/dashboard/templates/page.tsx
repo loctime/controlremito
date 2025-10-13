@@ -47,7 +47,7 @@ function TemplatesContent() {
     if (!user) return
 
     try {
-      const templatesRef = collection(db, "templates")
+      const templatesRef = collection(db, "apps/controld/templates")
       let q = query(templatesRef, where("active", "==", true))
 
       // Filtrar plantillas según el rol
@@ -70,7 +70,7 @@ function TemplatesContent() {
 
   const fetchProducts = async () => {
     try {
-      const q = query(collection(db, "products"), where("active", "==", true))
+      const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
       setProducts(productsData)
@@ -105,13 +105,13 @@ function TemplatesContent() {
       }
 
       if (editingTemplate) {
-        await updateDoc(doc(db, "templates", editingTemplate.id), templateData)
+        await updateDoc(doc(db, "apps/controld/templates", editingTemplate.id), templateData)
         toast({
           title: "Plantilla actualizada",
           description: "La plantilla se actualizó correctamente",
         })
       } else {
-        await addDoc(collection(db, "templates"), {
+        await addDoc(collection(db, "apps/controld/templates"), {
           ...templateData,
           createdAt: new Date(),
         })
@@ -149,7 +149,7 @@ function TemplatesContent() {
     if (!confirm("¿Estás seguro de que deseas eliminar esta plantilla?")) return
 
     try {
-      await updateDoc(doc(db, "templates", templateId), { active: false })
+      await updateDoc(doc(db, "apps/controld/templates", templateId), { active: false })
       toast({
         title: "Plantilla eliminada",
         description: "La plantilla se eliminó correctamente",

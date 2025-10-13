@@ -29,7 +29,7 @@ function DeliveryNotesContent() {
   const fetchDeliveryNotes = async () => {
     setLoading(true)
     try {
-      const q = query(collection(db, "deliveryNotes"), orderBy("createdAt", "desc"))
+      const q = query(collection(db, "apps/controld/deliveryNotes"), orderBy("createdAt", "desc"))
       const snapshot = await getDocs(q)
       const notesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as DeliveryNote[]
       setDeliveryNotes(notesData)

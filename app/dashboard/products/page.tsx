@@ -44,7 +44,7 @@ function ProductsContent() {
 
   const fetchProducts = async () => {
     try {
-      const q = query(collection(db, "products"), where("active", "==", true))
+      const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
       setProducts(productsData)
@@ -65,7 +65,7 @@ function ProductsContent() {
 
     try {
       if (editingProduct) {
-        await updateDoc(doc(db, "products", editingProduct.id), {
+        await updateDoc(doc(db, "apps/controld/products", editingProduct.id), {
           ...formData,
         })
         toast({
@@ -73,7 +73,7 @@ function ProductsContent() {
           description: "El producto se actualizó correctamente",
         })
       } else {
-        await addDoc(collection(db, "products"), {
+        await addDoc(collection(db, "apps/controld/products"), {
           ...formData,
           createdAt: new Date(),
           createdBy: user.id,
@@ -114,7 +114,7 @@ function ProductsContent() {
     if (!confirm("¿Estás seguro de que deseas eliminar este producto?")) return
 
     try {
-      await updateDoc(doc(db, "products", productId), { active: false })
+      await updateDoc(doc(db, "apps/controld/products", productId), { active: false })
       toast({
         title: "Producto eliminado",
         description: "El producto se eliminó correctamente",

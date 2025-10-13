@@ -41,7 +41,7 @@ function NewOrderContent() {
 
   const fetchBranches = async () => {
     try {
-      const q = query(collection(db, "branches"), where("active", "==", true))
+      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
 
@@ -61,7 +61,7 @@ function NewOrderContent() {
 
   const fetchProducts = async () => {
     try {
-      const q = query(collection(db, "products"), where("active", "==", true))
+      const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
       setProducts(productsData)
@@ -74,7 +74,7 @@ function NewOrderContent() {
     if (!user) return
 
     try {
-      const templatesRef = collection(db, "templates")
+      const templatesRef = collection(db, "apps/controld/templates")
       let q = query(templatesRef, where("active", "==", true))
 
       if (user.role === "branch" || user.role === "factory") {
@@ -141,7 +141,7 @@ function NewOrderContent() {
         notes: formData.notes,
       }
 
-      await addDoc(collection(db, "orders"), orderData)
+      await addDoc(collection(db, "apps/controld/orders"), orderData)
 
       toast({
         title: "Pedido creado",

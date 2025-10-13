@@ -33,7 +33,7 @@ function OrdersContent() {
 
     setLoading(true)
     try {
-      const ordersRef = collection(db, "orders")
+      const ordersRef = collection(db, "apps/controld/orders")
       let q = query(ordersRef, orderBy("createdAt", "desc"))
 
       // Filtrar según el rol

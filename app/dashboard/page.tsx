@@ -23,7 +23,7 @@ function DashboardContent() {
       if (!user) return
 
       try {
-        const ordersRef = collection(db, "orders")
+        const ordersRef = collection(db, "apps/controld/orders")
         let q = query(ordersRef)
 
         // Filtrar según el rol

@@ -51,7 +51,7 @@ function OrderDetailContent() {
   const fetchOrder = async () => {
     setLoading(true)
     try {
-      const orderDoc = await getDoc(doc(db, "orders", orderId))
+      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
       if (orderDoc.exists()) {
         const orderData = { id: orderDoc.id, ...orderDoc.data() } as Order
         setOrder(orderData)
@@ -90,7 +90,7 @@ function OrderDetailContent() {
 
     setActionLoading(true)
     try {
-      await updateDoc(doc(db, "orders", orderId), {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
         status: "preparing",
         preparedBy: user.id,
         preparedByName: user.name,
@@ -176,7 +176,7 @@ function OrderDetailContent() {
       // Items no disponibles para crear nuevo pedido
       const unavailableItems = updatedItems.filter((item) => item.status === "not_available")
 
-      await updateDoc(doc(db, "orders", orderId), {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
         status: "ready",
         items: updatedItems,
       })
@@ -184,7 +184,7 @@ function OrderDetailContent() {
       // Si hay items no disponibles, crear nuevo pedido automáticamente
       if (unavailableItems.length > 0) {
         const newOrderNumber = `PED-${Date.now()}`
-        await addDoc(collection(db, "orders"), {
+        await addDoc(collection(db, "apps/controld/orders"), {
           orderNumber: newOrderNumber,
           fromBranchId: order.fromBranchId,
           fromBranchName: order.fromBranchName,
@@ -282,7 +282,7 @@ function OrderDetailContent() {
         status: itemStatuses[item.id]?.status || item.status,
       }))
 
-      await updateDoc(doc(db, "orders", orderId), {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
         deliveredBy: user.id,
         deliveredByName: user.name,
         deliveredAt: new Date(),
@@ -325,7 +325,7 @@ function OrderDetailContent() {
       const itemsNotReceived = updatedItems.filter((item) => item.status === "not_received")
 
       // Actualizar pedido
-      await updateDoc(doc(db, "orders", orderId), {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
         status: "received",
         receivedBy: user.id,
         receivedByName: user.name,
@@ -334,7 +334,7 @@ function OrderDetailContent() {
       })
 
       // Crear remito con firmas automáticas
-      await addDoc(collection(db, "deliveryNotes"), {
+      await addDoc(collection(db, "apps/controld/deliveryNotes"), {
         orderId: order.id,
         orderNumber: order.orderNumber,
         fromBranchName: order.fromBranchName,
@@ -359,7 +359,7 @@ function OrderDetailContent() {
       const problemItems = [...itemsReturned, ...itemsNotReceived]
       if (problemItems.length > 0) {
         const newOrderNumber = `PED-${Date.now()}`
-        await addDoc(collection(db, "orders"), {
+        await addDoc(collection(db, "apps/controld/orders"), {
           orderNumber: newOrderNumber,
           fromBranchId: order.fromBranchId,
           fromBranchName: order.fromBranchName,

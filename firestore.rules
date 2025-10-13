@@ -9,7 +9,7 @@ service cloud.firestore {
     }
     
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return get(/databases/$(database)/documents/apps/controld/users/$(request.auth.uid)).data;
     }
     
     function isMaxDev() {
@@ -34,49 +34,51 @@ service cloud.firestore {
     
     // ===== REGLAS PARA REMITOS (CONTROLD) =====
     
-    // Usuarios - todos pueden leer, solo admin/maxdev pueden escribir
-    match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow write: if isMaxDev() || isAdmin();
-      allow create: if isAuthenticated(); // Permitir auto-registro
-      allow update: if isAuthenticated() && request.auth.uid == userId; // Usuarios pueden actualizar su propio perfil
-    }
-    
-    // Sucursales/Fábricas - todos autenticados pueden leer, admin/maxdev pueden escribir
-    match /branches/{branchId} {
-      allow read: if isAuthenticated();
-      allow write: if isMaxDev() || isAdmin();
-    }
-    
-    // Productos - todos autenticados pueden leer, admin/maxdev/factory pueden escribir
-    match /products/{productId} {
-      allow read: if isAuthenticated();
-      allow create: if isMaxDev() || isAdmin() || isFactory();
-      allow update, delete: if isMaxDev() || isAdmin();
-    }
-    
-    // Pedidos - permisos basados en rol
-    match /orders/{orderId} {
-      allow read: if isAuthenticated();
-      allow create: if isBranch() || isMaxDev() || isAdmin();
-      allow update: if isAuthenticated(); // Todos pueden actualizar estado
-      allow delete: if isMaxDev() || isAdmin();
-    }
-    
-    // Remitos de entrega
-    match /deliveryNotes/{noteId} {
-      allow read: if isAuthenticated();
-      allow create: if isDelivery() || isMaxDev() || isAdmin();
-      allow update: if isDelivery() || isMaxDev() || isAdmin();
-      allow delete: if isMaxDev() || isAdmin();
-    }
-    
-    // Plantillas
-    match /templates/{templateId} {
-      allow read: if isAuthenticated();
-      allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
-      allow update, delete: if isAuthenticated() && 
-                              (resource.data.createdBy == request.auth.uid || isMaxDev() || isAdmin());
+    match /apps/controld {
+      // Usuarios - todos pueden leer, solo admin/maxdev pueden escribir
+      match /users/{userId} {
+        allow read: if isAuthenticated();
+        allow write: if isMaxDev() || isAdmin();
+        allow create: if isAuthenticated(); // Permitir auto-registro
+        allow update: if isAuthenticated() && request.auth.uid == userId; // Usuarios pueden actualizar su propio perfil
+      }
+      
+      // Sucursales/Fábricas - todos autenticados pueden leer, admin/maxdev pueden escribir
+      match /branches/{branchId} {
+        allow read: if isAuthenticated();
+        allow write: if isMaxDev() || isAdmin();
+      }
+      
+      // Productos - todos autenticados pueden leer, admin/maxdev/factory pueden escribir
+      match /products/{productId} {
+        allow read: if isAuthenticated();
+        allow create: if isMaxDev() || isAdmin() || isFactory();
+        allow update, delete: if isMaxDev() || isAdmin();
+      }
+      
+      // Pedidos - permisos basados en rol
+      match /orders/{orderId} {
+        allow read: if isAuthenticated();
+        allow create: if isBranch() || isMaxDev() || isAdmin();
+        allow update: if isAuthenticated(); // Todos pueden actualizar estado
+        allow delete: if isMaxDev() || isAdmin();
+      }
+      
+      // Remitos de entrega
+      match /deliveryNotes/{noteId} {
+        allow read: if isAuthenticated();
+        allow create: if isDelivery() || isMaxDev() || isAdmin();
+        allow update: if isDelivery() || isMaxDev() || isAdmin();
+        allow delete: if isMaxDev() || isAdmin();
+      }
+      
+      // Plantillas
+      match /templates/{templateId} {
+        allow read: if isAuthenticated();
+        allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
+        allow update, delete: if isAuthenticated() && 
+                                (resource.data.createdBy == request.auth.uid || isMaxDev() || isAdmin());
+      }
     }
     
     // ===== REGLAS PARA CONTROLGASTOS =====

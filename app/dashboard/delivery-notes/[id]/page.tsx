@@ -31,7 +31,7 @@ function DeliveryNoteDetailContent() {
   const fetchNote = async () => {
     setLoading(true)
     try {
-      const noteDoc = await getDoc(doc(db, "deliveryNotes", noteId))
+      const noteDoc = await getDoc(doc(db, "apps/controld/deliveryNotes", noteId))
       if (noteDoc.exists()) {
         const noteData = { id: noteDoc.id, ...noteDoc.data() } as DeliveryNote
         setNote(noteData)
