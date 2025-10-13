@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore"
 
-export type UserRole = "admin" | "factory" | "branch" | "delivery"
+export type UserRole = "admin" | "factory" | "branch" | "delivery" | "maxdev"
 
 export type OrderStatus = "pending" | "preparing" | "ready" | "received"
 

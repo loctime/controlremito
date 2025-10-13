@@ -8,8 +8,9 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signOut as firebaseSignOut,
+  createUserWithEmailAndPassword,
 } from "firebase/auth"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db, googleProvider } from "./firebase"
 import type { User } from "./types"
 
@@ -18,7 +19,9 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null
   loading: boolean
   signInWithGoogle: () => Promise<void>
+  signInWithGoogleAndRole: (role: string) => Promise<void>
   signOut: () => Promise<void>
+  registerWithEmailPassword: (email: string, password: string, name: string, role: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -54,13 +57,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithPopup(auth, googleProvider)
   }
 
+  const signInWithGoogleAndRole = async (role: string) => {
+    const result = await signInWithPopup(auth, googleProvider)
+    const user = result.user
+
+    // Verificar si el usuario ya existe en Firestore
+    const userDoc = await getDoc(doc(db, "users", user.uid))
+    
+    if (!userDoc.exists()) {
+      // Crear documento de usuario en Firestore con el rol especificado
+      await setDoc(doc(db, "users", user.uid), {
+        email: user.email,
+        name: user.displayName || user.email?.split("@")[0] || "Usuario",
+        role,
+        createdAt: serverTimestamp(),
+        active: true,
+      })
+    }
+  }
+
   const signOut = async () => {
     await firebaseSignOut(auth)
     setUser(null)
   }
 
+  const registerWithEmailPassword = async (email: string, password: string, name: string, role: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+    const newUser = userCredential.user
+
+    // Crear documento de usuario en Firestore
+    await setDoc(doc(db, "users", newUser.uid), {
+      email: newUser.email,
+      name,
+      role,
+      createdAt: serverTimestamp(),
+      active: true,
+    })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signInWithGoogle, signInWithGoogleAndRole, signOut, registerWithEmailPassword }}>
       {children}
     </AuthContext.Provider>
   )
