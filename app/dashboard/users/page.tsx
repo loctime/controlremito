@@ -134,8 +134,8 @@ function UsersContent() {
       console.error("[v0] Error al guardar usuario:", error)
 
       let errorMessage = "No se pudo guardar el usuario"
-      if (error.code === "auth/email-already-in-use") {
-        errorMessage = "Este correo electrónico ya está en uso"
+      if (error.message === "auth/email-already-exists-wrong-password") {
+        errorMessage = "Este email ya existe en Firebase Auth pero la contraseña proporcionada es incorrecta. Usa la contraseña correcta del usuario existente para crear su perfil en esta app."
       } else if (error.code === "auth/invalid-email") {
         errorMessage = "El correo electrónico no es válido"
       } else if (error.code === "auth/weak-password") {
@@ -293,7 +293,9 @@ function UsersContent() {
                       required
                       minLength={6}
                     />
-                    <p className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
+                    <p className="text-xs text-muted-foreground">
+                      Mínimo 6 caracteres. Si el email ya existe en Firebase Auth (de otra app), usa la contraseña correcta del usuario existente.
+                    </p>
                   </div>
                 )}
                 <div className="space-y-2">
