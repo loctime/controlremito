@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
@@ -10,16 +10,28 @@ import { Package } from "lucide-react"
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
-  const { signInWithGoogle } = useAuth()
+  const { signInWithGoogle, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+
+  // Redirigir si el usuario ya está autenticado
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/dashboard")
+    }
+  }, [user, authLoading, router])
 
   const handleGoogleSignIn = async () => {
     setLoading(true)
 
     try {
       await signInWithGoogle()
-      router.push("/dashboard")
+      
+      // Esperar un momento para que Firestore cargue los datos del usuario
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      // Si después de esperar no tenemos user data, mostrar error
+      // La redirección al dashboard se manejará en el useEffect si es exitoso
     } catch (error) {
       console.error("[v0] Error al iniciar sesión con Google:", error)
       toast({
@@ -27,7 +39,6 @@ export default function LoginPage() {
         description: "No se pudo iniciar sesión con Google. Por favor, intenta de nuevo.",
         variant: "destructive",
       })
-    } finally {
       setLoading(false)
     }
   }
@@ -40,7 +51,9 @@ export default function LoginPage() {
             <Package className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl">Control de Remitos</CardTitle>
-          <CardDescription>Inicia sesión con tu cuenta de Google para acceder al sistema</CardDescription>
+          <CardDescription>
+            Inicia sesión con tu cuenta de Google. Solo usuarios autorizados pueden acceder.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Button onClick={handleGoogleSignIn} className="w-full" disabled={loading} size="lg">

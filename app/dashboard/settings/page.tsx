@@ -134,7 +134,7 @@ function SettingsContent() {
   const filteredBranches = branches.filter((branch) => branch.name.toLowerCase().includes(searchTerm.toLowerCase()))
 
   return (
-    <ProtectedRoute allowedRoles={["admin"]}>
+    <ProtectedRoute allowedRoles={["admin", "maxdev"]}>
       <div>
         <div className="mb-6">
           <h2 className="text-2xl font-bold">Configuración</h2>

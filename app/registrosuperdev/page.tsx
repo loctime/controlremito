@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
@@ -16,9 +16,17 @@ export default function RegistroSuperDevPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [name, setName] = useState("")
   const [loading, setLoading] = useState(false)
-  const { registerWithEmailPassword, signInWithGoogleAndRole } = useAuth()
+  const { registerWithEmailPassword, signInWithGoogleAndRole, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
+
+  // Si el usuario ya está autenticado y tiene datos en Firestore, redirigir al dashboard
+  useEffect(() => {
+    if (!authLoading && user) {
+      console.log("[Registro] Usuario ya registrado, redirigiendo al dashboard")
+      router.push("/dashboard")
+    }
+  }, [user, authLoading, router])
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,18 +95,26 @@ export default function RegistroSuperDevPage() {
     setLoading(true)
 
     try {
+      console.log("[Registro] Iniciando registro de maxdev con Google")
       await signInWithGoogleAndRole("maxdev")
+      
       toast({
         title: "¡Registro exitoso!",
         description: "Tu cuenta de desarrollador ha sido creada con Google",
       })
-      router.push("/dashboard")
+      
+      // No necesitamos redirigir manualmente, el useEffect lo hará cuando detecte el usuario
     } catch (error: any) {
       console.error("[v0] Error al registrar con Google:", error)
       
+      let errorMessage = "No se pudo crear la cuenta con Google."
+      if (error.code === "permission-denied" || error.message?.includes("permissions")) {
+        errorMessage = "Error de permisos. Si ya iniciaste sesión antes, cierra todas las pestañas y vuelve a intentarlo."
+      }
+      
       toast({
         title: "Error",
-        description: "No se pudo crear la cuenta con Google. Por favor, intenta de nuevo.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {

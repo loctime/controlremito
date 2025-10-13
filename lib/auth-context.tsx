@@ -22,6 +22,7 @@ interface AuthContextType {
   signInWithGoogleAndRole: (role: string) => Promise<void>
   signOut: () => Promise<void>
   registerWithEmailPassword: (email: string, password: string, name: string, role: string) => Promise<void>
+  createUser: (email: string, password: string, userData: Partial<User>) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -66,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (!userDoc.exists()) {
       // Crear documento de usuario en Firestore con el rol especificado
+      console.log("[Auth] Creando nuevo documento para usuario:", user.email, "con rol:", role)
       await setDoc(doc(db, "apps/controld/users", user.uid), {
         email: user.email,
         name: user.displayName || user.email?.split("@")[0] || "Usuario",
@@ -73,6 +75,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         createdAt: serverTimestamp(),
         active: true,
       })
+    } else {
+      // Usuario ya existe, actualizar solo si está inactivo o sin rol definido
+      const userData = userDoc.data()
+      if (!userData.active || !userData.role) {
+        console.log("[Auth] Actualizando usuario existente:", user.email, "con rol:", role)
+        await setDoc(doc(db, "apps/controld/users", user.uid), {
+          email: user.email,
+          name: user.displayName || userData.name || user.email?.split("@")[0] || "Usuario",
+          role,
+          createdAt: userData.createdAt || serverTimestamp(),
+          active: true,
+        }, { merge: true })
+      } else {
+        console.log("[Auth] Usuario ya existe y está activo en Firestore:", user.email)
+      }
     }
   }
 
@@ -95,8 +112,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
+  const createUser = async (email: string, password: string, userData: Partial<User>) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+    const newUser = userCredential.user
+
+    // Crear documento de usuario en Firestore con todos los datos proporcionados
+    await setDoc(doc(db, "apps/controld/users", newUser.uid), {
+      email: newUser.email,
+      name: userData.name || "",
+      role: userData.role || "branch",
+      branchId: userData.branchId || null,
+      createdAt: serverTimestamp(),
+      active: userData.active !== undefined ? userData.active : true,
+    })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signInWithGoogle, signInWithGoogleAndRole, signOut, registerWithEmailPassword }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signInWithGoogle, signInWithGoogleAndRole, signOut, registerWithEmailPassword, createUser }}>
       {children}
     </AuthContext.Provider>
   )

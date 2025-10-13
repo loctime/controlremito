@@ -202,7 +202,7 @@ function TemplatesContent() {
   )
 
   return (
-    <ProtectedRoute allowedRoles={["admin", "factory", "branch"]}>
+    <ProtectedRoute allowedRoles={["admin", "factory", "branch", "maxdev"]}>
       <div>
         <div className="mb-6 flex items-center justify-between">
           <div>

@@ -208,7 +208,7 @@ function NewOrderContent() {
   }
 
   return (
-    <ProtectedRoute allowedRoles={["branch", "factory"]}>
+    <ProtectedRoute allowedRoles={["branch", "factory", "maxdev"]}>
       <div>
         <div className="mb-6">
           <Link href="/dashboard/orders">

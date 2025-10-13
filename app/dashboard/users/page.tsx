@@ -35,11 +35,17 @@ function UsersContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    email: string
+    password: string
+    name: string
+    role: "admin" | "factory" | "branch" | "delivery"
+    branchId: string
+  }>({
     email: "",
     password: "",
     name: "",
-    role: "branch" as "admin" | "factory" | "branch" | "delivery",
+    role: "branch",
     branchId: "",
   })
 
@@ -147,18 +153,39 @@ function UsersContent() {
   }
 
   const handleEdit = (user: User) => {
+    // Prevenir edición de usuarios maxdev
+    if (user.role === "maxdev") {
+      toast({
+        title: "Acción no permitida",
+        description: "Los usuarios maxdev no pueden ser editados",
+        variant: "destructive",
+      })
+      return
+    }
+
     setEditingUser(user)
     setFormData({
       email: user.email,
       password: "",
       name: user.name,
-      role: user.role,
+      role: user.role as "admin" | "factory" | "branch" | "delivery",
       branchId: user.branchId || "",
     })
     setIsDialogOpen(true)
   }
 
   const handleDelete = async (userId: string) => {
+    // Prevenir eliminación de usuarios maxdev
+    const userToDelete = users.find((u) => u.id === userId)
+    if (userToDelete?.role === "maxdev") {
+      toast({
+        title: "Acción no permitida",
+        description: "Los usuarios maxdev no pueden ser eliminados",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return
 
     try {
@@ -184,6 +211,7 @@ function UsersContent() {
       factory: "Fábrica",
       branch: "Sucursal",
       delivery: "Delivery",
+      maxdev: "Super Admin",
     }
     return labels[role as keyof typeof labels] || role
   }
@@ -194,6 +222,7 @@ function UsersContent() {
       factory: "secondary" as const,
       branch: "secondary" as const,
       delivery: "secondary" as const,
+      maxdev: "default" as const,
     }
     return variants[role as keyof typeof variants] || ("secondary" as const)
   }
@@ -205,7 +234,7 @@ function UsersContent() {
   )
 
   return (
-    <ProtectedRoute allowedRoles={["admin"]}>
+    <ProtectedRoute allowedRoles={["admin", "maxdev"]}>
       <div>
         <div className="mb-6 flex items-center justify-between">
           <div>
@@ -360,10 +389,12 @@ function UsersContent() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(user)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          {user.id !== currentUser?.id && (
+                          {user.role !== "maxdev" && (
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(user)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {user.id !== currentUser?.id && user.role !== "maxdev" && (
                             <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id)}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
