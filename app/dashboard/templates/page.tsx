@@ -46,6 +46,7 @@ function TemplatesContent() {
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false)
   const [productSearchTerm, setProductSearchTerm] = useState("")
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     fetchTemplates()
@@ -75,6 +76,48 @@ function TemplatesContent() {
         description: "No se pudieron cargar las plantillas",
         variant: "destructive",
       })
+    }
+  }
+
+  const updateExistingTemplates = async () => {
+    try {
+      setUpdating(true)
+      let updatedCount = 0
+      
+      for (const template of templates) {
+        // Verificar si la plantilla necesita actualización
+        if (!template.destinationBranchIds || !template.allowedSendDays) {
+          const updateData: Partial<Template> = {
+            destinationBranchIds: template.destinationBranchIds || [],
+            allowedSendDays: template.allowedSendDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+          }
+          
+          await updateDoc(doc(db, "apps/controld/templates", template.id), updateData)
+          updatedCount++
+        }
+      }
+      
+      if (updatedCount > 0) {
+        toast({
+          title: "Plantillas actualizadas",
+          description: `Se actualizaron ${updatedCount} plantillas`,
+        })
+        fetchTemplates()
+      } else {
+        toast({
+          title: "Sin actualizaciones",
+          description: "Todas las plantillas ya están actualizadas",
+        })
+      }
+    } catch (error) {
+      console.error("[v0] Error al actualizar plantillas:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron actualizar las plantillas",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -287,335 +330,307 @@ function TemplatesContent() {
             <h2 className="text-2xl font-bold">Plantillas de Pedidos</h2>
             <p className="text-muted-foreground">Crea plantillas para agilizar la creación de pedidos</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => {
-                  setEditingTemplate(null)
-                  setFormData({ name: "", description: "", items: [], destinationBranchIds: [], allowedSendDays: [] })
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Nueva Plantilla
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{editingTemplate ? "Editar Plantilla" : "Nueva Plantilla"}</DialogTitle>
-                <DialogDescription>
-                  {editingTemplate ? "Modifica los datos de la plantilla" : "Completa los datos de la nueva plantilla"}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nombre *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descripción</Label>
-                  <Input
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Destinos *</Label>
-                  <Select
-                    value=""
-                    onValueChange={(branchId) => {
-                      if (branchId && !formData.destinationBranchIds.includes(branchId)) {
-                        setFormData({
-                          ...formData,
-                          destinationBranchIds: [...formData.destinationBranchIds, branchId]
-                        })
-                      }
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches
-                        .filter(branch => !formData.destinationBranchIds.includes(branch.id))
-                        .map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {formData.destinationBranchIds.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.destinationBranchIds.map((branchId) => {
-                        const branch = branches.find(b => b.id === branchId)
-                        return branch ? (
-                          <div key={branchId} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-md text-sm">
-                            {branch.name}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData({
-                                  ...formData,
-                                  destinationBranchIds: formData.destinationBranchIds.filter(id => id !== branchId)
-                                })
-                              }}
-                              className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        ) : null
-                      })}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={updateExistingTemplates}
+              disabled={updating}
+              className="text-xs"
+            >
+              {updating ? "Actualizando..." : "Actualizar plantillas"}
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => setEditingTemplate(null)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nueva plantilla
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingTemplate ? "Editar plantilla" : "Nueva plantilla"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {editingTemplate 
+                      ? "Modifica los datos de la plantilla"
+                      : "Completa los datos para crear una nueva plantilla"
+                    }
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Nombre *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Nombre de la plantilla"
+                        required
+                      />
                     </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Días de envío permitidos *</Label>
-                  <DaySelector
-                    selectedDays={formData.allowedSendDays}
-                    onChange={(days) => setFormData({ ...formData, allowedSendDays: days })}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Productos ({formData.items.length})</Label>
-                    <Dialog open={isProductSelectorOpen} onOpenChange={setIsProductSelectorOpen}>
-                      <DialogTrigger asChild>
-                        <Button type="button" variant="outline" size="sm" onClick={openProductSelector}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Agregar producto
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-                        <DialogHeader>
-                          <DialogTitle>Seleccionar Productos</DialogTitle>
-                          <DialogDescription>
-                            Selecciona los productos para incluir en la plantilla ({selectedProductIds.size} seleccionados)
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-                          {/* Buscador */}
-                          <div className="relative">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            <Input
-                              placeholder="Buscar por nombre o SKU..."
-                              value={productSearchTerm}
-                              onChange={(e) => setProductSearchTerm(e.target.value)}
-                              className="pl-9"
-                              autoFocus
-                            />
-                          </div>
-
-                          {/* Tabla de productos */}
-                          <div className="border rounded-md overflow-hidden flex-1 flex flex-col">
-                            <div className="overflow-y-auto flex-1">
-                              <Table>
-                                <TableHeader className="sticky top-0 bg-background z-10">
-                                  <TableRow>
-                                    <TableHead className="w-12"></TableHead>
-                                    <TableHead>Nombre</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {filteredProducts.length === 0 ? (
-                                    <TableRow>
-                                      <TableCell colSpan={2} className="text-center text-muted-foreground h-32">
-                                        {productSearchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
-                                      </TableCell>
-                                    </TableRow>
-                                  ) : (
-                                    filteredProducts.map((product) => {
-                                      const isSelected = selectedProductIds.has(product.id)
-                                      return (
-                                        <TableRow
-                                          key={product.id}
-                                          className={`cursor-pointer ${isSelected ? "bg-muted/50" : ""}`}
-                                          onClick={() => toggleProduct(product.id)}
-                                        >
-                                          <TableCell className="py-4">
-                                            <div className="flex items-center justify-center">
-                                              <Checkbox
-                                                checked={isSelected}
-                                                onCheckedChange={() => toggleProduct(product.id)}
-                                                className="h-6 w-6"
-                                              />
-                                            </div>
-                                          </TableCell>
-                                          <TableCell className="py-4">
-                                            <div>
-                                              <div className="font-medium text-base">{product.name}</div>
-                                              <div className="text-sm text-muted-foreground mt-1">
-                                                {product.sku && <span>SKU: {product.sku} • </span>}
-                                                <span>{product.unit}</span>
-                                              </div>
-                                            </div>
-                                          </TableCell>
-                                        </TableRow>
-                                      )
-                                    })
-                                  )}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </div>
-
-                          {/* Botones de acción */}
-                          <div className="flex justify-end gap-2 border-t pt-4">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setIsProductSelectorOpen(false)}
-                            >
-                              Cancelar
-                            </Button>
-                            <Button
-                              type="button"
-                              onClick={addSelectedProductsToTemplate}
-                              disabled={selectedProductIds.size === 0}
-                            >
-                              Agregar {selectedProductIds.size > 0 && `(${selectedProductIds.size})`}
-                            </Button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                    <div className="space-y-2">
+                      <Label htmlFor="description">Descripción</Label>
+                      <Input
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        placeholder="Descripción opcional"
+                      />
+                    </div>
                   </div>
 
-                  {/* Lista de productos agregados */}
-                  {formData.items.length === 0 ? (
-                    <div className="border rounded-md p-8 text-center text-muted-foreground text-sm">
-                      No hay productos en esta plantilla. Haz clic en "Agregar producto" para comenzar.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {formData.items.map((item, index) => (
-                        <div key={index} className="flex items-center gap-2 border rounded-md p-3">
-                          <div className="flex-1">
-                            <div className="font-medium">{item.productName}</div>
-                            <div className="text-sm text-muted-foreground">
-                              Cantidad: {item.quantity} {item.unit}
-                            </div>
-                          </div>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
-                            <X className="h-4 w-4 text-destructive" />
-                          </Button>
+                  <div className="space-y-2">
+                    <Label>Destinos permitidos *</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-32 overflow-y-auto border rounded p-2">
+                      {branches.map((branch) => (
+                        <div key={branch.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`branch-${branch.id}`}
+                            checked={formData.destinationBranchIds.includes(branch.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setFormData({
+                                  ...formData,
+                                  destinationBranchIds: [...formData.destinationBranchIds, branch.id],
+                                })
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  destinationBranchIds: formData.destinationBranchIds.filter(id => id !== branch.id),
+                                })
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`branch-${branch.id}`} className="text-sm">
+                            {branch.name}
+                          </Label>
                         </div>
                       ))}
                     </div>
-                  )}
-                </div>
+                  </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit">{editingTemplate ? "Actualizar" : "Crear"}</Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="space-y-2">
+                    <Label>Días de envío permitidos *</Label>
+                    <DaySelector
+                      selectedDays={formData.allowedSendDays}
+                      onChange={(days: DayOfWeek[]) => setFormData({ ...formData, allowedSendDays: days })}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Productos *</Label>
+                      <Button type="button" variant="outline" size="sm" onClick={openProductSelector}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Agregar productos
+                      </Button>
+                    </div>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {formData.items.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          No hay productos agregados
+                        </p>
+                      ) : (
+                        formData.items.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 border rounded">
+                            <span className="text-sm">{item.productName} - Cantidad: {item.quantity}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeItem(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit">
+                      {editingTemplate ? "Actualizar" : "Crear"} plantilla
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar plantillas..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+            <Input
+              placeholder="Buscar plantillas..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          {filteredTemplates.map((template) => (
+            <Card key={template.id}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg">{template.name}</CardTitle>
+                    <CardDescription>{template.description}</CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(template)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(template.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Productos ({template.items.length})</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {template.items.map((item, index) => (
+                        <div key={index} className="text-sm text-muted-foreground">
+                          {item.productName} - Cantidad: {item.quantity}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Destinos permitidos</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {template.destinationBranchIds?.map((branchId) => {
+                        const branch = branches.find(b => b.id === branchId)
+                        return (
+                          <span key={branchId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                            {branch?.name || branchId}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-medium mb-2">Días de envío</h4>
+                    <div className="flex flex-wrap gap-1">
+                      {template.allowedSendDays?.map((day) => (
+                        <span key={day} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
+                          {day === 'monday' ? 'Lunes' :
+                           day === 'tuesday' ? 'Martes' :
+                           day === 'wednesday' ? 'Miércoles' :
+                           day === 'thursday' ? 'Jueves' :
+                           day === 'friday' ? 'Viernes' :
+                           day === 'saturday' ? 'Sábado' :
+                           day === 'sunday' ? 'Domingo' : day}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {filteredTemplates.length === 0 && (
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">
+                {searchTerm ? "No se encontraron plantillas que coincidan con la búsqueda" : "No hay plantillas creadas"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Dialog para seleccionar productos */}
+      <Dialog open={isProductSelectorOpen} onOpenChange={setIsProductSelectorOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Seleccionar productos</DialogTitle>
+            <DialogDescription>
+              Selecciona los productos que quieres incluir en la plantilla
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar productos..."
+                value={productSearchTerm}
+                onChange={(e) => setProductSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <div className="max-h-96 overflow-y-auto border rounded">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Seleccionar</TableHead>
+                    <TableHead>Producto</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead>Unidad</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredProducts.map((product) => (
+                    <TableRow key={product.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedProductIds.has(product.id)}
+                          onCheckedChange={() => toggleProduct(product.id)}
+                        />
+                      </TableCell>
+                      <TableCell>{product.name}</TableCell>
+                      <TableCell>{product.sku || "-"}</TableCell>
+                      <TableCell>{product.unit}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">
+                {selectedProductIds.size} productos seleccionados
+              </span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsProductSelectorOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={addSelectedProductsToTemplate}>
+                  Agregar productos
+                </Button>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              {filteredTemplates.length === 0 ? (
-                <p className="col-span-2 text-center text-muted-foreground">No hay plantillas disponibles</p>
-              ) : (
-                filteredTemplates.map((template) => (
-                  <Card key={template.id}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{template.name}</CardTitle>
-                          {template.description && (
-                            <CardDescription className="mt-1">{template.description}</CardDescription>
-                          )}
-                        </div>
-                        <div className="flex gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(template)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(template.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">Productos ({template.items.length}):</p>
-                        <ul className="space-y-1 text-sm text-muted-foreground">
-                          {template.items.map((item, index) => (
-                            <li key={index}>
-                              • {item.productName} ({item.quantity} {item.unit})
-                            </li>
-                          ))}
-                        </ul>
-                        {template.destinationBranchIds && template.destinationBranchIds.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium">Destinos:</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {template.destinationBranchIds.map((branchId) => {
-                                const branch = branches.find(b => b.id === branchId)
-                                return branch ? (
-                                  <span key={branchId} className="text-xs bg-muted px-2 py-1 rounded">
-                                    {branch.name}
-                                  </span>
-                                ) : null
-                              })}
-                            </div>
-                          </div>
-                        )}
-                        {template.allowedSendDays && template.allowedSendDays.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium">Días de envío:</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {template.allowedSendDays.map((day) => (
-                                <span key={day} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                                  {day === 'monday' ? 'Lun' : 
-                                   day === 'tuesday' ? 'Mar' :
-                                   day === 'wednesday' ? 'Mié' :
-                                   day === 'thursday' ? 'Jue' :
-                                   day === 'friday' ? 'Vie' :
-                                   day === 'saturday' ? 'Sáb' : 'Dom'}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   )
 }

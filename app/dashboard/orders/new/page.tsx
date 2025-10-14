@@ -15,7 +15,7 @@ import { collection, addDoc, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Branch, Product, Template, DayOfWeek } from "@/lib/types"
-import { isDayAllowed, getNextAllowedDay } from "@/lib/utils"
+import { isDayAllowed, getNextAllowedDay, formatDayOfWeek } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
@@ -47,10 +47,10 @@ function NewOrderContent() {
   // Cargar plantilla automáticamente si hay parámetro en URL
   useEffect(() => {
     const templateId = searchParams.get('template')
-    if (templateId && templates.length > 0) {
+    if (templateId && templates.length > 0 && !formData.templateId) {
       loadTemplate(templateId)
     }
-  }, [searchParams, templates])
+  }, [searchParams, templates, formData.templateId])
 
   const fetchBranches = async () => {
     try {
@@ -106,40 +106,86 @@ function NewOrderContent() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("🚀 [DEBUG] handleSubmit ejecutándose...")
     e.preventDefault()
+    console.log("✅ [DEBUG] Evento preventDefault ejecutado")
 
+    // Validaciones más detalladas
     if (!user || !user.branchId) {
+      console.log("❌ [DEBUG] Error: Usuario o branchId faltante", { user: user?.id, branchId: user?.branchId })
       toast({
-        title: "Error",
-        description: "No se pudo identificar tu sucursal",
+        title: "Error de autenticación",
+        description: "No se pudo identificar tu sucursal. Por favor, cierra sesión y vuelve a iniciar sesión.",
         variant: "destructive",
       })
       return
     }
+    console.log("✅ [DEBUG] Validación de usuario pasada")
+
+    if (!formData.toBranchId) {
+      console.log("❌ [DEBUG] Error: Destino no seleccionado")
+      toast({
+        title: "Destino requerido",
+        description: "Debes seleccionar un destino para el pedido",
+        variant: "destructive",
+      })
+      return
+    }
+    console.log("✅ [DEBUG] Validación de destino pasada")
 
     if (formData.items.length === 0) {
+      console.log("❌ [DEBUG] Error: No hay items")
       toast({
-        title: "Error",
-        description: "Debes agregar al menos un producto",
+        title: "Productos requeridos",
+        description: "Debes agregar al menos un producto al pedido",
+        variant: "destructive",
+      })
+      return
+    }
+    console.log("✅ [DEBUG] Validación de items pasada")
+
+    // Validar que todos los items tengan producto seleccionado
+    const itemsWithoutProduct = formData.items.filter(item => !item.productId || !item.productName)
+    if (itemsWithoutProduct.length > 0) {
+      toast({
+        title: "Productos incompletos",
+        description: "Todos los productos deben estar completamente seleccionados",
         variant: "destructive",
       })
       return
     }
 
+    // Validar cantidades
+    const itemsWithInvalidQuantity = formData.items.filter(item => !item.quantity || item.quantity <= 0)
+    if (itemsWithInvalidQuantity.length > 0) {
+      toast({
+        title: "Cantidades inválidas",
+        description: "Todas las cantidades deben ser mayores a 0",
+        variant: "destructive",
+      })
+      return
+    }
+
+    console.log("🎯 [DEBUG] Todas las validaciones pasadas, iniciando creación...")
     setLoading(true)
 
     try {
+      console.log("🔍 [DEBUG] Buscando sucursales...")
       const fromBranch = allBranches.find((b) => b.id === user.branchId)
       const toBranch = allBranches.find((b) => b.id === formData.toBranchId)
 
-      if (!fromBranch || !toBranch) {
-        throw new Error("No se encontraron las sucursales")
+      if (!fromBranch) {
+        throw new Error(`No se encontró la sucursal de origen (ID: ${user.branchId})`)
+      }
+
+      if (!toBranch) {
+        throw new Error(`No se encontró la sucursal de destino (ID: ${formData.toBranchId})`)
       }
 
       // Generar número de pedido
       const orderNumber = `PED-${Date.now()}`
 
-      const orderData = {
+      const orderData: any = {
         orderNumber,
         fromBranchId: user.branchId,
         fromBranchName: fromBranch.name,
@@ -155,23 +201,61 @@ function NewOrderContent() {
         createdBy: user.id,
         createdByName: user.name,
         notes: formData.notes,
-        templateId: formData.templateId || undefined,
         allowedSendDays: formData.allowedSendDays,
       }
 
-      await addDoc(collection(db, "apps/controld/orders"), orderData)
+      // Solo agregar templateId si tiene un valor válido
+      if (formData.templateId) {
+        orderData.templateId = formData.templateId
+      }
+
+      console.log("📋 [DEBUG] Datos del pedido preparados:", orderData)
+      console.log("🔥 [DEBUG] Intentando conectar con Firestore...")
+      
+      const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+      
+      console.log("✅ [DEBUG] Documento creado exitosamente con ID:", docRef.id)
 
       toast({
-        title: "Pedido creado",
-        description: `El pedido ${orderNumber} se creó correctamente`,
+        title: "✅ Pedido creado exitosamente",
+        description: `El pedido ${orderNumber} se creó correctamente y se redirigirá a la lista de pedidos`,
       })
 
-      router.push("/dashboard/orders")
-    } catch (error) {
-      console.error("[v0] Error al crear pedido:", error)
+      // Pequeña pausa para que el usuario vea el mensaje de éxito
+      setTimeout(() => {
+        router.push("/dashboard/orders")
+      }, 1500)
+    } catch (error: any) {
+      console.error("❌ [DEBUG] Error detallado al crear pedido:", error)
+      console.error("🔍 [DEBUG] Código de error:", error.code)
+      console.error("📝 [DEBUG] Mensaje de error:", error.message)
+      console.error("📊 [DEBUG] Stack trace:", error.stack)
+      
+      let errorMessage = "No se pudo crear el pedido"
+      
+      // Mensajes de error más específicos
+      if (error.code === "permission-denied") {
+        errorMessage = "No tienes permisos para crear pedidos. Contacta al administrador."
+      } else if (error.code === "unavailable") {
+        errorMessage = "Servicio temporalmente no disponible. Intenta de nuevo en unos minutos."
+      } else if (error.code === "failed-precondition") {
+        errorMessage = "Los datos del pedido no son válidos. Verifica la información e intenta de nuevo."
+      } else if (error.code === "invalid-argument") {
+        if (error.message?.includes("undefined")) {
+          errorMessage = "Error en los datos del pedido. Por favor, recarga la página e intenta de nuevo."
+        } else {
+          errorMessage = "Los datos del pedido no son válidos. Verifica la información e intenta de nuevo."
+        }
+      } else if (error.message?.includes("blocked")) {
+        errorMessage = "Conexión bloqueada. Desactiva el bloqueador de anuncios o verifica tu conexión a internet."
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      console.log("💬 [DEBUG] Mostrando toast con mensaje:", errorMessage)
       toast({
-        title: "Error",
-        description: "No se pudo crear el pedido",
+        title: "❌ Error al crear pedido",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -204,6 +288,8 @@ function NewOrderContent() {
           productName: product.name,
           unit: product.unit,
         }
+      } else {
+        console.warn(`[v0] Producto no encontrado con ID: ${value}`)
       }
     } else {
       newItems[index] = { ...newItems[index], [field]: value }
@@ -214,15 +300,58 @@ function NewOrderContent() {
   const loadTemplate = (templateId: string) => {
     const template = templates.find((t) => t.id === templateId)
     if (template) {
-      setFormData({
-        ...formData,
-        items: template.items.map((item) => ({ ...item })),
-        templateId: template.id,
-        allowedSendDays: template.allowedSendDays || [],
-      })
+      try {
+        // Validar que la plantilla tenga items
+        if (!template.items || template.items.length === 0) {
+          toast({
+            title: "Plantilla vacía",
+            description: "La plantilla seleccionada no tiene productos",
+            variant: "destructive",
+          })
+          return
+        }
+
+        // Validar que los productos de la plantilla existan
+        const validItems = template.items.filter(item => {
+          const productExists = products.find(p => p.id === item.productId)
+          if (!productExists) {
+            console.warn(`[v0] Producto de plantilla no encontrado: ${item.productId}`)
+          }
+          return productExists
+        })
+
+        if (validItems.length !== template.items.length) {
+          toast({
+            title: "Advertencia",
+            description: `Se cargaron ${validItems.length} de ${template.items.length} productos. Algunos productos de la plantilla no están disponibles.`,
+            variant: "destructive",
+          })
+        }
+
+        setFormData({
+          ...formData,
+          items: validItems.map((item) => ({ ...item })),
+          templateId: template.id,
+          allowedSendDays: [], // Siempre empezar con array vacío para evitar errores
+        })
+        
+        toast({
+          title: "✅ Plantilla cargada",
+          description: `Se cargaron ${validItems.length} productos de la plantilla "${template.name}"`,
+        })
+      } catch (error) {
+        console.error("[v0] Error al cargar plantilla:", error)
+        toast({
+          title: "Error al cargar plantilla",
+          description: "Ocurrió un error al procesar la plantilla",
+          variant: "destructive",
+        })
+      }
+    } else {
       toast({
-        title: "Plantilla cargada",
-        description: `Se cargaron ${template.items.length} productos`,
+        title: "Plantilla no encontrada",
+        description: "La plantilla seleccionada no existe o no tienes permisos para acceder a ella",
+        variant: "destructive",
       })
     }
   }
@@ -248,39 +377,30 @@ function NewOrderContent() {
               <CardDescription>Completa los datos básicos del pedido</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {!formData.templateId ? (
-                <div className="space-y-2">
-                  <Label htmlFor="toBranchId">Destino *</Label>
-                  <Select
-                    value={formData.toBranchId}
-                    onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="toBranchId">Destino *</Label>
-                  <Select
-                    value={formData.toBranchId}
-                    onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar destino" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
+              <div className="space-y-2">
+                <Label htmlFor="toBranchId" className="text-sm font-medium">
+                  Destino <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.toBranchId}
+                  onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
+                >
+                  <SelectTrigger className={!formData.toBranchId ? "border-red-300 focus:border-red-500" : ""}>
+                    <SelectValue placeholder="Seleccionar destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      if (formData.templateId) {
                         const template = templates.find(t => t.id === formData.templateId)
                         const availableDestinations = template?.destinationBranchIds || []
+                        if (availableDestinations.length === 0) {
+                          // Si la plantilla no tiene destinos configurados, mostrar todos
+                          return branches.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
+                            </SelectItem>
+                          ))
+                        }
                         return branches
                           .filter(branch => availableDestinations.includes(branch.id))
                           .map((branch) => (
@@ -288,39 +408,19 @@ function NewOrderContent() {
                               {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
                             </SelectItem>
                           ))
-                      })()}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                      } else {
+                        // Sin plantilla, mostrar todos los destinos
+                        return branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
+                          </SelectItem>
+                        ))
+                      }
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              {formData.allowedSendDays.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Información de envío</Label>
-                  <div className="bg-muted/50 p-3 rounded-md">
-                    <div className="text-sm">
-                      <p className="font-medium mb-1">Días permitidos para envío:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {formData.allowedSendDays.map((day) => (
-                          <span key={day} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                            {day === 'monday' ? 'Lunes' : 
-                             day === 'tuesday' ? 'Martes' :
-                             day === 'wednesday' ? 'Miércoles' :
-                             day === 'thursday' ? 'Jueves' :
-                             day === 'friday' ? 'Viernes' :
-                             day === 'saturday' ? 'Sábado' : 'Domingo'}
-                          </span>
-                        ))}
-                      </div>
-                      {!isDayAllowed(formData.allowedSendDays) && (
-                        <p className="text-orange-600 mt-2 text-xs">
-                          ⚠️ Hoy no es un día permitido. Próximo envío: {getNextAllowedDay(formData.allowedSendDays)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas / Observaciones</Label>
@@ -375,35 +475,58 @@ function NewOrderContent() {
                   </p>
                 ) : (
                   formData.items.map((item, index) => (
-                    <div key={index} className="space-y-2 sm:space-y-0">
+                    <div key={index} className="space-y-2 sm:space-y-0 p-3 border rounded-lg bg-gray-50">
                       <div className="flex flex-col sm:flex-row gap-2">
-                        <Select value={item.productId} onValueChange={(value) => updateItem(index, "productId", value)}>
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Seleccionar producto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.unit})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex-1">
+                          <Label className="text-xs text-gray-600 mb-1 block">
+                            Producto <span className="text-red-500">*</span>
+                          </Label>
+                          <Select value={item.productId} onValueChange={(value) => updateItem(index, "productId", value)}>
+                            <SelectTrigger className={!item.productId ? "border-red-300 focus:border-red-500" : ""}>
+                              <SelectValue placeholder="Seleccionar producto" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {products.map((product) => (
+                                <SelectItem key={product.id} value={product.id}>
+                                  {product.name} ({product.unit})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            min="1"
-                            placeholder="Cantidad"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                            className="w-24 sm:w-32"
-                            required
-                          />
-                          <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
-                            <X className="h-4 w-4" />
-                          </Button>
+                          <div>
+                            <Label className="text-xs text-gray-600 mb-1 block">
+                              Cantidad <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              placeholder="Cantidad"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
+                              className={`w-24 sm:w-32 ${(!item.quantity || item.quantity <= 0) ? "border-red-300 focus:border-red-500" : ""}`}
+                              required
+                            />
+                          </div>
+                          <div className="flex items-end">
+                            <Button 
+                              type="button" 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => removeItem(index)}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
+                      {item.productName && (
+                        <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          ✓ {item.productName} - Cantidad: {item.quantity} {item.unit}
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -417,10 +540,30 @@ function NewOrderContent() {
                 Cancelar
               </Button>
             </Link>
-            <Button type="submit" disabled={loading || !formData.toBranchId || formData.items.length === 0} className="w-full sm:w-auto">
-              {loading ? "Creando..." : "Crear pedido"}
+            <Button 
+              type="submit" 
+              disabled={loading || !formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || !item.quantity || item.quantity <= 0)} 
+              className="w-full sm:w-auto"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creando pedido...
+                </>
+              ) : (
+                <>
+                  ✅ Crear pedido
+                </>
+              )}
             </Button>
           </div>
+          
+          {/* Indicador de validación */}
+          {(!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || !item.quantity || item.quantity <= 0)) && (
+            <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+              ⚠️ Completa todos los campos requeridos antes de crear el pedido
+            </div>
+          )}
         </form>
       </div>
     </ProtectedRoute>
