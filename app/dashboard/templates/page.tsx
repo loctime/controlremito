@@ -20,23 +20,28 @@ import { useEffect, useState } from "react"
 import { collection, addDoc, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
-import type { Template, Product } from "@/lib/types"
+import type { Template, Product, Branch, DayOfWeek } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { DaySelector } from "@/components/day-selector"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 function TemplatesContent() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [templates, setTemplates] = useState<Template[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    items: [] as { productId: string; productName: string; unit: string }[],
+    items: [] as { productId: string; productName: string; unit: string; quantity: number }[],
+    destinationBranchIds: [] as string[],
+    allowedSendDays: [] as DayOfWeek[],
   })
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false)
   const [productSearchTerm, setProductSearchTerm] = useState("")
@@ -45,6 +50,7 @@ function TemplatesContent() {
   useEffect(() => {
     fetchTemplates()
     fetchProducts()
+    fetchBranches()
   }, [user])
 
   const fetchTemplates = async () => {
@@ -83,6 +89,17 @@ function TemplatesContent() {
     }
   }
 
+  const fetchBranches = async () => {
+    try {
+      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
+      const snapshot = await getDocs(q)
+      const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
+      setBranches(branchesData)
+    } catch (error) {
+      console.error("[v0] Error al cargar sucursales:", error)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -97,11 +114,31 @@ function TemplatesContent() {
       return
     }
 
+    if (formData.destinationBranchIds.length === 0) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar al menos un destino",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (formData.allowedSendDays.length === 0) {
+      toast({
+        title: "Error",
+        description: "Debes seleccionar al menos un día de envío",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       const templateData = {
         name: formData.name,
         description: formData.description,
         items: formData.items,
+        destinationBranchIds: formData.destinationBranchIds,
+        allowedSendDays: formData.allowedSendDays,
         createdBy: user.id,
         createdByName: user.name,
         branchId: user.role === "admin" || user.role === "maxdev" ? null : (user.branchId || null),
@@ -127,7 +164,7 @@ function TemplatesContent() {
 
       setIsDialogOpen(false)
       setEditingTemplate(null)
-      setFormData({ name: "", description: "", items: [] })
+      setFormData({ name: "", description: "", items: [], destinationBranchIds: [], allowedSendDays: [] })
       fetchTemplates()
     } catch (error) {
       console.error("[v0] Error al guardar plantilla:", error)
@@ -145,6 +182,8 @@ function TemplatesContent() {
       name: template.name,
       description: template.description || "",
       items: template.items,
+      destinationBranchIds: template.destinationBranchIds || [],
+      allowedSendDays: template.allowedSendDays || [],
     })
     setIsDialogOpen(true)
   }
@@ -206,6 +245,7 @@ function TemplatesContent() {
         productId: product.id,
         productName: product.name,
         unit: product.unit,
+        quantity: 1, // Cantidad por defecto
       }
     })
 
@@ -252,7 +292,7 @@ function TemplatesContent() {
               <Button
                 onClick={() => {
                   setEditingTemplate(null)
-                  setFormData({ name: "", description: "", items: [] })
+                  setFormData({ name: "", description: "", items: [], destinationBranchIds: [], allowedSendDays: [] })
                 }}
               >
                 <Plus className="mr-2 h-4 w-4" />
@@ -282,6 +322,66 @@ function TemplatesContent() {
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Destinos *</Label>
+                  <Select
+                    value=""
+                    onValueChange={(branchId) => {
+                      if (branchId && !formData.destinationBranchIds.includes(branchId)) {
+                        setFormData({
+                          ...formData,
+                          destinationBranchIds: [...formData.destinationBranchIds, branchId]
+                        })
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches
+                        .filter(branch => !formData.destinationBranchIds.includes(branch.id))
+                        .map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.destinationBranchIds.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {formData.destinationBranchIds.map((branchId) => {
+                        const branch = branches.find(b => b.id === branchId)
+                        return branch ? (
+                          <div key={branchId} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-md text-sm">
+                            {branch.name}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData({
+                                  ...formData,
+                                  destinationBranchIds: formData.destinationBranchIds.filter(id => id !== branchId)
+                                })
+                              }}
+                              className="ml-1 hover:bg-primary/20 rounded-full p-0.5"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Días de envío permitidos *</Label>
+                  <DaySelector
+                    selectedDays={formData.allowedSendDays}
+                    onChange={(days) => setFormData({ ...formData, allowedSendDays: days })}
                   />
                 </div>
 
@@ -402,7 +502,9 @@ function TemplatesContent() {
                         <div key={index} className="flex items-center gap-2 border rounded-md p-3">
                           <div className="flex-1">
                             <div className="font-medium">{item.productName}</div>
-                            <div className="text-sm text-muted-foreground">Unidad: {item.unit}</div>
+                            <div className="text-sm text-muted-foreground">
+                              Cantidad: {item.quantity} {item.unit}
+                            </div>
                           </div>
                           <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
                             <X className="h-4 w-4 text-destructive" />
@@ -469,10 +571,42 @@ function TemplatesContent() {
                         <ul className="space-y-1 text-sm text-muted-foreground">
                           {template.items.map((item, index) => (
                             <li key={index}>
-                              • {item.productName} ({item.unit})
+                              • {item.productName} ({item.quantity} {item.unit})
                             </li>
                           ))}
                         </ul>
+                        {template.destinationBranchIds && template.destinationBranchIds.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium">Destinos:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {template.destinationBranchIds.map((branchId) => {
+                                const branch = branches.find(b => b.id === branchId)
+                                return branch ? (
+                                  <span key={branchId} className="text-xs bg-muted px-2 py-1 rounded">
+                                    {branch.name}
+                                  </span>
+                                ) : null
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        {template.allowedSendDays && template.allowedSendDays.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium">Días de envío:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {template.allowedSendDays.map((day) => (
+                                <span key={day} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                                  {day === 'monday' ? 'Lun' : 
+                                   day === 'tuesday' ? 'Mar' :
+                                   day === 'wednesday' ? 'Mié' :
+                                   day === 'thursday' ? 'Jue' :
+                                   day === 'friday' ? 'Vie' :
+                                   day === 'saturday' ? 'Sáb' : 'Dom'}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

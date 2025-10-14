@@ -15,13 +15,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { ArrowLeft, Package, CheckCircle, XCircle, AlertCircle, Truck, FileText } from "lucide-react"
+import { ArrowLeft, Package, CheckCircle, XCircle, AlertCircle, Truck, FileText, Send, Edit, Trash2 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { doc, getDoc, updateDoc, addDoc, collection } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Order } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { isDayAllowed } from "@/lib/utils"
+import { updateRemitStatus, getRemitMetadata } from "@/lib/remit-metadata-service"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -85,29 +87,92 @@ function OrderDetailContent() {
     }
   }
 
-  const handleStartPreparing = async () => {
+  const handleSendOrder = async () => {
     if (!order || !user) return
 
     setActionLoading(true)
     try {
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        status: "preparing",
+        status: "sent"
+      })
+
+      await updateRemitStatus(orderId, "sent", user)
+
+      toast({
+        title: "Pedido enviado",
+        description: "El pedido fue enviado correctamente",
+      })
+
+      fetchOrder()
+    } catch (error) {
+      console.error("Error al enviar pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el pedido",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleMarkReady = async () => {
+    if (!order || !user) return
+
+    setActionLoading(true)
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        status: "ready",
         preparedBy: user.id,
         preparedByName: user.name,
         preparedAt: new Date(),
       })
 
+      await updateRemitStatus(orderId, "ready", user)
+
       toast({
-        title: "Pedido en preparación",
-        description: "El pedido se marcó como en preparación",
+        title: "Pedido listo",
+        description: "El pedido está listo para recoger",
       })
 
       fetchOrder()
     } catch (error) {
-      console.error("[v0] Error al iniciar preparación:", error)
+      console.error("Error al marcar como listo:", error)
       toast({
         title: "Error",
-        description: "No se pudo iniciar la preparación",
+        description: "No se pudo marcar el pedido como listo",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleMarkInTransit = async () => {
+    if (!order || !user) return
+
+    setActionLoading(true)
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        status: "in_transit",
+        deliveredBy: user.id,
+        deliveredByName: user.name,
+        deliveredAt: new Date(),
+      })
+
+      await updateRemitStatus(orderId, "in_transit", user)
+
+      toast({
+        title: "Pedido en camino",
+        description: "El pedido está en camino",
+      })
+
+      fetchOrder()
+    } catch (error) {
+      console.error("Error al marcar en camino:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el pedido como en camino",
         variant: "destructive",
       })
     } finally {
@@ -320,88 +385,25 @@ function OrderDetailContent() {
 
     setActionLoading(true)
     try {
-      const updatedItems = order.items.map((item) => ({
-        ...item,
-        status: itemStatuses[item.id]?.status || item.status,
-        notReceivedReason: itemStatuses[item.id]?.status === "not_received" ? itemStatuses[item.id]?.reason : undefined,
-        returnReason: itemStatuses[item.id]?.status === "returned" ? itemStatuses[item.id]?.reason : undefined,
-      }))
-
-      // Separar items por estado
-      const itemsDelivered = updatedItems.filter((item) => item.status === "delivered")
-      const itemsReturned = updatedItems.filter((item) => item.status === "returned")
-      const itemsNotReceived = updatedItems.filter((item) => item.status === "not_received")
-
       // Actualizar pedido
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
         status: "received",
         receivedBy: user.id,
         receivedByName: user.name,
         receivedAt: new Date(),
-        items: updatedItems,
       })
 
-      // Crear remito con firmas automáticas
-      await addDoc(collection(db, "apps/controld/deliveryNotes"), {
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        fromBranchName: order.fromBranchName,
-        toBranchName: order.toBranchName,
-        deliverySignature: {
-          userId: order.deliveredBy || "",
-          userName: order.deliveredByName || "",
-          timestamp: order.deliveredAt || new Date(),
-        },
-        branchSignature: {
-          userId: user.id,
-          userName: user.name,
-          timestamp: new Date(),
-        },
-        itemsDelivered,
-        itemsReturned,
-        itemsNotReceived,
-        createdAt: new Date(),
+      // Actualizar metadata del remito
+      await updateRemitStatus(orderId, "received", user)
+
+      toast({
+        title: "Recepción confirmada",
+        description: "El pedido fue recibido correctamente",
       })
-
-      // Si hay items con problemas, crear nuevo pedido
-      const problemItems = [...itemsReturned, ...itemsNotReceived]
-      if (problemItems.length > 0) {
-        const newOrderNumber = `PED-${Date.now()}`
-        await addDoc(collection(db, "apps/controld/orders"), {
-          orderNumber: newOrderNumber,
-          fromBranchId: order.fromBranchId,
-          fromBranchName: order.fromBranchName,
-          toBranchId: order.toBranchId,
-          toBranchName: order.toBranchName,
-          status: "pending",
-          items: problemItems.map((item) => ({
-            ...item,
-            id: `${Date.now()}-${Math.random()}`,
-            status: "pending",
-            notReceivedReason: undefined,
-            returnReason: undefined,
-          })),
-          createdAt: new Date(),
-          createdBy: user.id,
-          createdByName: user.name,
-          parentOrderId: orderId,
-          notes: `Pedido generado automáticamente por items con problemas del pedido ${order.orderNumber}`,
-        })
-
-        toast({
-          title: "Recepción confirmada",
-          description: `Se generó el remito y un nuevo pedido (${newOrderNumber}) con los ${problemItems.length} items con problemas`,
-        })
-      } else {
-        toast({
-          title: "Recepción confirmada",
-          description: "Se generó el remito correctamente",
-        })
-      }
 
       router.push("/dashboard/orders")
     } catch (error) {
-      console.error("[v0] Error al confirmar recepción:", error)
+      console.error("Error al confirmar recepción:", error)
       toast({
         title: "Error",
         description: "No se pudo confirmar la recepción",
@@ -414,9 +416,10 @@ function OrderDetailContent() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { label: "Pendiente", variant: "secondary" as const, icon: AlertCircle },
-      preparing: { label: "En preparación", variant: "default" as const, icon: Package },
+      draft: { label: "Borrador", variant: "outline" as const, icon: Edit },
+      sent: { label: "Enviado", variant: "secondary" as const, icon: Send },
       ready: { label: "Listo", variant: "default" as const, icon: CheckCircle },
+      in_transit: { label: "En camino", variant: "default" as const, icon: Truck },
       received: { label: "Recibido", variant: "default" as const, icon: CheckCircle },
     }
     const config = statusConfig[status as keyof typeof statusConfig] || {
@@ -462,12 +465,15 @@ function OrderDetailContent() {
     })
   }
 
-  const canStartPreparing = user?.role === "factory" && order?.status === "pending"
-  const canMarkItems = user?.role === "factory" && order?.status === "preparing"
-  const canMarkReady = user?.role === "factory" && order?.status === "preparing"
-  const canDeliveryMark = user?.role === "delivery" && order?.status === "ready" && !order?.deliveredBy
-  const canBranchReceive =
-    user?.role === "branch" && order?.status === "ready" && order?.deliveredBy && user?.branchId === order?.fromBranchId
+  // Condiciones para botones según nuevo sistema
+  const canEditDraft = user?.role === "branch" && order?.status === "draft" && order?.createdBy === user?.id
+  const canSendDraft = user?.role === "branch" && order?.status === "draft" && order?.createdBy === user?.id && 
+                      order?.allowedSendDays && isDayAllowed(order.allowedSendDays)
+  const canMarkReady = (user?.role === "factory" || user?.role === "branch") && order?.status === "sent" && 
+                      order?.toBranchId === user?.branchId
+  const canMarkInTransit = user?.role === "delivery" && order?.status === "ready"
+  const canMarkReceived = user?.role === "branch" && order?.status === "in_transit" && 
+                         order?.fromBranchId === user?.branchId
 
   if (loading) {
     return (
@@ -786,42 +792,71 @@ function OrderDetailContent() {
                 <CardTitle>Acciones</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                {canStartPreparing && (
-                  <Button className="w-full" onClick={handleStartPreparing} disabled={actionLoading}>
-                    <Package className="mr-2 h-4 w-4" />
-                    Iniciar preparación
+                {canEditDraft && (
+                  <Link href={`/dashboard/orders/new?edit=${orderId}`} className="block">
+                    <Button variant="outline" className="w-full">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar pedido
+                    </Button>
+                  </Link>
+                )}
+                {canSendDraft && (
+                  <Button className="w-full" onClick={handleSendOrder} disabled={actionLoading}>
+                    <Send className="mr-2 h-4 w-4" />
+                    Enviar pedido
                   </Button>
                 )}
                 {canMarkReady && (
                   <Button className="w-full" onClick={handleMarkReady} disabled={actionLoading}>
-                    <Truck className="mr-2 h-4 w-4" />
+                    <CheckCircle className="mr-2 h-4 w-4" />
                     Marcar como listo
                   </Button>
                 )}
-                {canDeliveryMark && (
-                  <Button className="w-full" onClick={handleConfirmDelivery} disabled={actionLoading}>
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Confirmar entrega
+                {canMarkInTransit && (
+                  <Button className="w-full" onClick={handleMarkInTransit} disabled={actionLoading}>
+                    <Truck className="mr-2 h-4 w-4" />
+                    Recoger pedido
                   </Button>
                 )}
-                {canBranchReceive && (
+                {canMarkReceived && (
                   <Button className="w-full" onClick={handleConfirmReception} disabled={actionLoading}>
                     <FileText className="mr-2 h-4 w-4" />
-                    Confirmar recepción y generar remito
+                    Recibir pedido
                   </Button>
                 )}
-                {order.status === "ready" && user?.role === "factory" && (
+                {order.status === "draft" && order.createdBy !== user?.id && (
+                  <div className="rounded-lg bg-muted p-4 text-center">
+                    <Edit className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+                    <p className="text-sm font-medium">Borrador</p>
+                    <p className="text-xs text-muted-foreground">Solo el creador puede editarlo</p>
+                  </div>
+                )}
+                {order.status === "sent" && order.toBranchId !== user?.branchId && (
+                  <div className="rounded-lg bg-muted p-4 text-center">
+                    <Send className="mx-auto mb-2 h-8 w-8 text-blue-600" />
+                    <p className="text-sm font-medium">Pedido enviado</p>
+                    <p className="text-xs text-muted-foreground">Esperando preparación en destino</p>
+                  </div>
+                )}
+                {order.status === "ready" && user?.role !== "delivery" && (
                   <div className="rounded-lg bg-muted p-4 text-center">
                     <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-600" />
-                    <p className="text-sm font-medium">Pedido listo para entrega</p>
+                    <p className="text-sm font-medium">Pedido listo</p>
                     <p className="text-xs text-muted-foreground">Esperando que delivery lo retire</p>
+                  </div>
+                )}
+                {order.status === "in_transit" && order.fromBranchId !== user?.branchId && (
+                  <div className="rounded-lg bg-muted p-4 text-center">
+                    <Truck className="mx-auto mb-2 h-8 w-8 text-orange-600" />
+                    <p className="text-sm font-medium">En camino</p>
+                    <p className="text-xs text-muted-foreground">Delivery llevando el pedido</p>
                   </div>
                 )}
                 {order.status === "received" && (
                   <div className="rounded-lg bg-muted p-4 text-center">
                     <CheckCircle className="mx-auto mb-2 h-8 w-8 text-green-600" />
                     <p className="text-sm font-medium">Pedido completado</p>
-                    <p className="text-xs text-muted-foreground">El remito fue generado</p>
+                    <p className="text-xs text-muted-foreground">Remito generado</p>
                   </div>
                 )}
               </CardContent>

@@ -14,15 +14,17 @@ import { useEffect, useState } from "react"
 import { collection, addDoc, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
-import type { Branch, Product, Template } from "@/lib/types"
+import type { Branch, Product, Template, DayOfWeek } from "@/lib/types"
+import { isDayAllowed, getNextAllowedDay } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 
 function NewOrderContent() {
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [branches, setBranches] = useState<Branch[]>([])
   const [allBranches, setAllBranches] = useState<Branch[]>([]) // Todas las sucursales sin filtrar
   const [products, setProducts] = useState<Product[]>([])
@@ -32,6 +34,8 @@ function NewOrderContent() {
     toBranchId: "",
     notes: "",
     items: [] as { productId: string; productName: string; quantity: number; unit: string }[],
+    templateId: "",
+    allowedSendDays: [] as DayOfWeek[],
   })
 
   useEffect(() => {
@@ -39,6 +43,14 @@ function NewOrderContent() {
     fetchProducts()
     fetchTemplates()
   }, [user])
+
+  // Cargar plantilla automáticamente si hay parámetro en URL
+  useEffect(() => {
+    const templateId = searchParams.get('template')
+    if (templateId && templates.length > 0) {
+      loadTemplate(templateId)
+    }
+  }, [searchParams, templates])
 
   const fetchBranches = async () => {
     try {
@@ -133,7 +145,7 @@ function NewOrderContent() {
         fromBranchName: fromBranch.name,
         toBranchId: formData.toBranchId,
         toBranchName: toBranch.name,
-        status: "pending",
+        status: "draft",
         items: formData.items.map((item) => ({
           ...item,
           id: `${Date.now()}-${Math.random()}`,
@@ -143,6 +155,8 @@ function NewOrderContent() {
         createdBy: user.id,
         createdByName: user.name,
         notes: formData.notes,
+        templateId: formData.templateId || undefined,
+        allowedSendDays: formData.allowedSendDays,
       }
 
       await addDoc(collection(db, "apps/controld/orders"), orderData)
@@ -203,6 +217,8 @@ function NewOrderContent() {
       setFormData({
         ...formData,
         items: template.items.map((item) => ({ ...item })),
+        templateId: template.id,
+        allowedSendDays: template.allowedSendDays || [],
       })
       toast({
         title: "Plantilla cargada",
@@ -232,24 +248,79 @@ function NewOrderContent() {
               <CardDescription>Completa los datos básicos del pedido</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="toBranchId">Destino *</Label>
-                <Select
-                  value={formData.toBranchId}
-                  onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar destino" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id}>
-                        {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!formData.templateId ? (
+                <div className="space-y-2">
+                  <Label htmlFor="toBranchId">Destino *</Label>
+                  <Select
+                    value={formData.toBranchId}
+                    onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {branches.map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id}>
+                          {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label htmlFor="toBranchId">Destino *</Label>
+                  <Select
+                    value={formData.toBranchId}
+                    onValueChange={(value) => setFormData({ ...formData, toBranchId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(() => {
+                        const template = templates.find(t => t.id === formData.templateId)
+                        const availableDestinations = template?.destinationBranchIds || []
+                        return branches
+                          .filter(branch => availableDestinations.includes(branch.id))
+                          .map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
+                            </SelectItem>
+                          ))
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {formData.allowedSendDays.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Información de envío</Label>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="text-sm">
+                      <p className="font-medium mb-1">Días permitidos para envío:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {formData.allowedSendDays.map((day) => (
+                          <span key={day} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                            {day === 'monday' ? 'Lunes' : 
+                             day === 'tuesday' ? 'Martes' :
+                             day === 'wednesday' ? 'Miércoles' :
+                             day === 'thursday' ? 'Jueves' :
+                             day === 'friday' ? 'Viernes' :
+                             day === 'saturday' ? 'Sábado' : 'Domingo'}
+                          </span>
+                        ))}
+                      </div>
+                      {!isDayAllowed(formData.allowedSendDays) && (
+                        <p className="text-orange-600 mt-2 text-xs">
+                          ⚠️ Hoy no es un día permitido. Próximo envío: {getNextAllowedDay(formData.allowedSendDays)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas / Observaciones</Label>
@@ -266,15 +337,15 @@ function NewOrderContent() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <CardTitle>Productos</CardTitle>
                   <CardDescription>Agrega los productos que necesitas</CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   {templates.length > 0 && (
                     <Select onValueChange={loadTemplate}>
-                      <SelectTrigger className="w-48">
+                      <SelectTrigger className="w-full sm:w-48">
                         <SelectValue placeholder="Cargar plantilla" />
                       </SelectTrigger>
                       <SelectContent>
@@ -289,7 +360,7 @@ function NewOrderContent() {
                       </SelectContent>
                     </Select>
                   )}
-                  <Button type="button" variant="outline" onClick={addItem}>
+                  <Button type="button" variant="outline" onClick={addItem} className="w-full sm:w-auto">
                     <Plus className="mr-2 h-4 w-4" />
                     Agregar producto
                   </Button>
@@ -304,31 +375,35 @@ function NewOrderContent() {
                   </p>
                 ) : (
                   formData.items.map((item, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Select value={item.productId} onValueChange={(value) => updateItem(index, "productId", value)}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Seleccionar producto" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} ({product.unit})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        min="1"
-                        placeholder="Cantidad"
-                        value={item.quantity}
-                        onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                        className="w-32"
-                        required
-                      />
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                    <div key={index} className="space-y-2 sm:space-y-0">
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Select value={item.productId} onValueChange={(value) => updateItem(index, "productId", value)}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Seleccionar producto" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {products.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} ({product.unit})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="flex gap-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            placeholder="Cantidad"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
+                            className="w-24 sm:w-32"
+                            required
+                          />
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   ))
                 )}
@@ -336,13 +411,13 @@ function NewOrderContent() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-2">
-            <Link href="/dashboard/orders">
-              <Button type="button" variant="outline">
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <Link href="/dashboard/orders" className="w-full sm:w-auto">
+              <Button type="button" variant="outline" className="w-full">
                 Cancelar
               </Button>
             </Link>
-            <Button type="submit" disabled={loading || !formData.toBranchId || formData.items.length === 0}>
+            <Button type="submit" disabled={loading || !formData.toBranchId || formData.items.length === 0} className="w-full sm:w-auto">
               {loading ? "Creando..." : "Crear pedido"}
             </Button>
           </div>

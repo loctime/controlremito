@@ -2,7 +2,9 @@ import type { Timestamp } from "firebase/firestore"
 
 export type UserRole = "admin" | "factory" | "branch" | "delivery" | "maxdev"
 
-export type OrderStatus = "pending" | "preparing" | "ready" | "shipped" | "in_transit" | "received"
+export type OrderStatus = "draft" | "sent" | "ready" | "in_transit" | "received"
+
+export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"
 
 export type ItemStatus = "pending" | "available" | "not_available" | "delivered" | "not_received" | "returned"
 
@@ -71,6 +73,8 @@ export interface Order {
   receivedAt?: Timestamp
   parentOrderId?: string // si fue generado automáticamente por items faltantes
   notes?: string
+  templateId?: string // referencia a la plantilla usada
+  allowedSendDays?: DayOfWeek[] // heredado de la plantilla
 }
 
 export interface DeliveryNote {
@@ -111,4 +115,18 @@ export interface Template {
   branchId?: string // si es de una sucursal específica
   createdAt: Timestamp
   active: boolean
+  destinationBranchIds: string[] // múltiples destinos posibles
+  allowedSendDays: DayOfWeek[] // días en que se puede enviar
+}
+
+export interface RemitMetadata {
+  orderId: string
+  orderNumber: string
+  createdAt: Timestamp
+  sentSignature?: { userId: string; userName: string; timestamp: Timestamp }
+  readySignature?: { userId: string; userName: string; timestamp: Timestamp }
+  inTransitSignature?: { userId: string; userName: string; timestamp: Timestamp }
+  receivedSignature?: { userId: string; userName: string; timestamp: Timestamp }
+  currentStatus: OrderStatus
+  statusHistory: { status: OrderStatus; timestamp: Timestamp; userId: string; userName: string }[]
 }

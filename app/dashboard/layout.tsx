@@ -34,12 +34,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { name: "Inicio", href: "/dashboard", icon: Package, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
     { name: "Pedidos", href: "/dashboard/orders", icon: FileText, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
-    { name: "Productos", href: "/dashboard/products", icon: Boxes, roles: ["admin", "factory", "branch", "maxdev"] },
+    { name: "Productos", href: "/dashboard/products", icon: Boxes, roles: ["admin", "factory", "maxdev"] },
     {
       name: "Plantillas",
       href: "/dashboard/templates",
       icon: ClipboardList,
-      roles: ["admin", "factory", "branch", "maxdev"],
+      roles: ["admin", "factory", "maxdev"],
     },
     {
       name: "Remitos",
@@ -82,35 +82,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-50 border-b bg-background">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
-            {/* Menú móvil - Versión simple */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="md:hidden mr-2 border-2">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Abrir menú</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                {filteredNavigation.map((item) => {
-                  const Icon = item.icon
-                  const isActive = pathname === item.href
-                  return (
-                    <DropdownMenuItem key={item.href} asChild>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-2 cursor-pointer",
-                          isActive && "bg-accent"
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                        {item.name}
-                      </Link>
-                    </DropdownMenuItem>
-                  )
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Menú móvil - Versión simple (no se muestra para sucursal) */}
+            {user?.role !== "branch" && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="md:hidden mr-2 border-2">
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Abrir menú</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {filteredNavigation.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href
+                    return (
+                      <DropdownMenuItem key={item.href} asChild>
+                        <Link
+                          href={item.href}
+                          className={cn(
+                            "flex items-center gap-2 cursor-pointer",
+                            isActive && "bg-accent"
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.name}
+                        </Link>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             
             <Package className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-semibold">Control de Remitos</h1>

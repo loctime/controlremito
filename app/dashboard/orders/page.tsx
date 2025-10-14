@@ -5,13 +5,16 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye } from "lucide-react"
+import { Plus, Search, Eye, Send } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Order } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { isDayAllowed } from "@/lib/utils"
+import { createRemitMetadata } from "@/lib/remit-metadata-service"
+import { doc, updateDoc } from "firebase/firestore"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
@@ -79,9 +82,10 @@ function OrdersContent() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      pending: { label: "Pendiente", variant: "secondary" as const },
-      preparing: { label: "En preparación", variant: "default" as const },
+      draft: { label: "Borrador", variant: "outline" as const },
+      sent: { label: "Enviado", variant: "secondary" as const },
       ready: { label: "Listo", variant: "default" as const },
+      in_transit: { label: "En camino", variant: "default" as const },
       received: { label: "Recibido", variant: "default" as const },
     }
     const config = statusConfig[status as keyof typeof statusConfig] || {
@@ -101,6 +105,58 @@ function OrdersContent() {
       hour: "2-digit",
       minute: "2-digit",
     })
+  }
+
+  const handleSendOrder = async (order: Order) => {
+    if (!user) return
+
+    try {
+      // Verificar si es el creador del pedido
+      if (order.createdBy !== user.id) {
+        toast({
+          title: "Error",
+          description: "Solo el creador del pedido puede enviarlo",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Verificar si hoy es un día permitido
+      if (order.allowedSendDays && !isDayAllowed(order.allowedSendDays)) {
+        toast({
+          title: "Error",
+          description: "Hoy no es un día permitido para enviar este pedido",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Actualizar estado del pedido
+      await updateDoc(doc(db, "apps/controld/orders", order.id), {
+        status: "sent"
+      })
+
+      // Crear metadata del remito
+      await createRemitMetadata({
+        ...order,
+        status: "sent"
+      })
+
+      toast({
+        title: "Pedido enviado",
+        description: `El pedido ${order.orderNumber} fue enviado correctamente`,
+      })
+
+      // Recargar la lista
+      fetchOrders()
+    } catch (error) {
+      console.error("Error al enviar pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el pedido",
+        variant: "destructive",
+      })
+    }
   }
 
   const filteredOrders = orders.filter((order) => {
@@ -150,9 +206,10 @@ function OrdersContent() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="pending">Pendiente</SelectItem>
-                  <SelectItem value="preparing">En preparación</SelectItem>
+                  <SelectItem value="draft">Borrador</SelectItem>
+                  <SelectItem value="sent">Enviado</SelectItem>
                   <SelectItem value="ready">Listo</SelectItem>
+                  <SelectItem value="in_transit">En camino</SelectItem>
                   <SelectItem value="received">Recibido</SelectItem>
                 </SelectContent>
               </Select>
@@ -191,11 +248,26 @@ function OrdersContent() {
                         <TableCell className="text-sm">{formatDate(order.createdAt)}</TableCell>
                         <TableCell>{order.items.length}</TableCell>
                         <TableCell className="text-right">
-                          <Link href={`/dashboard/orders/${order.id}`}>
-                            <Button variant="ghost" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </Link>
+                          <div className="flex items-center gap-2 justify-end">
+                            {order.status === "draft" && 
+                             order.createdBy === user?.id && 
+                             order.allowedSendDays && 
+                             isDayAllowed(order.allowedSendDays) && (
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSendOrder(order)}
+                              >
+                                <Send className="h-4 w-4 mr-1" />
+                                Enviar
+                              </Button>
+                            )}
+                            <Link href={`/dashboard/orders/${order.id}`}>
+                              <Button variant="ghost" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
