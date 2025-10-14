@@ -6,14 +6,19 @@ import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, signOut } = useAuth()
+  const { user, signOut, changeRole } = useAuth()
   const pathname = usePathname()
+
+  const handleRoleChange = async (newRole: string) => {
+    await changeRole(newRole)
+  }
 
   const getRoleLabel = (role: string) => {
     const labels = {
@@ -110,12 +115,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Package className="h-6 w-6 text-primary" />
             <h1 className="text-xl font-semibold">Control de Remitos</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right">
+          <div className="flex items-center gap-2 md:gap-4">
+            {/* Selector de rol para desarrollo */}
+            <Select value={user?.role} onValueChange={handleRoleChange}>
+              <SelectTrigger className="w-[100px] md:w-[140px] h-8 md:h-9 text-xs bg-yellow-50 border-yellow-300">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="factory">🏭 Fábrica</SelectItem>
+                <SelectItem value="branch">🏪 Sucursal</SelectItem>
+                <SelectItem value="delivery">🚚 Delivery</SelectItem>
+                <SelectItem value="admin">👑 Admin</SelectItem>
+                <SelectItem value="maxdev">💻 Dev</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="text-right hidden sm:block">
               <p className="text-sm font-medium">{user?.name}</p>
               <p className="text-xs text-muted-foreground">{getRoleLabel(user?.role || "")}</p>
             </div>
-            <Button variant="outline" onClick={signOut}>
+            <Button variant="outline" onClick={signOut} className="text-xs md:text-sm">
               Cerrar sesión
             </Button>
           </div>

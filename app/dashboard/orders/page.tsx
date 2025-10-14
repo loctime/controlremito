@@ -37,7 +37,7 @@ function OrdersContent() {
       let ordersData: Order[] = []
 
       // Filtrar según el rol
-      if (user.role === "branch" || user.role === "factory") {
+      if ((user.role === "branch" || user.role === "factory") && user.branchId) {
         // Para branch y factory: obtener pedidos donde están como origen O destino
         const qFrom = query(ordersRef, where("fromBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
         const qTo = query(ordersRef, where("toBranchId", "==", user.branchId), orderBy("createdAt", "desc"))

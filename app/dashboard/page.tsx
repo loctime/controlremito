@@ -26,10 +26,10 @@ function DashboardContent() {
         const ordersRef = collection(db, "apps/controld/orders")
         let q = query(ordersRef)
 
-        // Filtrar según el rol
-        if (user.role === "branch") {
+        // Filtrar según el rol (solo si tiene branchId asignado)
+        if (user.role === "branch" && user.branchId) {
           q = query(ordersRef, where("fromBranchId", "==", user.branchId))
-        } else if (user.role === "factory") {
+        } else if (user.role === "factory" && user.branchId) {
           q = query(ordersRef, where("toBranchId", "==", user.branchId))
         }
 

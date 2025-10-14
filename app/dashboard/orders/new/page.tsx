@@ -81,7 +81,7 @@ function NewOrderContent() {
       const templatesRef = collection(db, "apps/controld/templates")
       let q = query(templatesRef, where("active", "==", true))
 
-      if (user.role === "branch" || user.role === "factory") {
+      if ((user.role === "branch" || user.role === "factory") && user.branchId) {
         q = query(templatesRef, where("active", "==", true), where("branchId", "in", [user.branchId, null]))
       }
 

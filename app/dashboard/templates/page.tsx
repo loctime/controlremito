@@ -55,7 +55,7 @@ function TemplatesContent() {
       let q = query(templatesRef, where("active", "==", true))
 
       // Filtrar plantillas según el rol
-      if (user.role === "branch" || user.role === "factory") {
+      if ((user.role === "branch" || user.role === "factory") && user.branchId) {
         q = query(templatesRef, where("active", "==", true), where("branchId", "in", [user.branchId, null]))
       }
 

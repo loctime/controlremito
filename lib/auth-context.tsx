@@ -27,6 +27,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   registerWithEmailPassword: (email: string, password: string, name: string, role: string) => Promise<void>
   createUser: (email: string, password: string, userData: Partial<User>) => Promise<void>
+  changeRole: (role: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -211,8 +212,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // Función para cambiar el rol del usuario actual (solo para desarrollo)
+  const changeRole = async (role: string) => {
+    if (!firebaseUser) return
+    
+    await setDoc(doc(db, "apps/controld/users", firebaseUser.uid), {
+      role,
+    }, { merge: true })
+    
+    // Recargar los datos del usuario
+    const userDoc = await getDoc(doc(db, "apps/controld/users", firebaseUser.uid))
+    if (userDoc.exists()) {
+      setUser({ id: firebaseUser.uid, ...userDoc.data() } as User)
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, firebaseUser, loading, signInWithGoogle, signInWithGoogleAndRole, signInWithEmail, signOut, registerWithEmailPassword, createUser }}>
+    <AuthContext.Provider value={{ user, firebaseUser, loading, signInWithGoogle, signInWithGoogleAndRole, signInWithEmail, signOut, registerWithEmailPassword, createUser, changeRole }}>
       {children}
     </AuthContext.Provider>
   )
