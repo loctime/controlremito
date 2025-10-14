@@ -358,10 +358,9 @@ function TemplatesContent() {
                                       return (
                                         <TableRow
                                           key={product.id}
-                                          className={`cursor-pointer ${isSelected ? "bg-muted/50" : ""}`}
-                                          onClick={() => toggleProduct(product.id)}
+                                          className={isSelected ? "bg-muted/50" : ""}
                                         >
-                                          <TableCell className="py-4">
+                                          <TableCell className="py-4 cursor-pointer" onClick={() => toggleProduct(product.id)}>
                                             <div className="flex items-center justify-center">
                                               <Checkbox
                                                 checked={isSelected}
@@ -370,7 +369,7 @@ function TemplatesContent() {
                                               />
                                             </div>
                                           </TableCell>
-                                          <TableCell className="py-4">
+                                          <TableCell className="py-4 cursor-pointer" onClick={() => toggleProduct(product.id)}>
                                             <div>
                                               <div className="font-medium text-base">{product.name}</div>
                                               <div className="text-sm text-muted-foreground mt-1">
@@ -379,7 +378,7 @@ function TemplatesContent() {
                                               </div>
                                             </div>
                                           </TableCell>
-                                          <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
+                                          <TableCell className="py-4">
                                             {isSelected && (
                                               <Input
                                                 type="number"
