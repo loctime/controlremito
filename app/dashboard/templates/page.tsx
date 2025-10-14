@@ -104,7 +104,7 @@ function TemplatesContent() {
         items: formData.items,
         createdBy: user.id,
         createdByName: user.name,
-        branchId: user.role === "admin" ? null : user.branchId,
+        branchId: user.role === "admin" || user.role === "maxdev" ? null : (user.branchId || null),
         active: true,
       }
 
