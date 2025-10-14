@@ -2,7 +2,7 @@ import type { Timestamp } from "firebase/firestore"
 
 export type UserRole = "admin" | "factory" | "branch" | "delivery" | "maxdev"
 
-export type OrderStatus = "pending" | "preparing" | "ready" | "received"
+export type OrderStatus = "pending" | "preparing" | "ready" | "shipped" | "in_transit" | "received"
 
 export type ItemStatus = "pending" | "available" | "not_available" | "delivered" | "not_received" | "returned"
 

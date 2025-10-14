@@ -3,7 +3,7 @@
 import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, FileText, Truck, CheckCircle } from "lucide-react"
+import { ShoppingCart, Clock, Package, Truck, CheckCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, query, where, getDocs, type Timestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -12,10 +12,11 @@ import type { Order } from "@/lib/types"
 function DashboardContent() {
   const { user } = useAuth()
   const [stats, setStats] = useState({
-    pending: 0,
-    preparing: 0,
-    ready: 0,
-    receivedToday: 0,
+    makeOrder: 0,
+    pendingToReceive: 0,
+    pendingProducts: 0,
+    onTheWay: 0,
+    received: 0,
   })
 
   useEffect(() => {
@@ -40,10 +41,11 @@ function DashboardContent() {
         today.setHours(0, 0, 0, 0)
 
         setStats({
-          pending: orders.filter((o) => o.status === "pending").length,
-          preparing: orders.filter((o) => o.status === "preparing").length,
-          ready: orders.filter((o) => o.status === "ready").length,
-          receivedToday: orders.filter((o) => {
+          makeOrder: 0, // Esta categoría podría ser para mostrar órdenes que necesitan ser creadas
+          pendingToReceive: orders.filter((o) => o.status === "pending" || o.status === "preparing").length,
+          pendingProducts: orders.filter((o) => o.status === "ready").length,
+          onTheWay: orders.filter((o) => o.status === "shipped" || o.status === "in_transit").length,
+          received: orders.filter((o) => {
             if (o.status !== "received" || !o.receivedAt) return false
             const receivedDate = (o.receivedAt as Timestamp).toDate()
             return receivedDate >= today
@@ -65,47 +67,58 @@ function DashboardContent() {
           <p className="text-muted-foreground">Resumen de actividad</p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pedidos Pendientes</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Hacer Pedido</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.pending}</div>
-              <p className="text-xs text-muted-foreground">Esperando preparación</p>
+              <div className="text-2xl font-bold">{stats.makeOrder}</div>
+              <p className="text-xs text-muted-foreground">Nuevos pedidos</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En Preparación</CardTitle>
+              <CardTitle className="text-sm font-medium">Pedidos por Recibir</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.pendingToReceive}</div>
+              <p className="text-xs text-muted-foreground">Todavía no está listo</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Productos Pendientes</CardTitle>
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.preparing}</div>
-              <p className="text-xs text-muted-foreground">Siendo preparados</p>
+              <div className="text-2xl font-bold">{stats.pendingProducts}</div>
+              <p className="text-xs text-muted-foreground">Pendientes de otro pedido</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Listos</CardTitle>
+              <CardTitle className="text-sm font-medium">En Camino</CardTitle>
               <Truck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.ready}</div>
-              <p className="text-xs text-muted-foreground">Para entregar</p>
+              <div className="text-2xl font-bold">{stats.onTheWay}</div>
+              <p className="text-xs text-muted-foreground">Ya los tiene el delivery</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recibidos Hoy</CardTitle>
+              <CardTitle className="text-sm font-medium">Recibidos</CardTitle>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.receivedToday}</div>
+              <div className="text-2xl font-bold">{stats.received}</div>
               <p className="text-xs text-muted-foreground">Completados hoy</p>
             </CardContent>
           </Card>
