@@ -8,28 +8,32 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/apps/controld/users/$(request.auth.uid));
+    }
+    
     function getUserData() {
       return get(/databases/$(database)/documents/apps/controld/users/$(request.auth.uid)).data;
     }
     
     function isMaxDev() {
-      return isAuthenticated() && getUserData().role == 'maxdev';
+      return isAuthenticated() && userDocExists() && getUserData().role == 'maxdev';
     }
     
     function isAdmin() {
-      return isAuthenticated() && (getUserData().role == 'admin' || getUserData().role == 'maxdev');
+      return isAuthenticated() && userDocExists() && (getUserData().role == 'admin' || getUserData().role == 'maxdev');
     }
     
     function isBranch() {
-      return isAuthenticated() && getUserData().role == 'branch';
+      return isAuthenticated() && userDocExists() && getUserData().role == 'branch';
     }
     
     function isFactory() {
-      return isAuthenticated() && getUserData().role == 'factory';
+      return isAuthenticated() && userDocExists() && getUserData().role == 'factory';
     }
     
     function isDelivery() {
-      return isAuthenticated() && getUserData().role == 'delivery';
+      return isAuthenticated() && userDocExists() && getUserData().role == 'delivery';
     }
     
     // ===== REGLAS PARA REMITOS (CONTROLD) =====
