@@ -134,11 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         active: userData.active !== undefined ? userData.active : true,
       })
       
-      // Cerrar sesión del usuario recién creado para que el admin mantenga su sesión
+      // Cerrar sesión del usuario recién creado
       await firebaseSignOut(auth)
       
-      // Esperar a que se restaure la sesión del admin
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Esperar más tiempo para que el auth listener se actualice
+      await new Promise(resolve => setTimeout(resolve, 1500))
       
     } catch (error: any) {
       // Si el usuario ya existe en Firebase Auth (de otra app), 
@@ -180,8 +180,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Cerrar sesión del usuario para restaurar la sesión del admin
           await firebaseSignOut(auth)
           
-          // Esperar a que se restaure la sesión del admin
-          await new Promise(resolve => setTimeout(resolve, 500))
+          // Esperar más tiempo para que el auth listener se actualice
+          await new Promise(resolve => setTimeout(resolve, 1500))
           
         } catch (signInError: any) {
           // Si falla el inicio de sesión, significa que la contraseña es incorrecta

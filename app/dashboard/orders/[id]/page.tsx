@@ -167,11 +167,17 @@ function OrderDetailContent() {
     setActionLoading(true)
     try {
       // Actualizar items con sus estados
-      const updatedItems = order.items.map((item) => ({
-        ...item,
-        status: itemStatuses[item.id].status,
-        notAvailableReason: itemStatuses[item.id].reason,
-      }))
+      const updatedItems = order.items.map((item) => {
+        const newItem: any = {
+          ...item,
+          status: itemStatuses[item.id].status,
+        }
+        // Solo agregar notAvailableReason si existe
+        if (itemStatuses[item.id].reason) {
+          newItem.notAvailableReason = itemStatuses[item.id].reason
+        }
+        return newItem
+      })
 
       // Items no disponibles para crear nuevo pedido
       const unavailableItems = updatedItems.filter((item) => item.status === "not_available")
@@ -191,12 +197,14 @@ function OrderDetailContent() {
           toBranchId: order.toBranchId,
           toBranchName: order.toBranchName,
           status: "pending",
-          items: unavailableItems.map((item) => ({
-            ...item,
-            id: `${Date.now()}-${Math.random()}`,
-            status: "pending",
-            notAvailableReason: undefined,
-          })),
+          items: unavailableItems.map((item) => {
+            const { notAvailableReason, returnReason, notReceivedReason, ...itemWithoutReasons } = item
+            return {
+              ...itemWithoutReasons,
+              id: `${Date.now()}-${Math.random()}`,
+              status: "pending",
+            }
+          }),
           createdAt: new Date(),
           createdBy: user.id,
           createdByName: user.name,
