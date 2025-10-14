@@ -36,11 +36,11 @@ function TemplatesContent() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    items: [] as { productId: string; productName: string; quantity: number; unit: string }[],
+    items: [] as { productId: string; productName: string; unit: string }[],
   })
   const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false)
   const [productSearchTerm, setProductSearchTerm] = useState("")
-  const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: number }>({})
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchTemplates()
@@ -173,34 +173,24 @@ function TemplatesContent() {
     setIsProductSelectorOpen(true)
     setProductSearchTerm("")
     // Inicializar con los productos ya agregados
-    const initialSelected: { [key: string]: number } = {}
-    formData.items.forEach((item) => {
-      initialSelected[item.productId] = item.quantity
-    })
-    setSelectedProducts(initialSelected)
+    const initialSelected = new Set(formData.items.map((item) => item.productId))
+    setSelectedProductIds(initialSelected)
   }
 
   const toggleProduct = (productId: string) => {
-    setSelectedProducts((prev) => {
-      const newSelected = { ...prev }
-      if (newSelected[productId]) {
-        delete newSelected[productId]
+    setSelectedProductIds((prev) => {
+      const newSelected = new Set(prev)
+      if (newSelected.has(productId)) {
+        newSelected.delete(productId)
       } else {
-        newSelected[productId] = 1
+        newSelected.add(productId)
       }
       return newSelected
     })
   }
 
-  const updateQuantity = (productId: string, quantity: number) => {
-    setSelectedProducts((prev) => ({
-      ...prev,
-      [productId]: quantity,
-    }))
-  }
-
   const addSelectedProductsToTemplate = () => {
-    const selectedCount = Object.keys(selectedProducts).length
+    const selectedCount = selectedProductIds.size
     if (selectedCount === 0) {
       toast({
         title: "Sin productos",
@@ -210,12 +200,11 @@ function TemplatesContent() {
       return
     }
 
-    const newItems = Object.entries(selectedProducts).map(([productId, quantity]) => {
+    const newItems = Array.from(selectedProductIds).map((productId) => {
       const product = products.find((p) => p.id === productId)!
       return {
         productId: product.id,
         productName: product.name,
-        quantity,
         unit: product.unit,
       }
     })
@@ -238,12 +227,6 @@ function TemplatesContent() {
       ...formData,
       items: formData.items.filter((_, i) => i !== index),
     })
-  }
-
-  const updateItem = (index: number, field: string, value: string | number) => {
-    const newItems = [...formData.items]
-    newItems[index] = { ...newItems[index], [field]: value }
-    setFormData({ ...formData, items: newItems })
   }
 
   const filteredProducts = products.filter(
@@ -312,12 +295,11 @@ function TemplatesContent() {
                           Agregar producto
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+                      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
                         <DialogHeader>
                           <DialogTitle>Seleccionar Productos</DialogTitle>
                           <DialogDescription>
-                            Selecciona los productos y define las cantidades ({Object.keys(selectedProducts).length}{" "}
-                            seleccionados)
+                            Selecciona los productos para incluir en la plantilla ({selectedProductIds.size} seleccionados)
                           </DialogDescription>
                         </DialogHeader>
 
@@ -342,25 +324,25 @@ function TemplatesContent() {
                                   <TableRow>
                                     <TableHead className="w-12"></TableHead>
                                     <TableHead>Nombre</TableHead>
-                                    <TableHead className="w-32">Cantidad</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                   {filteredProducts.length === 0 ? (
                                     <TableRow>
-                                      <TableCell colSpan={3} className="text-center text-muted-foreground h-32">
+                                      <TableCell colSpan={2} className="text-center text-muted-foreground h-32">
                                         {productSearchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
                                       </TableCell>
                                     </TableRow>
                                   ) : (
                                     filteredProducts.map((product) => {
-                                      const isSelected = !!selectedProducts[product.id]
+                                      const isSelected = selectedProductIds.has(product.id)
                                       return (
                                         <TableRow
                                           key={product.id}
-                                          className={isSelected ? "bg-muted/50" : ""}
+                                          className={`cursor-pointer ${isSelected ? "bg-muted/50" : ""}`}
+                                          onClick={() => toggleProduct(product.id)}
                                         >
-                                          <TableCell className="py-4 cursor-pointer" onClick={() => toggleProduct(product.id)}>
+                                          <TableCell className="py-4">
                                             <div className="flex items-center justify-center">
                                               <Checkbox
                                                 checked={isSelected}
@@ -369,7 +351,7 @@ function TemplatesContent() {
                                               />
                                             </div>
                                           </TableCell>
-                                          <TableCell className="py-4 cursor-pointer" onClick={() => toggleProduct(product.id)}>
+                                          <TableCell className="py-4">
                                             <div>
                                               <div className="font-medium text-base">{product.name}</div>
                                               <div className="text-sm text-muted-foreground mt-1">
@@ -377,19 +359,6 @@ function TemplatesContent() {
                                                 <span>{product.unit}</span>
                                               </div>
                                             </div>
-                                          </TableCell>
-                                          <TableCell className="py-4">
-                                            {isSelected && (
-                                              <Input
-                                                type="number"
-                                                inputMode="decimal"
-                                                min="0.01"
-                                                step="0.01"
-                                                value={selectedProducts[product.id] || 1}
-                                                onChange={(e) => updateQuantity(product.id, Number(e.target.value))}
-                                                className="w-full h-11 text-base"
-                                              />
-                                            )}
                                           </TableCell>
                                         </TableRow>
                                       )
@@ -412,9 +381,9 @@ function TemplatesContent() {
                             <Button
                               type="button"
                               onClick={addSelectedProductsToTemplate}
-                              disabled={Object.keys(selectedProducts).length === 0}
+                              disabled={selectedProductIds.size === 0}
                             >
-                              Agregar {Object.keys(selectedProducts).length > 0 && `(${Object.keys(selectedProducts).length})`}
+                              Agregar {selectedProductIds.size > 0 && `(${selectedProductIds.size})`}
                             </Button>
                           </div>
                         </div>
@@ -433,20 +402,8 @@ function TemplatesContent() {
                         <div key={index} className="flex items-center gap-2 border rounded-md p-3">
                           <div className="flex-1">
                             <div className="font-medium">{item.productName}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {item.quantity} {item.unit}
-                            </div>
+                            <div className="text-sm text-muted-foreground">Unidad: {item.unit}</div>
                           </div>
-                          <Input
-                            type="number"
-                            inputMode="decimal"
-                            min="1"
-                            step="0.01"
-                            placeholder="Cantidad"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                            className="w-24"
-                          />
                           <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
                             <X className="h-4 w-4 text-destructive" />
                           </Button>
@@ -512,7 +469,7 @@ function TemplatesContent() {
                         <ul className="space-y-1 text-sm text-muted-foreground">
                           {template.items.map((item, index) => (
                             <li key={index}>
-                              • {item.productName}: {item.quantity} {item.unit}
+                              • {item.productName} ({item.unit})
                             </li>
                           ))}
                         </ul>
