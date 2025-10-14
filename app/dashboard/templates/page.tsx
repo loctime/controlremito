@@ -22,7 +22,8 @@ import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Template, Product } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 function TemplatesContent() {
   const { user } = useAuth()
@@ -37,6 +38,9 @@ function TemplatesContent() {
     description: "",
     items: [] as { productId: string; productName: string; quantity: number; unit: string }[],
   })
+  const [isProductSelectorOpen, setIsProductSelectorOpen] = useState(false)
+  const [productSearchTerm, setProductSearchTerm] = useState("")
+  const [selectedProducts, setSelectedProducts] = useState<{ [key: string]: number }>({})
 
   useEffect(() => {
     fetchTemplates()
@@ -165,11 +169,68 @@ function TemplatesContent() {
     }
   }
 
-  const addItem = () => {
+  const openProductSelector = () => {
+    setIsProductSelectorOpen(true)
+    setProductSearchTerm("")
+    // Inicializar con los productos ya agregados
+    const initialSelected: { [key: string]: number } = {}
+    formData.items.forEach((item) => {
+      initialSelected[item.productId] = item.quantity
+    })
+    setSelectedProducts(initialSelected)
+  }
+
+  const toggleProduct = (productId: string) => {
+    setSelectedProducts((prev) => {
+      const newSelected = { ...prev }
+      if (newSelected[productId]) {
+        delete newSelected[productId]
+      } else {
+        newSelected[productId] = 1
+      }
+      return newSelected
+    })
+  }
+
+  const updateQuantity = (productId: string, quantity: number) => {
+    setSelectedProducts((prev) => ({
+      ...prev,
+      [productId]: quantity,
+    }))
+  }
+
+  const addSelectedProductsToTemplate = () => {
+    const selectedCount = Object.keys(selectedProducts).length
+    if (selectedCount === 0) {
+      toast({
+        title: "Sin productos",
+        description: "Selecciona al menos un producto",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const newItems = Object.entries(selectedProducts).map(([productId, quantity]) => {
+      const product = products.find((p) => p.id === productId)!
+      return {
+        productId: product.id,
+        productName: product.name,
+        quantity,
+        unit: product.unit,
+      }
+    })
+
     setFormData({
       ...formData,
-      items: [...formData.items, { productId: "", productName: "", quantity: 1, unit: "" }],
+      items: newItems,
     })
+
+    toast({
+      title: "Productos agregados",
+      description: `Se agregaron ${selectedCount} productos a la plantilla`,
+    })
+
+    setIsProductSelectorOpen(false)
   }
 
   const removeItem = (index: number) => {
@@ -181,21 +242,15 @@ function TemplatesContent() {
 
   const updateItem = (index: number, field: string, value: string | number) => {
     const newItems = [...formData.items]
-    if (field === "productId") {
-      const product = products.find((p) => p.id === value)
-      if (product) {
-        newItems[index] = {
-          ...newItems[index],
-          productId: product.id,
-          productName: product.name,
-          unit: product.unit,
-        }
-      }
-    } else {
-      newItems[index] = { ...newItems[index], [field]: value }
-    }
+    newItems[index] = { ...newItems[index], [field]: value }
     setFormData({ ...formData, items: newItems })
   }
+
+  const filteredProducts = products.filter(
+    (product) =>
+      product.name.toLowerCase().includes(productSearchTerm.toLowerCase()) ||
+      product.sku?.toLowerCase().includes(productSearchTerm.toLowerCase()),
+  )
 
   const filteredTemplates = templates.filter((template) =>
     template.name.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -249,42 +304,157 @@ function TemplatesContent() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label>Productos</Label>
-                    <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Agregar producto
-                    </Button>
+                    <Label>Productos ({formData.items.length})</Label>
+                    <Dialog open={isProductSelectorOpen} onOpenChange={setIsProductSelectorOpen}>
+                      <DialogTrigger asChild>
+                        <Button type="button" variant="outline" size="sm" onClick={openProductSelector}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Agregar producto
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+                        <DialogHeader>
+                          <DialogTitle>Seleccionar Productos</DialogTitle>
+                          <DialogDescription>
+                            Selecciona los productos y define las cantidades ({Object.keys(selectedProducts).length}{" "}
+                            seleccionados)
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+                          {/* Buscador */}
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                              placeholder="Buscar por nombre o SKU..."
+                              value={productSearchTerm}
+                              onChange={(e) => setProductSearchTerm(e.target.value)}
+                              className="pl-9"
+                              autoFocus
+                            />
+                          </div>
+
+                          {/* Tabla de productos */}
+                          <div className="border rounded-md overflow-hidden flex-1 flex flex-col">
+                            <div className="overflow-y-auto flex-1">
+                              <Table>
+                                <TableHeader className="sticky top-0 bg-background z-10">
+                                  <TableRow>
+                                    <TableHead className="w-12"></TableHead>
+                                    <TableHead>Nombre</TableHead>
+                                    <TableHead className="w-32">Cantidad</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {filteredProducts.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={3} className="text-center text-muted-foreground h-32">
+                                        {productSearchTerm ? "No se encontraron productos" : "No hay productos disponibles"}
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    filteredProducts.map((product) => {
+                                      const isSelected = !!selectedProducts[product.id]
+                                      return (
+                                        <TableRow
+                                          key={product.id}
+                                          className={`cursor-pointer ${isSelected ? "bg-muted/50" : ""}`}
+                                          onClick={() => toggleProduct(product.id)}
+                                        >
+                                          <TableCell className="py-4">
+                                            <div className="flex items-center justify-center">
+                                              <Checkbox
+                                                checked={isSelected}
+                                                onCheckedChange={() => toggleProduct(product.id)}
+                                                className="h-6 w-6"
+                                              />
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="py-4">
+                                            <div>
+                                              <div className="font-medium text-base">{product.name}</div>
+                                              <div className="text-sm text-muted-foreground mt-1">
+                                                {product.sku && <span>SKU: {product.sku} • </span>}
+                                                <span>{product.unit}</span>
+                                              </div>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="py-4" onClick={(e) => e.stopPropagation()}>
+                                            {isSelected && (
+                                              <Input
+                                                type="number"
+                                                inputMode="decimal"
+                                                min="0.01"
+                                                step="0.01"
+                                                value={selectedProducts[product.id] || 1}
+                                                onChange={(e) => updateQuantity(product.id, Number(e.target.value))}
+                                                className="w-full h-11 text-base"
+                                              />
+                                            )}
+                                          </TableCell>
+                                        </TableRow>
+                                      )
+                                    })
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+
+                          {/* Botones de acción */}
+                          <div className="flex justify-end gap-2 border-t pt-4">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsProductSelectorOpen(false)}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              type="button"
+                              onClick={addSelectedProductsToTemplate}
+                              disabled={Object.keys(selectedProducts).length === 0}
+                            >
+                              Agregar {Object.keys(selectedProducts).length > 0 && `(${Object.keys(selectedProducts).length})`}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
 
-                  <div className="space-y-2">
-                    {formData.items.map((item, index) => (
-                      <div key={index} className="flex gap-2">
-                        <Select value={item.productId} onValueChange={(value) => updateItem(index, "productId", value)}>
-                          <SelectTrigger className="flex-1">
-                            <SelectValue placeholder="Seleccionar producto" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem key={product.id} value={product.id}>
-                                {product.name} ({product.unit})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input
-                          type="number"
-                          min="1"
-                          placeholder="Cantidad"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                          className="w-32"
-                        />
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  {/* Lista de productos agregados */}
+                  {formData.items.length === 0 ? (
+                    <div className="border rounded-md p-8 text-center text-muted-foreground text-sm">
+                      No hay productos en esta plantilla. Haz clic en "Agregar producto" para comenzar.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {formData.items.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2 border rounded-md p-3">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.productName}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {item.quantity} {item.unit}
+                            </div>
+                          </div>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            min="1"
+                            step="0.01"
+                            placeholder="Cantidad"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
+                            className="w-24"
+                          />
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(index)}>
+                            <X className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-2">
