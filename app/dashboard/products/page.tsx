@@ -326,7 +326,7 @@ function ProductsContent() {
                   Importación Masiva
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+              <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
                 <DialogHeader>
                   <DialogTitle>Importación Masiva de Productos</DialogTitle>
                   <DialogDescription>
@@ -400,25 +400,33 @@ Producto 2	P002	litros	Descripción 2"
                         Limpiar
                       </Button>
                     </div>
-                    <div className="border rounded-md max-h-80 overflow-y-auto">
-                      <Table>
+                    <div className="border rounded-md max-h-80 overflow-y-auto overflow-x-hidden">
+                      <Table className="table-fixed">
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-12">#</TableHead>
-                            <TableHead>Nombre</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Unidad</TableHead>
-                            <TableHead>Descripción</TableHead>
+                            <TableHead className="w-10">#</TableHead>
+                            <TableHead className="w-[30%]">Nombre</TableHead>
+                            <TableHead className="w-[20%]">SKU</TableHead>
+                            <TableHead className="w-[15%]">Unidad</TableHead>
+                            <TableHead className="w-[35%]">Descripción</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {previewData.map((product, idx) => (
                             <TableRow key={idx}>
-                              <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                              <TableCell className="font-medium">{product.name || "⚠️ Sin nombre"}</TableCell>
-                              <TableCell>{product.sku || "-"}</TableCell>
-                              <TableCell>{product.unit || "unidades"}</TableCell>
-                              <TableCell className="truncate max-w-xs">{product.description || "-"}</TableCell>
+                              <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+                              <TableCell className="font-medium truncate" title={product.name}>
+                                {product.name || "⚠️ Sin nombre"}
+                              </TableCell>
+                              <TableCell className="truncate" title={product.sku}>
+                                {product.sku || "-"}
+                              </TableCell>
+                              <TableCell className="truncate" title={product.unit}>
+                                {product.unit || "unidades"}
+                              </TableCell>
+                              <TableCell className="truncate text-muted-foreground" title={product.description}>
+                                {product.description || "-"}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
