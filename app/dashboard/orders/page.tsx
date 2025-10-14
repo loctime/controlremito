@@ -34,19 +34,36 @@ function OrdersContent() {
     setLoading(true)
     try {
       const ordersRef = collection(db, "apps/controld/orders")
-      let q = query(ordersRef, orderBy("createdAt", "desc"))
+      let ordersData: Order[] = []
 
       // Filtrar según el rol
-      if (user.role === "branch") {
-        q = query(ordersRef, where("fromBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
-      } else if (user.role === "factory") {
-        q = query(ordersRef, where("toBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
+      if (user.role === "branch" || user.role === "factory") {
+        // Para branch y factory: obtener pedidos donde están como origen O destino
+        const qFrom = query(ordersRef, where("fromBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
+        const qTo = query(ordersRef, where("toBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
+
+        const [snapshotFrom, snapshotTo] = await Promise.all([getDocs(qFrom), getDocs(qTo)])
+
+        const ordersFrom = snapshotFrom.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+        const ordersTo = snapshotTo.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+
+        // Combinar y eliminar duplicados
+        const ordersMap = new Map<string, Order>()
+        ;[...ordersFrom, ...ordersTo].forEach((order) => ordersMap.set(order.id, order))
+        ordersData = Array.from(ordersMap.values()).sort(
+          (a, b) => (b.createdAt as any)?.seconds - (a.createdAt as any)?.seconds
+        )
       } else if (user.role === "delivery") {
-        q = query(ordersRef, where("status", "in", ["ready", "received"]), orderBy("createdAt", "desc"))
+        const q = query(ordersRef, where("status", "in", ["ready", "received"]), orderBy("createdAt", "desc"))
+        const snapshot = await getDocs(q)
+        ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+      } else {
+        // admin o maxdev - ver todos
+        const q = query(ordersRef, orderBy("createdAt", "desc"))
+        const snapshot = await getDocs(q)
+        ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
       }
 
-      const snapshot = await getDocs(q)
-      const ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
       setOrders(ordersData)
     } catch (error) {
       console.error("[v0] Error al cargar pedidos:", error)

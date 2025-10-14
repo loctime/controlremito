@@ -24,6 +24,7 @@ function NewOrderContent() {
   const { toast } = useToast()
   const router = useRouter()
   const [branches, setBranches] = useState<Branch[]>([])
+  const [allBranches, setAllBranches] = useState<Branch[]>([]) // Todas las sucursales sin filtrar
   const [products, setProducts] = useState<Product[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(false)
@@ -44,6 +45,9 @@ function NewOrderContent() {
       const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
+
+      // Guardar todas las sucursales sin filtrar
+      setAllBranches(branchesData)
 
       // Filtrar: si es sucursal, solo mostrar fábricas y otras sucursales (no la propia)
       const filtered =
@@ -113,8 +117,8 @@ function NewOrderContent() {
     setLoading(true)
 
     try {
-      const fromBranch = branches.find((b) => b.id === user.branchId)
-      const toBranch = branches.find((b) => b.id === formData.toBranchId)
+      const fromBranch = allBranches.find((b) => b.id === user.branchId)
+      const toBranch = allBranches.find((b) => b.id === formData.toBranchId)
 
       if (!fromBranch || !toBranch) {
         throw new Error("No se encontraron las sucursales")
