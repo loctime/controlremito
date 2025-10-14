@@ -39,15 +39,22 @@ service cloud.firestore {
     // ===== REGLAS PARA REMITOS (CONTROLD) =====
     
     match /apps/controld {
-      // Usuarios - todos pueden leer, solo admin/maxdev pueden escribir
+      // Usuarios - todos autenticados pueden leer, crear su propio documento, admin/maxdev pueden modificar todos
       match /users/{userId} {
+        // Permitir lectura a todos los autenticados (sin validar si existe su documento)
         allow read: if isAuthenticated();
+        
         // Permitir crear su propio documento de usuario (auto-registro)
         allow create: if isAuthenticated() && request.auth.uid == userId;
+        
         // Permitir actualizar su propio perfil o si es admin/maxdev
-        allow update: if (isAuthenticated() && request.auth.uid == userId) || isMaxDev() || isAdmin();
+        allow update: if isAuthenticated() && (
+          request.auth.uid == userId || 
+          (userDocExists() && (getUserData().role == 'admin' || getUserData().role == 'maxdev'))
+        );
+        
         // Solo admin/maxdev pueden eliminar usuarios
-        allow delete: if isMaxDev() || isAdmin();
+        allow delete: if userDocExists() && (getUserData().role == 'admin' || getUserData().role == 'maxdev');
       }
       
       // Sucursales/Fábricas - todos autenticados pueden leer, admin/maxdev pueden escribir

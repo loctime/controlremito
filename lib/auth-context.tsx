@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { createContext, useContext, useEffect, useState } from "react"
+import { initializeApp, deleteApp } from "firebase/app"
 import {
   type User as FirebaseUser,
   onAuthStateChanged,
@@ -10,6 +11,7 @@ import {
   signOut as firebaseSignOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  getAuth,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db, googleProvider } from "./firebase"
@@ -120,8 +122,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const createUser = async (email: string, password: string, userData: Partial<User>) => {
     try {
-      // Intentar crear el usuario en Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password)
+      // Crear una segunda instancia de Firebase solo para crear usuarios
+      // Esto evita que se cierre la sesión del admin
+      const secondaryApp = initializeApp(
+        {
+          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+        },
+        'secondary' + Date.now() // Nombre único para cada operación
+      )
+      const secondaryAuth = getAuth(secondaryApp)
+
+      // Crear el usuario en la instancia secundaria (no afecta la sesión principal)
+      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password)
       const newUser = userCredential.user
 
       // Crear documento de usuario en Firestore con todos los datos proporcionados
@@ -134,22 +148,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         active: userData.active !== undefined ? userData.active : true,
       })
       
-      // Cerrar sesión del usuario recién creado
-      await firebaseSignOut(auth)
-      
-      // Esperar más tiempo para que el auth listener se actualice
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // Eliminar la app secundaria para liberar recursos
+      await deleteApp(secondaryApp)
       
     } catch (error: any) {
       // Si el usuario ya existe en Firebase Auth (de otra app), 
-      // iniciar sesión temporalmente para obtener el UID y crear el documento
+      // iniciar sesión en instancia secundaria para obtener el UID y crear el documento
       if (error.code === "auth/email-already-in-use") {
-        // Guardar el usuario actual (admin)
-        const currentUser = auth.currentUser
-        
         try {
+          // Crear una instancia secundaria para verificar el usuario existente
+          const secondaryApp = initializeApp(
+            {
+              apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+              authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+              projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+            },
+            'secondary-check' + Date.now()
+          )
+          const secondaryAuth = getAuth(secondaryApp)
+          
           // Iniciar sesión con el usuario existente para obtener su UID
-          const userCredential = await signInWithEmailAndPassword(auth, email, password)
+          const userCredential = await signInWithEmailAndPassword(secondaryAuth, email, password)
           const existingUser = userCredential.user
           
           // Verificar si ya existe el documento en Firestore
@@ -177,11 +196,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             })
           }
           
-          // Cerrar sesión del usuario para restaurar la sesión del admin
-          await firebaseSignOut(auth)
-          
-          // Esperar más tiempo para que el auth listener se actualice
-          await new Promise(resolve => setTimeout(resolve, 1500))
+          // Eliminar la app secundaria
+          await deleteApp(secondaryApp)
           
         } catch (signInError: any) {
           // Si falla el inicio de sesión, significa que la contraseña es incorrecta

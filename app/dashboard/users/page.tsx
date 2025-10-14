@@ -122,7 +122,7 @@ function UsersContent() {
 
         toast({
           title: "Usuario creado",
-          description: "El usuario se creó correctamente. Recarga la página para ver los cambios.",
+          description: "El usuario se creó correctamente",
         })
       }
 
@@ -130,12 +130,8 @@ function UsersContent() {
       setEditingUser(null)
       setFormData({ email: "", password: "", name: "", role: "branch", branchId: "" })
       
-      // Esperar a que se restaure la sesión antes de recargar usuarios
-      setTimeout(() => {
-        fetchUsers().catch(() => {
-          // Ignorar errores si la sesión aún no se restauró
-        })
-      }, 2000)
+      // Recargar usuarios inmediatamente (la sesión del admin se mantiene)
+      fetchUsers()
     } catch (error: any) {
       console.error("[v0] Error al guardar usuario:", error)
 
