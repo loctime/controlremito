@@ -4,7 +4,7 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit } from "lucide-react"
+import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -13,6 +13,8 @@ import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 import { isDayAllowed } from "@/lib/utils"
 import { createRemitMetadata } from "@/lib/remit-metadata-service"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 function DashboardContent() {
   const { user } = useAuth()
@@ -26,6 +28,12 @@ function DashboardContent() {
   })
   const [templates, setTemplates] = useState<Template[]>([])
   const [draftOrders, setDraftOrders] = useState<Order[]>([])
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+  const [editFormData, setEditFormData] = useState<{
+    items: { productId: string; productName: string; quantity: number; unit: string }[]
+    notes: string
+  }>({ items: [], notes: "" })
 
   useEffect(() => {
     const fetchData = async () => {
@@ -261,6 +269,74 @@ function DashboardContent() {
     }
   }
 
+  const toggleExpanded = (templateId: string) => {
+    if (expandedCard === templateId) {
+      setExpandedCard(null)
+      setEditingOrder(null)
+    } else {
+      setExpandedCard(templateId)
+    }
+  }
+
+  const startEditing = (order: Order) => {
+    setEditingOrder(order)
+    setEditFormData({
+      items: order.items.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unit: item.unit
+      })),
+      notes: order.notes || ""
+    })
+  }
+
+  const cancelEditing = () => {
+    setEditingOrder(null)
+    setEditFormData({ items: [], notes: "" })
+  }
+
+  const updateItemQuantity = (itemIndex: number, newQuantity: number) => {
+    if (newQuantity < 0) return
+    const newItems = [...editFormData.items]
+    newItems[itemIndex] = { ...newItems[itemIndex], quantity: newQuantity }
+    setEditFormData({ ...editFormData, items: newItems })
+  }
+
+  const saveChanges = async () => {
+    if (!editingOrder) return
+
+    try {
+      const updatedItems = editFormData.items.map(item => ({
+        ...item,
+        id: `${Date.now()}-${item.productId}`,
+        status: "pending" as const,
+      }))
+
+      await updateDoc(doc(db, "apps/controld/orders", editingOrder.id), {
+        items: updatedItems,
+        notes: editFormData.notes
+      })
+
+      toast({
+        title: "Cambios guardados",
+        description: "El pedido se actualizó correctamente",
+      })
+
+      // Recargar borradores
+      await fetchDraftOrders()
+      setEditingOrder(null)
+      setEditFormData({ items: [], notes: "" })
+    } catch (error) {
+      console.error("Error al guardar cambios:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron guardar los cambios",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Si es sucursal, mostrar plantillas y borradores
   if (user?.role === "branch") {
     return (
@@ -271,114 +347,61 @@ function DashboardContent() {
             <p className="text-muted-foreground">Gestiona tus pedidos y plantillas</p>
           </div>
 
-          {/* Sección de Borradores */}
-          {draftOrders.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-4">📝 Borradores en Progreso</h3>
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {draftOrders.map((order) => {
-                  const template = templates.find(t => t.id === order.templateId)
-                  return (
-                    <Card key={order.id} className="border-orange-200 bg-orange-50/50">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Edit className="h-5 w-5 text-orange-600" />
-                            <CardTitle className="text-base sm:text-lg text-orange-800">
-                              {template?.name || "Pedido"}
-                            </CardTitle>
-                          </div>
-                          <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
-                            Borrador
-                          </span>
-                        </div>
-                        <CardDescription className="text-sm text-orange-700">
-                          {order.orderNumber}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground mb-2">
-                              Productos ({order.items.length}):
-                            </p>
-                            <div className="space-y-1">
-                              {order.items.slice(0, 3).map((item, index) => (
-                                <div key={index} className="text-sm">
-                                  <span className="font-medium">{item.productName}</span>
-                                  <span className="text-muted-foreground ml-2">
-                                    {item.quantity} {item.unit}
-                                  </span>
-                                </div>
-                              ))}
-                              {order.items.length > 3 && (
-                                <p className="text-sm text-muted-foreground">
-                                  +{order.items.length - 3} productos más...
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              className="flex-1"
-                              onClick={() => window.location.href = `/dashboard/orders/new?edit=${order.id}`}
-                            >
-                              <Edit className="mr-1 h-3 w-3" />
-                              Editar
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              className="flex-1"
-                              onClick={() => sendDraftOrder(order)}
-                              disabled={order.allowedSendDays && !isDayAllowed(order.allowedSendDays)}
-                            >
-                              <Send className="mr-1 h-3 w-3" />
-                              Enviar
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Sección de Plantillas */}
+          {/* Sección Unificada de Plantillas */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">📋 Plantillas Disponibles</h3>
+            <h3 className="text-lg font-semibold mb-4">📋 Plantillas</h3>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {templates.map((template) => {
                 const existingDraft = draftOrders.find(order => order.templateId === template.id)
                 return (
-                  <Card key={template.id} className="hover:shadow-lg transition-all">
+                  <Card 
+                    key={template.id} 
+                    className={`hover:shadow-lg transition-all ${
+                      existingDraft 
+                        ? "border-orange-200 bg-orange-50/50" 
+                        : "border-gray-200"
+                    }`}
+                  >
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <FileText className="h-5 w-5 text-primary" />
-                          <CardTitle className="text-base sm:text-lg">{template.name}</CardTitle>
+                          {existingDraft ? (
+                            <Edit className="h-5 w-5 text-orange-600" />
+                          ) : (
+                            <FileText className="h-5 w-5 text-primary" />
+                          )}
+                          <CardTitle className={`text-base sm:text-lg ${
+                            existingDraft ? "text-orange-800" : ""
+                          }`}>
+                            {template.name}
+                          </CardTitle>
                         </div>
-                        {existingDraft && (
-                          <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">
+                        {existingDraft ? (
+                          <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
                             En Borrador
+                          </span>
+                        ) : (
+                          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                            Disponible
                           </span>
                         )}
                       </div>
                       {template.description && (
-                        <CardDescription className="text-sm">{template.description}</CardDescription>
+                        <CardDescription className={`text-sm ${
+                          existingDraft ? "text-orange-700" : ""
+                        }`}>
+                          {existingDraft ? existingDraft.orderNumber : template.description}
+                        </CardDescription>
                       )}
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
                         <div>
                           <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Productos incluidos ({template.items.length}):
+                            Productos ({existingDraft ? existingDraft.items.length : template.items.length}):
                           </p>
                           <div className="space-y-1">
-                            {template.items.slice(0, 3).map((item, index) => (
+                            {(existingDraft ? existingDraft.items : template.items).slice(0, 3).map((item, index) => (
                               <div key={index} className="text-sm">
                                 <span className="font-medium">{item.productName}</span>
                                 <span className="text-muted-foreground ml-2">
@@ -386,32 +409,124 @@ function DashboardContent() {
                                 </span>
                               </div>
                             ))}
-                            {template.items.length > 3 && (
+                            {(existingDraft ? existingDraft.items : template.items).length > 3 && (
                               <p className="text-sm text-muted-foreground">
-                                +{template.items.length - 3} productos más...
+                                +{(existingDraft ? existingDraft.items : template.items).length - 3} productos más...
                               </p>
                             )}
                           </div>
                         </div>
-                        <Button 
-                          onClick={() => createOrderFromTemplate(template)}
-                          className="w-full"
-                          variant={existingDraft ? "outline" : "default"}
-                        >
-                          {existingDraft ? (
-                            <>
-                              <Edit className="mr-2 h-4 w-4" />
-                              <span className="hidden sm:inline">Continuar Edición</span>
-                              <span className="sm:hidden">Continuar</span>
-                            </>
-                          ) : (
-                            <>
-                              <Plus className="mr-2 h-4 w-4" />
-                              <span className="hidden sm:inline">Crear pedido</span>
-                              <span className="sm:hidden">Crear</span>
-                            </>
-                          )}
-                        </Button>
+                        
+                        {existingDraft ? (
+                          // Botones para borrador existente
+                          <div className="space-y-3">
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex-1"
+                                onClick={() => {
+                                  if (editingOrder?.id === existingDraft.id) {
+                                    cancelEditing()
+                                  } else {
+                                    startEditing(existingDraft)
+                                  }
+                                }}
+                              >
+                                {editingOrder?.id === existingDraft.id ? (
+                                  <>
+                                    <X className="mr-1 h-3 w-3" />
+                                    Cancelar
+                                  </>
+                                ) : (
+                                  <>
+                                    <Edit className="mr-1 h-3 w-3" />
+                                    Editar
+                                  </>
+                                )}
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                className="flex-1"
+                                onClick={() => sendDraftOrder(existingDraft)}
+                                disabled={existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)}
+                              >
+                                <Send className="mr-1 h-3 w-3" />
+                                Enviar
+                              </Button>
+                            </div>
+                            
+                            {/* Sección de edición expandible */}
+                            {editingOrder?.id === existingDraft.id && (
+                              <div className="border-t pt-3 space-y-3">
+                                <div>
+                                  <Label className="text-sm font-medium">Notas del pedido</Label>
+                                  <Input
+                                    value={editFormData.notes}
+                                    onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                                    placeholder="Agregar notas..."
+                                    className="mt-1"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label className="text-sm font-medium">Cantidades</Label>
+                                  <div className="space-y-2 mt-2">
+                                    {editFormData.items.map((item, index) => (
+                                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                        <div className="flex-1">
+                                          <span className="text-sm font-medium">{item.productName}</span>
+                                          <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateItemQuantity(index, item.quantity - 1)}
+                                            disabled={item.quantity <= 0}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            -
+                                          </Button>
+                                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateItemQuantity(index, item.quantity + 1)}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            +
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <Button 
+                                    onClick={saveChanges}
+                                    className="flex-1"
+                                    size="sm"
+                                  >
+                                    <Save className="mr-1 h-3 w-3" />
+                                    Guardar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Botón para crear nuevo
+                          <Button 
+                            onClick={() => createOrderFromTemplate(template)}
+                            className="w-full"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            <span className="hidden sm:inline">Crear pedido</span>
+                            <span className="sm:hidden">Crear</span>
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
