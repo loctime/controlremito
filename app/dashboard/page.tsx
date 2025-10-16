@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase"
 import type { Order, Template } from "@/lib/types"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import { isDayAllowed } from "@/lib/utils"
+import { isDayAllowed, getNextAllowedDay, getCurrentDayOfWeek } from "@/lib/utils"
 import { createRemitMetadata } from "@/lib/remit-metadata-service"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -161,6 +161,38 @@ function DashboardContent() {
       console.log("📝 [DEBUG] Borradores encontrados:", draftOrdersData.length)
     } catch (error) {
       console.error("[v0] Error al cargar borradores:", error)
+    }
+  }
+
+  const getTemplateStatus = (template: Template) => {
+    const existingDraft = draftOrders.find(order => order.templateId === template.id)
+    
+    if (existingDraft) {
+      return {
+        status: 'draft',
+        label: 'En Borrador',
+        color: 'bg-orange-200 text-orange-800'
+      }
+    }
+
+    // Verificar si hay un pedido enviado recientemente para esta plantilla
+    // (esto requeriría cargar todos los pedidos enviados, por ahora asumimos que si no hay borrador, está disponible)
+    const today = getCurrentDayOfWeek()
+    const isTodayAllowed = template.allowedSendDays?.includes(today) || false
+    
+    if (isTodayAllowed) {
+      return {
+        status: 'available',
+        label: 'Disponible',
+        color: 'bg-green-200 text-green-800'
+      }
+    } else {
+      const nextDay = getNextAllowedDay(template.allowedSendDays || [])
+      return {
+        status: 'waiting',
+        label: `Próximo: ${nextDay}`,
+        color: 'bg-blue-200 text-blue-800'
+      }
     }
   }
 
@@ -381,42 +413,42 @@ function DashboardContent() {
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {templates.map((template) => {
                 const existingDraft = draftOrders.find(order => order.templateId === template.id)
+                const templateStatus = getTemplateStatus(template)
+                
                 return (
                   <Card 
                     key={template.id} 
                     className={`hover:shadow-lg transition-all ${
-                      existingDraft 
+                      templateStatus.status === 'draft'
                         ? "border-orange-200 bg-orange-50/50" 
+                        : templateStatus.status === 'waiting'
+                        ? "border-blue-200 bg-blue-50/50"
                         : "border-gray-200"
                     }`}
                   >
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          {existingDraft ? (
+                          {templateStatus.status === 'draft' ? (
                             <Edit className="h-5 w-5 text-orange-600" />
                           ) : (
                             <FileText className="h-5 w-5 text-primary" />
                           )}
                           <CardTitle className={`text-base sm:text-lg ${
-                            existingDraft ? "text-orange-800" : ""
+                            templateStatus.status === 'draft' ? "text-orange-800" : 
+                            templateStatus.status === 'waiting' ? "text-blue-800" : ""
                           }`}>
                             {template.name}
                           </CardTitle>
                         </div>
-                        {existingDraft ? (
-                          <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded">
-                            En Borrador
-                          </span>
-                        ) : (
-                          <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                            Disponible
-                          </span>
-                        )}
+                        <span className={`text-xs px-2 py-1 rounded ${templateStatus.color}`}>
+                          {templateStatus.label}
+                        </span>
                       </div>
                       {template.description && (
                         <CardDescription className={`text-sm ${
-                          existingDraft ? "text-orange-700" : ""
+                          templateStatus.status === 'draft' ? "text-orange-700" : 
+                          templateStatus.status === 'waiting' ? "text-blue-700" : ""
                         }`}>
                           {existingDraft ? existingDraft.orderNumber : template.description}
                         </CardDescription>
@@ -566,8 +598,8 @@ function DashboardContent() {
                               </div>
                             )}
                           </div>
-                        ) : (
-                          // Botón para crear nuevo
+                        ) : templateStatus.status === 'available' ? (
+                          // Botón para crear nuevo (solo cuando está disponible)
                           <Button 
                             onClick={() => createOrderFromTemplate(template)}
                             className="w-full"
@@ -576,6 +608,11 @@ function DashboardContent() {
                             <span className="hidden sm:inline">Crear pedido</span>
                             <span className="sm:hidden">Crear</span>
                           </Button>
+                        ) : (
+                          // Cuando no está disponible, mostrar mensaje
+                          <div className="w-full text-center text-sm text-muted-foreground py-2">
+                            No disponible hoy
+                          </div>
                         )}
                       </div>
                     </CardContent>

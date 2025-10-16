@@ -93,6 +93,14 @@ service cloud.firestore {
         allow update, delete: if isAuthenticated() && 
                                 (resource.data.createdBy == request.auth.uid || isMaxDev() || isAdmin());
       }
+      
+      // Metadata de remitos (historial de estados y firmas)
+      match /remit-metadata/{metadataId} {
+        allow read: if isAuthenticated();
+        allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
+        allow update: if isFactory() || isDelivery() || isMaxDev() || isAdmin();
+        allow delete: if isMaxDev() || isAdmin();
+      }
     }
     
     // ===== REGLAS PARA CONTROLGASTOS =====
