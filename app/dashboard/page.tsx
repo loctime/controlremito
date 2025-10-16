@@ -142,6 +142,21 @@ function DashboardContent() {
       )
       const snapshot = await getDocs(q)
       const draftOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+      
+      // Arreglar borradores que no tienen días permitidos
+      for (const draft of draftOrdersData) {
+        if (!draft.allowedSendDays || draft.allowedSendDays.length === 0) {
+          const template = templates.find(t => t.id === draft.templateId)
+          if (template && template.allowedSendDays) {
+            console.log("🔧 [DEBUG] Arreglando borrador sin días permitidos:", draft.id)
+            await updateDoc(doc(db, "apps/controld/orders", draft.id), {
+              allowedSendDays: template.allowedSendDays
+            })
+            draft.allowedSendDays = template.allowedSendDays
+          }
+        }
+      }
+      
       setDraftOrders(draftOrdersData)
       console.log("📝 [DEBUG] Borradores encontrados:", draftOrdersData.length)
     } catch (error) {
@@ -202,8 +217,11 @@ function DashboardContent() {
         createdBy: user.id,
         createdByName: user.name,
         templateId: template.id,
-        allowedSendDays: template.allowedSendDays,
+        allowedSendDays: template.allowedSendDays || [],
       }
+
+      console.log("🔍 [DEBUG] Creando borrador - Días permitidos de la plantilla:", template.allowedSendDays)
+      console.log("🔍 [DEBUG] Creando borrador - Días permitidos del pedido:", orderData.allowedSendDays)
 
       const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
       
@@ -232,7 +250,7 @@ function DashboardContent() {
 
     try {
       // Verificar si hoy es un día permitido
-      if (order.allowedSendDays && !isDayAllowed(order.allowedSendDays)) {
+      if (order.allowedSendDays && order.allowedSendDays.length > 0 && !isDayAllowed(order.allowedSendDays)) {
         toast({
           title: "Error",
           description: "Hoy no es un día permitido para enviar este pedido",
@@ -242,8 +260,18 @@ function DashboardContent() {
       }
 
       // Actualizar estado del pedido
+      console.log("🔍 [DEBUG] Actualizando pedido:", order.id, "usuario:", user.id)
+      console.log("🔍 [DEBUG] Datos del pedido:", {
+        createdBy: order.createdBy,
+        fromBranchId: order.fromBranchId,
+        userBranchId: user.branchId
+      })
+      
       await updateDoc(doc(db, "apps/controld/orders", order.id), {
-        status: "sent"
+        status: "sent",
+        sentAt: new Date(),
+        sentBy: user.id,
+        sentByName: user.name
       })
 
       // Crear metadata del remito
@@ -341,7 +369,7 @@ function DashboardContent() {
   if (user?.role === "branch") {
     return (
       <ProtectedRoute>
-        <div>
+        <div className="max-w-7xl mx-auto">
           <div className="mb-6">
             <h2 className="text-2xl font-bold">Bienvenido, {user?.name}</h2>
             <p className="text-muted-foreground">Gestiona tus pedidos y plantillas</p>
@@ -350,7 +378,7 @@ function DashboardContent() {
           {/* Sección Unificada de Plantillas */}
           <div>
             <h3 className="text-lg font-semibold mb-4">📋 Plantillas</h3>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
               {templates.map((template) => {
                 const existingDraft = draftOrders.find(order => order.templateId === template.id)
                 return (
@@ -396,7 +424,8 @@ function DashboardContent() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        <div>
+                        {/* Solo mostrar detalles de productos en desktop */}
+                        <div className="hidden sm:block">
                           <p className="text-sm font-medium text-muted-foreground mb-2">
                             Productos ({existingDraft ? existingDraft.items.length : template.items.length}):
                           </p>
@@ -415,6 +444,13 @@ function DashboardContent() {
                               </p>
                             )}
                           </div>
+                        </div>
+
+                        {/* En móvil, solo mostrar contador simple */}
+                        <div className="sm:hidden">
+                          <p className="text-sm text-muted-foreground">
+                            {existingDraft ? existingDraft.items.length : template.items.length} productos
+                          </p>
                         </div>
                         
                         {existingDraft ? (
@@ -436,23 +472,37 @@ function DashboardContent() {
                                 {editingOrder?.id === existingDraft.id ? (
                                   <>
                                     <X className="mr-1 h-3 w-3" />
-                                    Cancelar
+                                    <span className="hidden sm:inline">Cancelar</span>
                                   </>
                                 ) : (
                                   <>
                                     <Edit className="mr-1 h-3 w-3" />
-                                    Editar
+                                    <span className="hidden sm:inline">Editar</span>
                                   </>
                                 )}
                               </Button>
                               <Button 
                                 size="sm" 
-                                className="flex-1"
+                                className={`flex-1 ${
+                                  existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : ''
+                                }`}
                                 onClick={() => sendDraftOrder(existingDraft)}
                                 disabled={existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)}
+                                title={
+                                  existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)
+                                    ? `Hoy no es un día permitido para enviar. Días permitidos: ${existingDraft.allowedSendDays.join(', ')}`
+                                    : 'Enviar pedido'
+                                }
                               >
                                 <Send className="mr-1 h-3 w-3" />
-                                Enviar
+                                <span className="hidden sm:inline">
+                                  {existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays) 
+                                    ? 'No disponible' 
+                                    : 'Enviar'
+                                  }
+                                </span>
                               </Button>
                             </div>
                             
@@ -560,7 +610,7 @@ function DashboardContent() {
   // Para otros roles, mostrar estadísticas
   return (
     <ProtectedRoute>
-      <div>
+      <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h2 className="text-xl sm:text-2xl font-bold">Bienvenido, {user?.name}</h2>
           <p className="text-sm sm:text-base text-muted-foreground">Resumen de actividad</p>

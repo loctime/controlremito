@@ -9,16 +9,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Plus, X, FileText } from "lucide-react"
-import { useEffect, useState } from "react"
+import { ArrowLeft, Plus, X, FileText, Send, CheckCircle, Edit, Truck, AlertCircle } from "lucide-react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
-import type { Branch, Product, Template, DayOfWeek } from "@/lib/types"
+import type { Branch, Product, Template, DayOfWeek, Order } from "@/lib/types"
 import { isDayAllowed, getNextAllowedDay, formatDayOfWeek } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
+import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 function NewOrderContent() {
   const { user } = useAuth()
@@ -31,6 +33,11 @@ function NewOrderContent() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(false)
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [createdOrderId, setCreatedOrderId] = useState<string | null>(null)
+  const [orderDetails, setOrderDetails] = useState<Order | null>(null)
+  const [loadingDetails, setLoadingDetails] = useState(false)
   const [formData, setFormData] = useState({
     toBranchId: "",
     notes: "",
@@ -38,12 +45,242 @@ function NewOrderContent() {
     templateId: "",
     allowedSendDays: [] as DayOfWeek[],
   })
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const draftOrderIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     fetchBranches()
     fetchProducts()
     fetchTemplates()
+    loadDraftFromLocalStorage()
   }, [user])
+
+  // Cargar borrador desde localStorage al inicializar
+  const loadDraftFromLocalStorage = useCallback(() => {
+    if (!user?.branchId) return
+    
+    try {
+      const draftKey = `order_draft_${user.branchId}_${user.id}`
+      const savedDraft = localStorage.getItem(draftKey)
+      
+      if (savedDraft) {
+        const draftData = JSON.parse(savedDraft)
+        
+        // Verificar que el borrador no sea muy antiguo (más de 7 días)
+        const draftDate = new Date(draftData.timestamp)
+        const now = new Date()
+        const daysDiff = (now.getTime() - draftDate.getTime()) / (1000 * 60 * 60 * 24)
+        
+        if (daysDiff < 7) {
+          setFormData(draftData.formData)
+          setLastSaved(draftDate)
+          
+          // Si hay un ID de pedido guardado, cargar ese pedido
+          if (draftData.orderId) {
+            draftOrderIdRef.current = draftData.orderId
+          }
+          
+          toast({
+            title: "Borrador recuperado",
+            description: "Se encontró un borrador guardado automáticamente",
+          })
+        } else {
+          // Eliminar borrador antiguo
+          localStorage.removeItem(draftKey)
+        }
+      }
+    } catch (error) {
+      console.error("Error al cargar borrador desde localStorage:", error)
+    }
+  }, [user, toast])
+
+  // Guardar borrador en localStorage
+  const saveDraftToLocalStorage = useCallback((data: typeof formData, orderId?: string) => {
+    if (!user?.branchId) return
+    
+    try {
+      const draftKey = `order_draft_${user.branchId}_${user.id}`
+      const draftData = {
+        formData: data,
+        orderId: orderId || draftOrderIdRef.current,
+        timestamp: new Date().toISOString(),
+      }
+      
+      localStorage.setItem(draftKey, JSON.stringify(draftData))
+    } catch (error) {
+      console.error("Error al guardar borrador en localStorage:", error)
+    }
+  }, [user])
+
+  // Limpiar borrador del localStorage
+  const clearDraftFromLocalStorage = useCallback(() => {
+    if (!user?.branchId) return
+    
+    try {
+      const draftKey = `order_draft_${user.branchId}_${user.id}`
+      localStorage.removeItem(draftKey)
+      draftOrderIdRef.current = null
+    } catch (error) {
+      console.error("Error al limpiar borrador del localStorage:", error)
+    }
+  }, [user])
+
+  // Guardar borrador en Firestore
+  const saveDraftToFirestore = useCallback(async (data: typeof formData) => {
+    if (!user || !user.branchId) return null
+    
+    try {
+      setSaving(true)
+      
+      const fromBranch = allBranches.find((b) => b.id === user.branchId)
+      const toBranch = allBranches.find((b) => b.id === data.toBranchId)
+      
+      if (!fromBranch) {
+        throw new Error(`No se encontró la sucursal de origen (ID: ${user.branchId})`)
+      }
+
+      const orderData: any = {
+        fromBranchId: user.branchId,
+        fromBranchName: fromBranch.name,
+        toBranchId: data.toBranchId || "",
+        toBranchName: toBranch?.name || "",
+        status: "draft",
+        items: data.items.map((item: any) => ({
+          ...item,
+          id: item.id || `${Date.now()}-${Math.random()}`,
+          status: "pending",
+        })),
+        updatedAt: new Date(),
+        createdBy: user.id,
+        createdByName: user.name,
+        notes: data.notes,
+        allowedSendDays: data.allowedSendDays,
+      }
+
+      // Solo agregar templateId si tiene un valor válido
+      if (data.templateId) {
+        orderData.templateId = data.templateId
+      }
+
+      let orderId: string
+
+      if (draftOrderIdRef.current) {
+        // Actualizar pedido existente
+        await updateDoc(doc(db, "apps/controld/orders", draftOrderIdRef.current), orderData)
+        orderId = draftOrderIdRef.current
+      } else {
+        // Crear nuevo pedido en borrador
+        orderData.orderNumber = `PED-${Date.now()}`
+        orderData.createdAt = new Date()
+        
+        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        orderId = docRef.id
+        draftOrderIdRef.current = orderId
+      }
+
+      setLastSaved(new Date())
+      return orderId
+    } catch (error) {
+      console.error("Error al guardar borrador en Firestore:", error)
+      return null
+    } finally {
+      setSaving(false)
+    }
+  }, [user, allBranches])
+
+  // Función de guardado automático
+  const autoSave = useCallback(async () => {
+    if (!user || !formData.toBranchId || formData.items.length === 0) {
+      return
+    }
+
+    try {
+      const orderId = await saveDraftToFirestore(formData)
+      if (orderId) {
+        saveDraftToLocalStorage(formData, orderId)
+      }
+    } catch (error) {
+      console.error("Error en guardado automático:", error)
+    }
+  }, [user, formData, saveDraftToFirestore, saveDraftToLocalStorage])
+
+  // Configurar guardado automático cuando cambia el formData
+  useEffect(() => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+    }
+
+    // Solo guardar automáticamente si hay datos mínimos
+    if (formData.toBranchId && formData.items.length > 0) {
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        autoSave()
+      }, 30000) // Guardar cada 30 segundos
+    }
+
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [formData, autoSave])
+
+  // Limpiar timeout al desmontar
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Función para guardar borrador manualmente
+  const handleSaveDraft = useCallback(async () => {
+    if (!formData.toBranchId || formData.items.length === 0) {
+      toast({
+        title: "Datos insuficientes",
+        description: "Selecciona un destino y agrega al menos un producto para guardar el borrador",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const orderId = await saveDraftToFirestore(formData)
+      if (orderId) {
+        saveDraftToLocalStorage(formData, orderId)
+        toast({
+          title: "Borrador guardado",
+          description: "El pedido se guardó como borrador exitosamente",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "No se pudo guardar el borrador",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error al guardar borrador:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo guardar el borrador",
+        variant: "destructive",
+      })
+    }
+  }, [formData, saveDraftToFirestore, saveDraftToLocalStorage, toast])
+
+  // Función para volver al formulario de creación
+  const handleBackToForm = useCallback(() => {
+    setCreatedOrderId(null)
+    setEditingOrderId(null)
+    setFormData({
+      toBranchId: "",
+      notes: "",
+      items: [],
+      templateId: "",
+      allowedSendDays: [],
+    })
+  }, [])
 
   // Cargar plantilla automáticamente si hay parámetro en URL
   useEffect(() => {
@@ -60,6 +297,34 @@ function NewOrderContent() {
       loadExistingOrder(editOrderId)
     }
   }, [searchParams, editingOrderId])
+
+  // Cargar detalles del pedido creado
+  useEffect(() => {
+    if (createdOrderId) {
+      loadOrderDetails(createdOrderId)
+    }
+  }, [createdOrderId])
+
+  const loadOrderDetails = async (orderId: string) => {
+    try {
+      setLoadingDetails(true)
+      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+      
+      if (orderDoc.exists()) {
+        const orderData = orderDoc.data()
+        setOrderDetails({ id: orderId, ...orderData } as Order)
+      }
+    } catch (error) {
+      console.error("Error al cargar detalles del pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los detalles del pedido",
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingDetails(false)
+    }
+  }
 
   const fetchBranches = async () => {
     try {
@@ -255,14 +520,16 @@ function NewOrderContent() {
 
         toast({
           title: "✅ Pedido creado exitosamente",
-          description: `El pedido ${orderNumber} se creó correctamente y se redirigirá a la lista de pedidos`,
+          description: `El pedido ${orderNumber} se creó correctamente`,
         })
+
+        // Establecer el ID del pedido creado para mostrar la vista de detalles
+        setCreatedOrderId(docRef.id)
       }
 
-      // Pequeña pausa para que el usuario vea el mensaje de éxito
-      setTimeout(() => {
-        router.push("/dashboard/orders")
-      }, 1500)
+      // Limpiar borrador del localStorage y resetear estado
+      clearDraftFromLocalStorage()
+      draftOrderIdRef.current = null
     } catch (error: any) {
       console.error("❌ [DEBUG] Error detallado al crear pedido:", error)
       console.error("🔍 [DEBUG] Código de error:", error.code)
@@ -435,6 +702,179 @@ function NewOrderContent() {
     }
   }
 
+  // Función para obtener el badge de estado
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      draft: { label: "Borrador", variant: "outline" as const, icon: Edit },
+      sent: { label: "Enviado", variant: "secondary" as const, icon: Send },
+      ready: { label: "Listo", variant: "default" as const, icon: CheckCircle },
+      in_transit: { label: "En camino", variant: "default" as const, icon: Truck },
+      received: { label: "Recibido", variant: "default" as const, icon: CheckCircle },
+    }
+    const config = statusConfig[status as keyof typeof statusConfig] || {
+      label: status,
+      variant: "secondary" as const,
+      icon: AlertCircle,
+    }
+    const Icon = config.icon
+    return (
+      <Badge variant={config.variant} className="flex w-fit items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {config.label}
+      </Badge>
+    )
+  }
+
+  // Función para formatear fechas
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return "-"
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp)
+    return date.toLocaleDateString("es-AR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
+
+  // Si se creó un pedido, mostrar la vista de detalles
+  if (createdOrderId && orderDetails) {
+    return (
+      <ProtectedRoute allowedRoles={["branch", "factory", "maxdev"]}>
+        <div>
+          <div className="mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <Button variant="ghost" size="sm" onClick={handleBackToForm}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Crear otro pedido
+              </Button>
+              <Link href="/dashboard/orders">
+                <Button variant="ghost" size="sm">
+                  Ver todos los pedidos
+                </Button>
+              </Link>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold">Pedido Creado</h2>
+                <p className="text-muted-foreground">Detalles del pedido creado exitosamente</p>
+              </div>
+              {getStatusBadge(orderDetails.status)}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {/* Información general del pedido */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Información del Pedido</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Número de Pedido</Label>
+                    <p className="text-lg font-semibold">{orderDetails.orderNumber}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Estado</Label>
+                    <div className="mt-1">{getStatusBadge(orderDetails.status)}</div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Desde</Label>
+                    <p>{orderDetails.fromBranchName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Hacia</Label>
+                    <p>{orderDetails.toBranchName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Creado por</Label>
+                    <p>{orderDetails.createdByName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Fecha de creación</Label>
+                    <p>{formatDate(orderDetails.createdAt)}</p>
+                  </div>
+                </div>
+                {orderDetails.notes && (
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">Notas</Label>
+                    <p className="mt-1 p-3 bg-muted rounded-md">{orderDetails.notes}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Productos del pedido */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Productos ({orderDetails.items.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Producto</TableHead>
+                      <TableHead>Cantidad</TableHead>
+                      <TableHead>Unidad</TableHead>
+                      <TableHead>Estado</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {orderDetails.items.map((item, index) => (
+                      <TableRow key={item.id || index}>
+                        <TableCell className="font-medium">{item.productName}</TableCell>
+                        <TableCell>{item.quantity}</TableCell>
+                        <TableCell>{item.unit}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {item.status === "pending" ? "Pendiente" : 
+                             item.status === "available" ? "Disponible" :
+                             item.status === "not_available" ? "No disponible" :
+                             item.status === "delivered" ? "Entregado" :
+                             item.status === "not_received" ? "No recibido" :
+                             item.status === "returned" ? "Devuelto" : item.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            {/* Botones de acción */}
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <Button variant="outline" onClick={handleBackToForm}>
+                Crear otro pedido
+              </Button>
+              <Link href="/dashboard/orders">
+                <Button>
+                  Ver todos los pedidos
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
+  // Vista de carga de detalles
+  if (createdOrderId && loadingDetails) {
+    return (
+      <ProtectedRoute allowedRoles={["branch", "factory", "maxdev"]}>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Cargando detalles del pedido...</p>
+          </div>
+        </div>
+      </ProtectedRoute>
+    )
+  }
+
   return (
     <ProtectedRoute allowedRoles={["branch", "factory", "maxdev"]}>
       <div>
@@ -445,12 +885,27 @@ function NewOrderContent() {
               Volver a pedidos
             </Button>
           </Link>
-          <h2 className="text-2xl font-bold">
-            {editingOrderId ? "Editar Pedido" : "Nuevo Pedido"}
-          </h2>
-          <p className="text-muted-foreground">
-            {editingOrderId ? "Modifica los detalles del pedido" : "Crea un nuevo pedido de productos"}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">
+                {editingOrderId ? "Editar Pedido" : "Nuevo Pedido"}
+              </h2>
+              <p className="text-muted-foreground">
+                {editingOrderId ? "Modifica los detalles del pedido" : "Crea un nuevo pedido de productos"}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {saving && (
+                <div className="flex items-center gap-1">
+                  <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-600"></div>
+                  <span>Guardando...</span>
+                </div>
+              )}
+              {lastSaved && !saving && (
+                <span>Guardado: {lastSaved.toLocaleTimeString()}</span>
+              )}
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -624,6 +1079,24 @@ function NewOrderContent() {
               </Button>
             </Link>
             <Button 
+              type="button" 
+              variant="secondary"
+              onClick={handleSaveDraft}
+              disabled={saving || !formData.toBranchId || formData.items.length === 0}
+              className="w-full sm:w-auto"
+            >
+              {saving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  💾 Guardar borrador
+                </>
+              )}
+            </Button>
+            <Button 
               type="submit" 
               disabled={loading || !formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || !item.quantity || item.quantity <= 0)} 
               className="w-full sm:w-auto"
@@ -645,6 +1118,13 @@ function NewOrderContent() {
           {(!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || !item.quantity || item.quantity <= 0)) && (
             <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
               ⚠️ Completa todos los campos requeridos antes de crear el pedido
+            </div>
+          )}
+          
+          {/* Información sobre guardado automático */}
+          {formData.toBranchId && formData.items.length > 0 && (
+            <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
+              💡 Tu pedido se guarda automáticamente cada 30 segundos. También puedes usar el botón "Guardar borrador" para guardar manualmente.
             </div>
           )}
         </form>
