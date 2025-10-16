@@ -46,6 +46,11 @@ function OrderDetailContent() {
   const [issueType, setIssueType] = useState<"not_received" | "returned">("not_received")
   const [issueReason, setIssueReason] = useState("")
 
+  // Definir permisos según el rol del usuario
+  const canMarkItems = user?.role === "factory" && order?.status === "sent"
+  const canDeliveryMark = user?.role === "delivery" && order?.status === "ready"
+  const canBranchReceive = user?.role === "branch" && order?.status === "in_transit"
+
   useEffect(() => {
     fetchOrder()
   }, [orderId])

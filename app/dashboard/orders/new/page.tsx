@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Plus, X, FileText } from "lucide-react"
 import { useEffect, useState } from "react"
-import { collection, addDoc, getDocs, query, where } from "firebase/firestore"
+import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Branch, Product, Template, DayOfWeek } from "@/lib/types"
@@ -30,6 +30,7 @@ function NewOrderContent() {
   const [products, setProducts] = useState<Product[]>([])
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(false)
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     toBranchId: "",
     notes: "",
@@ -51,6 +52,14 @@ function NewOrderContent() {
       loadTemplate(templateId)
     }
   }, [searchParams, templates, formData.templateId])
+
+  // Cargar pedido existente para editar
+  useEffect(() => {
+    const editOrderId = searchParams.get('edit')
+    if (editOrderId && !editingOrderId) {
+      loadExistingOrder(editOrderId)
+    }
+  }, [searchParams, editingOrderId])
 
   const fetchBranches = async () => {
     try {
@@ -228,14 +237,27 @@ function NewOrderContent() {
       console.log("📋 [DEBUG] Datos del pedido preparados:", orderData)
       console.log("🔥 [DEBUG] Intentando conectar con Firestore...")
       
-      const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
-      
-      console.log("✅ [DEBUG] Documento creado exitosamente con ID:", docRef.id)
+      if (editingOrderId) {
+        // Actualizar pedido existente
+        await updateDoc(doc(db, "apps/controld/orders", editingOrderId), orderData)
+        
+        console.log("✅ [DEBUG] Pedido actualizado exitosamente")
+        
+        toast({
+          title: "✅ Pedido actualizado exitosamente",
+          description: `El pedido ${orderNumber} se actualizó correctamente`,
+        })
+      } else {
+        // Crear nuevo pedido
+        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        
+        console.log("✅ [DEBUG] Documento creado exitosamente con ID:", docRef.id)
 
-      toast({
-        title: "✅ Pedido creado exitosamente",
-        description: `El pedido ${orderNumber} se creó correctamente y se redirigirá a la lista de pedidos`,
-      })
+        toast({
+          title: "✅ Pedido creado exitosamente",
+          description: `El pedido ${orderNumber} se creó correctamente y se redirigirá a la lista de pedidos`,
+        })
+      }
 
       // Pequeña pausa para que el usuario vea el mensaje de éxito
       setTimeout(() => {
@@ -372,6 +394,47 @@ function NewOrderContent() {
     }
   }
 
+  const loadExistingOrder = async (orderId: string) => {
+    try {
+      setLoading(true)
+      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+      
+      if (orderDoc.exists()) {
+        const orderData = orderDoc.data()
+        setEditingOrderId(orderId)
+        
+        setFormData({
+          toBranchId: orderData.toBranchId || "",
+          notes: orderData.notes || "",
+          items: orderData.items?.map((item: any) => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unit: item.unit,
+          })) || [],
+          templateId: orderData.templateId || "",
+          allowedSendDays: orderData.allowedSendDays || [],
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "No se encontró el pedido para editar",
+          variant: "destructive",
+        })
+        router.push("/dashboard")
+      }
+    } catch (error) {
+      console.error("Error al cargar pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el pedido",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   return (
     <ProtectedRoute allowedRoles={["branch", "factory", "maxdev"]}>
       <div>
@@ -382,8 +445,12 @@ function NewOrderContent() {
               Volver a pedidos
             </Button>
           </Link>
-          <h2 className="text-2xl font-bold">Nuevo Pedido</h2>
-          <p className="text-muted-foreground">Crea un nuevo pedido de productos</p>
+          <h2 className="text-2xl font-bold">
+            {editingOrderId ? "Editar Pedido" : "Nuevo Pedido"}
+          </h2>
+          <p className="text-muted-foreground">
+            {editingOrderId ? "Modifica los detalles del pedido" : "Crea un nuevo pedido de productos"}
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
