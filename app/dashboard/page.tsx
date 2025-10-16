@@ -80,14 +80,36 @@ function DashboardContent() {
 
     try {
       const templatesRef = collection(db, "apps/controld/templates")
-      let q = query(templatesRef, where("active", "==", true))
+      
+      console.log("🔍 [DEBUG] Cargando plantillas para rol:", user.role, "branchId:", user.branchId)
+
+      let templatesData: Template[] = []
 
       if (user.role === "branch" && user.branchId) {
-        q = query(templatesRef, where("active", "==", true), where("branchId", "in", [user.branchId, null]))
+        // Firestore no permite usar "in" con null, así que hacemos dos consultas separadas
+        
+        // 1. Plantillas globales (branchId == null)
+        const globalQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", null))
+        const globalSnapshot = await getDocs(globalQuery)
+        const globalTemplates = globalSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+        console.log("📋 [DEBUG] Plantillas globales encontradas:", globalTemplates.length)
+        
+        // 2. Plantillas específicas de esta sucursal (branchId == user.branchId)
+        const branchQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", user.branchId))
+        const branchSnapshot = await getDocs(branchQuery)
+        const branchTemplates = branchSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+        console.log("📋 [DEBUG] Plantillas de la sucursal encontradas:", branchTemplates.length)
+        
+        // Combinar ambas listas
+        templatesData = [...globalTemplates, ...branchTemplates]
+      } else {
+        // Para admin y otros roles, traer todas las activas
+        const q = query(templatesRef, where("active", "==", true))
+        const snapshot = await getDocs(q)
+        templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
       }
 
-      const snapshot = await getDocs(q)
-      const templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+      console.log("📋 [DEBUG] Total plantillas encontradas:", templatesData.length, templatesData)
       setTemplates(templatesData)
     } catch (error) {
       console.error("[v0] Error al cargar plantillas:", error)

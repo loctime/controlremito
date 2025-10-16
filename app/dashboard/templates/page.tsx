@@ -59,15 +59,31 @@ function TemplatesContent() {
 
     try {
       const templatesRef = collection(db, "apps/controld/templates")
-      let q = query(templatesRef, where("active", "==", true))
+      let templatesData: Template[] = []
 
       // Filtrar plantillas según el rol
       if ((user.role === "branch" || user.role === "factory") && user.branchId) {
-        q = query(templatesRef, where("active", "==", true), where("branchId", "in", [user.branchId, null]))
+        // Firestore no permite usar "in" con null, así que hacemos dos consultas separadas
+        
+        // 1. Plantillas globales (branchId == null)
+        const globalQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", null))
+        const globalSnapshot = await getDocs(globalQuery)
+        const globalTemplates = globalSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+        
+        // 2. Plantillas específicas de esta sucursal/fábrica (branchId == user.branchId)
+        const branchQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", user.branchId))
+        const branchSnapshot = await getDocs(branchQuery)
+        const branchTemplates = branchSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+        
+        // Combinar ambas listas
+        templatesData = [...globalTemplates, ...branchTemplates]
+      } else {
+        // Para admin y otros roles, traer todas las activas
+        const q = query(templatesRef, where("active", "==", true))
+        const snapshot = await getDocs(q)
+        templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
       }
 
-      const snapshot = await getDocs(q)
-      const templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
       setTemplates(templatesData)
     } catch (error) {
       console.error("[v0] Error al cargar plantillas:", error)
