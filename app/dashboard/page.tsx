@@ -34,6 +34,8 @@ function DashboardContent() {
     items: { productId: string; productName: string; quantity: number; unit: string }[]
     notes: string
   }>({ items: [], notes: "" })
+  const [pendingOrders, setPendingOrders] = useState<Order[]>([])
+  const [showPendingOrders, setShowPendingOrders] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -161,6 +163,30 @@ function DashboardContent() {
       console.log("📝 [DEBUG] Borradores encontrados:", draftOrdersData.length)
     } catch (error) {
       console.error("[v0] Error al cargar borradores:", error)
+    }
+  }
+
+  const fetchPendingOrders = async () => {
+    if (!user) return
+
+    try {
+      const ordersRef = collection(db, "apps/controld/orders")
+      let q = query(ordersRef, where("status", "==", "sent"))
+
+      // Filtrar según el rol
+      if (user.role === "branch" && user.branchId) {
+        q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "sent"))
+      } else if (user.role === "factory" && user.branchId) {
+        q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "sent"))
+      }
+
+      const snapshot = await getDocs(q)
+      const pendingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+      
+      setPendingOrders(pendingOrdersData)
+      console.log("📦 [DEBUG] Pedidos pendientes encontrados:", pendingOrdersData.length)
+    } catch (error) {
+      console.error("[v0] Error al cargar pedidos pendientes:", error)
     }
   }
 
@@ -665,9 +691,17 @@ function DashboardContent() {
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-md transition-shadow">
+          <Card 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={async () => {
+              if (!showPendingOrders) {
+                await fetchPendingOrders()
+              }
+              setShowPendingOrders(!showPendingOrders)
+            }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Por Recibir</CardTitle>
+              <CardTitle className="text-sm font-medium">Recibir</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -709,6 +743,91 @@ function DashboardContent() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Sección de pedidos pendientes */}
+        {showPendingOrders && (
+          <div className="mt-6">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold">📦 Pedidos Pendientes de Recibir</h3>
+              <p className="text-sm text-muted-foreground">
+                Pedidos enviados que están esperando ser recibidos
+              </p>
+            </div>
+            
+            {pendingOrders.length > 0 ? (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {pendingOrders.map((order) => (
+                  <Card key={order.id} className="border-orange-200 bg-orange-50/50">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">{order.orderNumber}</CardTitle>
+                        <Clock className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <CardDescription>
+                        De: {order.fromBranchName} → Para: {order.toBranchName}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground mb-2">
+                            Productos ({order.items.length}):
+                          </p>
+                          <div className="space-y-1">
+                            {order.items.slice(0, 3).map((item, index) => (
+                              <div key={index} className="text-sm">
+                                <span className="font-medium">{item.productName}</span>
+                                <span className="text-muted-foreground ml-2">
+                                  {item.quantity} {item.unit}
+                                </span>
+                              </div>
+                            ))}
+                            {order.items.length > 3 && (
+                              <p className="text-sm text-muted-foreground">
+                                +{order.items.length - 3} productos más...
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {order.notes && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Notas:</p>
+                            <p className="text-sm text-gray-700">{order.notes}</p>
+                          </div>
+                        )}
+                        
+                        <div className="text-xs text-muted-foreground">
+                          {order.sentAt ? (
+                            <>
+                              Enviado: {new Date(order.sentAt.seconds * 1000).toLocaleDateString('es-ES')}
+                              {order.sentByName && ` por ${order.sentByName}`}
+                            </>
+                          ) : (
+                            <>
+                              Creado: {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString('es-ES') : 'N/A'}
+                              {order.createdByName && ` por ${order.createdByName}`}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No hay pedidos pendientes</h3>
+                  <p className="text-muted-foreground">
+                    No hay pedidos enviados esperando ser recibidos.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   )

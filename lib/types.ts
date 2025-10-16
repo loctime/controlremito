@@ -62,6 +62,9 @@ export interface Order {
   createdAt: Timestamp
   createdBy: string
   createdByName: string
+  sentBy?: string
+  sentByName?: string
+  sentAt?: Timestamp
   preparedBy?: string
   preparedByName?: string
   preparedAt?: Timestamp
