@@ -173,19 +173,21 @@ function OrdersContent() {
   return (
     <ProtectedRoute>
       <div>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Pedidos</h2>
-            <p className="text-muted-foreground">Gestiona todos los pedidos del sistema</p>
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold">Pedidos</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">Gestiona todos los pedidos del sistema</p>
+            </div>
+            {(user?.role === "branch" || user?.role === "factory") && (
+              <Link href="/dashboard/orders/new" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Pedido
+                </Button>
+              </Link>
+            )}
           </div>
-          {(user?.role === "branch" || user?.role === "factory") && (
-            <Link href="/dashboard/orders/new">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Pedido
-              </Button>
-            </Link>
-          )}
         </div>
 
         <Card>
@@ -217,63 +219,118 @@ function OrdersContent() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-center text-muted-foreground">Cargando pedidos...</p>
+              <p className="text-center text-muted-foreground py-8">Cargando pedidos...</p>
+            ) : filteredOrders.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No hay pedidos disponibles</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Número</TableHead>
-                    <TableHead>Desde</TableHead>
-                    <TableHead>Hacia</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredOrders.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="text-center text-muted-foreground">
-                        No hay pedidos disponibles
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredOrders.map((order) => (
-                      <TableRow key={order.id}>
-                        <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                        <TableCell>{order.fromBranchName}</TableCell>
-                        <TableCell>{order.toBranchName}</TableCell>
-                        <TableCell>{getStatusBadge(order.status)}</TableCell>
-                        <TableCell className="text-sm">{formatDate(order.createdAt)}</TableCell>
-                        <TableCell>{order.items.length}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center gap-2 justify-end">
+              <>
+                {/* Vista Mobile - Cards */}
+                <div className="block md:hidden space-y-4">
+                  {filteredOrders.map((order) => (
+                    <Card key={order.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-base">{order.orderNumber}</p>
+                              <div className="flex items-center gap-2">
+                                {getStatusBadge(order.status)}
+                              </div>
+                            </div>
+                            <Link href={`/dashboard/orders/${order.id}`}>
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-muted-foreground text-xs">Desde</p>
+                              <p className="font-medium truncate">{order.fromBranchName}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">Hacia</p>
+                              <p className="font-medium truncate">{order.toBranchName}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-sm pt-2 border-t">
+                            <div className="flex items-center gap-3 text-muted-foreground">
+                              <span className="text-xs">{formatDate(order.createdAt)}</span>
+                              <span className="text-xs">{order.items.length} items</span>
+                            </div>
                             {order.status === "draft" && 
                              order.createdBy === user?.id && 
                              order.allowedSendDays && 
                              isDayAllowed(order.allowedSendDays) && (
                               <Button 
-                                variant="outline" 
+                                variant="default" 
                                 size="sm" 
                                 onClick={() => handleSendOrder(order)}
                               >
-                                <Send className="h-4 w-4 mr-1" />
+                                <Send className="h-3 w-3 mr-1" />
                                 Enviar
                               </Button>
                             )}
-                            <Link href={`/dashboard/orders/${order.id}`}>
-                              <Button variant="ghost" size="sm">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
                           </div>
-                        </TableCell>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Número</TableHead>
+                        <TableHead>Desde</TableHead>
+                        <TableHead>Hacia</TableHead>
+                        <TableHead>Estado</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Items</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredOrders.map((order) => (
+                        <TableRow key={order.id}>
+                          <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                          <TableCell>{order.fromBranchName}</TableCell>
+                          <TableCell>{order.toBranchName}</TableCell>
+                          <TableCell>{getStatusBadge(order.status)}</TableCell>
+                          <TableCell className="text-sm">{formatDate(order.createdAt)}</TableCell>
+                          <TableCell>{order.items.length}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center gap-2 justify-end">
+                              {order.status === "draft" && 
+                               order.createdBy === user?.id && 
+                               order.allowedSendDays && 
+                               isDayAllowed(order.allowedSendDays) && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleSendOrder(order)}
+                                >
+                                  <Send className="h-4 w-4 mr-1" />
+                                  Enviar
+                                </Button>
+                              )}
+                              <Link href={`/dashboard/orders/${order.id}`}>
+                                <Button variant="ghost" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

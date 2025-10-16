@@ -325,23 +325,24 @@ function TemplatesContent() {
   return (
     <ProtectedRoute allowedRoles={["admin", "factory", "branch", "maxdev"]}>
       <div>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Plantillas de Pedidos</h2>
-            <p className="text-muted-foreground">Crea plantillas para agilizar la creación de pedidos</p>
-          </div>
-          <div className="flex gap-2">
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold">Plantillas de Pedidos</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">Crea plantillas para agilizar la creación de pedidos</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={updateExistingTemplates}
               disabled={updating}
-              className="text-xs"
+              className="text-xs w-full sm:w-auto"
             >
               {updating ? "Actualizando..." : "Actualizar plantillas"}
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setEditingTemplate(null)}>
+                <Button onClick={() => setEditingTemplate(null)} className="w-full sm:w-auto">
                   <Plus className="mr-2 h-4 w-4" />
                   Nueva plantilla
                 </Button>
@@ -462,6 +463,7 @@ function TemplatesContent() {
               </DialogContent>
             </Dialog>
           </div>
+          </div>
         </div>
 
         <div className="mb-4">
@@ -480,28 +482,29 @@ function TemplatesContent() {
           {filteredTemplates.map((template) => (
             <Card key={template.id}>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{template.name}</CardTitle>
-                    <CardDescription>{template.description}</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex-1">
+                    <CardTitle className="text-base sm:text-lg">{template.name}</CardTitle>
+                    <CardDescription className="text-sm">{template.description}</CardDescription>
                   </div>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleEdit(template)}
+                      className="flex-1 sm:flex-none"
                     >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Editar
+                      <Edit className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Editar</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handleDelete(template.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 flex-1 sm:flex-none"
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Eliminar
+                      <Trash2 className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Eliminar</span>
                     </Button>
                   </div>
                 </div>
@@ -509,23 +512,23 @@ function TemplatesContent() {
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <h4 className="font-medium mb-2">Productos ({template.items.length})</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <h4 className="text-sm sm:text-base font-medium mb-2">Productos ({template.items.length})</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {template.items.map((item, index) => (
                         <div key={index} className="text-sm text-muted-foreground">
-                          {item.productName} - Cantidad: {item.quantity}
+                          {item.productName} - Cant: {item.quantity}
                         </div>
                       ))}
                     </div>
                   </div>
                   
                   <div>
-                    <h4 className="font-medium mb-2">Destinos permitidos</h4>
+                    <h4 className="text-sm sm:text-base font-medium mb-2">Destinos permitidos</h4>
                     <div className="flex flex-wrap gap-1">
                       {template.destinationBranchIds?.map((branchId) => {
                         const branch = branches.find(b => b.id === branchId)
                         return (
-                          <span key={branchId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                          <span key={branchId} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded truncate max-w-full">
                             {branch?.name || branchId}
                           </span>
                         )
@@ -534,17 +537,17 @@ function TemplatesContent() {
                   </div>
 
                   <div>
-                    <h4 className="font-medium mb-2">Días de envío</h4>
+                    <h4 className="text-sm sm:text-base font-medium mb-2">Días de envío</h4>
                     <div className="flex flex-wrap gap-1">
                       {template.allowedSendDays?.map((day) => (
                         <span key={day} className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded">
-                          {day === 'monday' ? 'Lunes' :
-                           day === 'tuesday' ? 'Martes' :
-                           day === 'wednesday' ? 'Miércoles' :
-                           day === 'thursday' ? 'Jueves' :
-                           day === 'friday' ? 'Viernes' :
-                           day === 'saturday' ? 'Sábado' :
-                           day === 'sunday' ? 'Domingo' : day}
+                          {day === 'monday' ? 'Lun' :
+                           day === 'tuesday' ? 'Mar' :
+                           day === 'wednesday' ? 'Mié' :
+                           day === 'thursday' ? 'Jue' :
+                           day === 'friday' ? 'Vie' :
+                           day === 'saturday' ? 'Sáb' :
+                           day === 'sunday' ? 'Dom' : day}
                         </span>
                       ))}
                     </div>

@@ -68,8 +68,8 @@ function DeliveryNotesContent() {
     <ProtectedRoute>
       <div>
         <div className="mb-6">
-          <h2 className="text-2xl font-bold">Remitos</h2>
-          <p className="text-muted-foreground">Historial de remitos generados</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Remitos</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Historial de remitos generados</p>
         </div>
 
         <Card>
@@ -86,58 +86,103 @@ function DeliveryNotesContent() {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <p className="text-center text-muted-foreground">Cargando remitos...</p>
+              <p className="text-center text-muted-foreground py-8">Cargando remitos...</p>
+            ) : filteredNotes.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No hay remitos disponibles</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Pedido</TableHead>
-                    <TableHead>Desde</TableHead>
-                    <TableHead>Hacia</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredNotes.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        No hay remitos disponibles
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredNotes.map((note) => (
-                      <TableRow key={note.id}>
-                        <TableCell className="font-medium">{note.orderNumber}</TableCell>
-                        <TableCell>{note.fromBranchName}</TableCell>
-                        <TableCell>{note.toBranchName}</TableCell>
-                        <TableCell className="text-sm">{formatDate(note.createdAt)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Badge variant="default">{note.itemsDelivered.length} OK</Badge>
-                            {note.itemsReturned.length > 0 && (
-                              <Badge variant="destructive">{note.itemsReturned.length} Dev</Badge>
-                            )}
-                            {note.itemsNotReceived.length > 0 && (
-                              <Badge variant="destructive">{note.itemsNotReceived.length} NR</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+              <>
+                {/* Vista Mobile - Cards */}
+                <div className="block md:hidden space-y-4">
+                  {filteredNotes.map((note) => (
+                    <Card key={note.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <p className="font-semibold text-base">{note.orderNumber}</p>
+                              <div className="flex flex-wrap gap-1">
+                                <Badge variant="default" className="text-xs">{note.itemsDelivered.length} OK</Badge>
+                                {note.itemsReturned.length > 0 && (
+                                  <Badge variant="destructive" className="text-xs">{note.itemsReturned.length} Dev</Badge>
+                                )}
+                                {note.itemsNotReceived.length > 0 && (
+                                  <Badge variant="destructive" className="text-xs">{note.itemsNotReceived.length} NR</Badge>
+                                )}
+                              </div>
+                            </div>
                             <Link href={`/dashboard/delivery-notes/${note.id}`}>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="outline" size="sm">
                                 <Eye className="h-4 w-4" />
                               </Button>
                             </Link>
                           </div>
-                        </TableCell>
+                          
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <p className="text-muted-foreground text-xs">Desde</p>
+                              <p className="font-medium truncate">{note.fromBranchName}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground text-xs">Hacia</p>
+                              <p className="font-medium truncate">{note.toBranchName}</p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-sm pt-2 border-t">
+                            <span className="text-xs text-muted-foreground">{formatDate(note.createdAt)}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Pedido</TableHead>
+                        <TableHead>Desde</TableHead>
+                        <TableHead>Hacia</TableHead>
+                        <TableHead>Fecha</TableHead>
+                        <TableHead>Items</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredNotes.map((note) => (
+                        <TableRow key={note.id}>
+                          <TableCell className="font-medium">{note.orderNumber}</TableCell>
+                          <TableCell>{note.fromBranchName}</TableCell>
+                          <TableCell>{note.toBranchName}</TableCell>
+                          <TableCell className="text-sm">{formatDate(note.createdAt)}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Badge variant="default">{note.itemsDelivered.length} OK</Badge>
+                              {note.itemsReturned.length > 0 && (
+                                <Badge variant="destructive">{note.itemsReturned.length} Dev</Badge>
+                              )}
+                              {note.itemsNotReceived.length > 0 && (
+                                <Badge variant="destructive">{note.itemsNotReceived.length} NR</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Link href={`/dashboard/delivery-notes/${note.id}`}>
+                                <Button variant="ghost" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

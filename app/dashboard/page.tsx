@@ -104,18 +104,18 @@ function DashboardContent() {
             <p className="text-muted-foreground">Selecciona una plantilla para crear tu pedido</p>
           </div>
 
-           <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {templates.map((template) => (
-              <Card key={template.id} className="hover:shadow-md transition-shadow">
+              <Card key={template.id} className="hover:shadow-lg transition-all">
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <FileText className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
+                      <CardTitle className="text-base sm:text-lg">{template.name}</CardTitle>
                     </div>
                   </div>
                   {template.description && (
-                    <CardDescription>{template.description}</CardDescription>
+                    <CardDescription className="text-sm">{template.description}</CardDescription>
                   )}
                 </CardHeader>
                 <CardContent>
@@ -143,7 +143,8 @@ function DashboardContent() {
                     <Button asChild className="w-full">
                       <Link href={`/dashboard/orders/new?template=${template.id}`}>
                         <Plus className="mr-2 h-4 w-4" />
-                        Crear pedido con esta plantilla
+                        <span className="hidden sm:inline">Crear pedido con esta plantilla</span>
+                        <span className="sm:hidden">Crear pedido</span>
                       </Link>
                     </Button>
                   </div>
@@ -179,63 +180,63 @@ function DashboardContent() {
     <ProtectedRoute>
       <div>
         <div className="mb-6">
-          <h2 className="text-2xl font-bold">Bienvenido, {user?.name}</h2>
-          <p className="text-muted-foreground">Resumen de actividad</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Bienvenido, {user?.name}</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Resumen de actividad</p>
         </div>
 
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-          <Card>
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+          <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Hacer Pedido</CardTitle>
-              <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Hacer Pedido</CardTitle>
+              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg sm:text-2xl font-bold">{stats.makeOrder}</div>
-              <p className="text-xs text-muted-foreground hidden sm:block">Borradores editables</p>
+              <div className="text-2xl font-bold">{stats.makeOrder}</div>
+              <p className="text-xs text-muted-foreground mt-1">Borradores editables</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Por Recibir</CardTitle>
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Por Recibir</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg sm:text-2xl font-bold">{stats.pendingToReceive}</div>
-              <p className="text-xs text-muted-foreground hidden sm:block">Pendientes de preparación</p>
+              <div className="text-2xl font-bold">{stats.pendingToReceive}</div>
+              <p className="text-xs text-muted-foreground mt-1">Pendientes de prep.</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Pendientes</CardTitle>
-              <Package className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg sm:text-2xl font-bold">{stats.pendingProducts}</div>
-              <p className="text-xs text-muted-foreground hidden sm:block">Listos para recoger</p>
+              <div className="text-2xl font-bold">{stats.pendingProducts}</div>
+              <p className="text-xs text-muted-foreground mt-1">Listos para recoger</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">En Camino</CardTitle>
-              <Truck className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">En Camino</CardTitle>
+              <Truck className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg sm:text-2xl font-bold">{stats.onTheWay}</div>
-              <p className="text-xs text-muted-foreground hidden sm:block">Ya los tiene el delivery</p>
+              <div className="text-2xl font-bold">{stats.onTheWay}</div>
+              <p className="text-xs text-muted-foreground mt-1">Con el delivery</p>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hover:shadow-md transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Recibidos</CardTitle>
-              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Recibidos</CardTitle>
+              <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-lg sm:text-2xl font-bold">{stats.received}</div>
-              <p className="text-xs text-muted-foreground hidden sm:block">Completados hoy</p>
+              <div className="text-2xl font-bold">{stats.received}</div>
+              <p className="text-xs text-muted-foreground mt-1">Completados hoy</p>
             </CardContent>
           </Card>
         </div>

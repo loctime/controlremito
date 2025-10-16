@@ -238,23 +238,25 @@ function UsersContent() {
   return (
     <ProtectedRoute allowedRoles={["admin", "maxdev"]}>
       <div>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Usuarios</h2>
-            <p className="text-muted-foreground">Gestiona los usuarios del sistema</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => {
-                  setEditingUser(null)
-                  setFormData({ email: "", password: "", name: "", role: "branch", branchId: "" })
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo Usuario
-              </Button>
-            </DialogTrigger>
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold">Usuarios</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">Gestiona los usuarios del sistema</p>
+            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => {
+                    setEditingUser(null)
+                    setFormData({ email: "", password: "", name: "", role: "branch", branchId: "" })
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuevo Usuario
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingUser ? "Editar Usuario" : "Nuevo Usuario"}</DialogTitle>
@@ -348,6 +350,7 @@ function UsersContent() {
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         <Card>
@@ -363,53 +366,94 @@ function UsersContent() {
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Sucursal</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No hay usuarios disponibles
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={getRoleBadgeVariant(user.role)}>{getRoleLabel(user.role)}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.branchId ? branches.find((b) => b.id === user.branchId)?.name || "-" : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {user.role !== "maxdev" && (
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(user)}>
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {user.id !== currentUser?.id && user.role !== "maxdev" && (
-                            <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          )}
+            {filteredUsers.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No hay usuarios disponibles</p>
+            ) : (
+              <>
+                {/* Vista Mobile - Cards */}
+                <div className="block md:hidden space-y-4">
+                  {filteredUsers.map((user) => (
+                    <Card key={user.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1 flex-1">
+                              <p className="font-semibold text-base">{user.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge variant={getRoleBadgeVariant(user.role)} className="text-xs">
+                                  {getRoleLabel(user.role)}
+                                </Badge>
+                                {user.branchId && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {branches.find((b) => b.id === user.branchId)?.name || "-"}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {user.role !== "maxdev" && (
+                                <Button variant="ghost" size="sm" onClick={() => handleEdit(user)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {user.id !== currentUser?.id && user.role !== "maxdev" && (
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Rol</TableHead>
+                        <TableHead>Sucursal</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell>
+                            <Badge variant={getRoleBadgeVariant(user.role)}>{getRoleLabel(user.role)}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {user.branchId ? branches.find((b) => b.id === user.branchId)?.name || "-" : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              {user.role !== "maxdev" && (
+                                <Button variant="ghost" size="sm" onClick={() => handleEdit(user)}>
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {user.id !== currentUser?.id && user.role !== "maxdev" && (
+                                <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id)}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

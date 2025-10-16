@@ -313,17 +313,19 @@ function ProductsContent() {
   return (
     <ProtectedRoute allowedRoles={["admin", "factory", "branch", "maxdev"]}>
       <div>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold">Productos</h2>
-            <p className="text-muted-foreground">Gestiona el catálogo de productos</p>
-          </div>
-          <div className="flex gap-2">
+        <div className="mb-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold">Productos</h2>
+              <p className="text-sm sm:text-base text-muted-foreground">Gestiona el catálogo de productos</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
             <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="w-full sm:w-auto">
                   <Upload className="mr-2 h-4 w-4" />
-                  Importación Masiva
+                  <span className="hidden sm:inline">Importación Masiva</span>
+                  <span className="sm:hidden">Importar</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
@@ -447,6 +449,7 @@ Producto 2	P002	litros	Descripción 2"
                     setEditingProduct(null)
                     setFormData({ name: "", description: "", sku: "", unit: "" })
                   }}
+                  className="w-full sm:w-auto"
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Nuevo Producto
@@ -505,6 +508,7 @@ Producto 2	P002	litros	Descripción 2"
             </DialogContent>
             </Dialog>
           </div>
+          </div>
         </div>
 
         <Card>
@@ -522,45 +526,81 @@ Producto 2	P002	litros	Descripción 2"
             </div>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Unidad</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProducts.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No hay productos disponibles
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredProducts.map((product) => (
-                    <TableRow key={product.id}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell>{product.sku || "-"}</TableCell>
-                      <TableCell>{product.unit}</TableCell>
-                      <TableCell>{product.description || "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+            {filteredProducts.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No hay productos disponibles</p>
+            ) : (
+              <>
+                {/* Vista Mobile - Cards */}
+                <div className="block md:hidden space-y-4">
+                  {filteredProducts.map((product) => (
+                    <Card key={product.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1 flex-1">
+                              <p className="font-semibold text-base">{product.name}</p>
+                              {product.sku && (
+                                <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                              )}
+                              <Badge variant="secondary" className="text-xs">{product.unit}</Badge>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {product.description && (
+                            <div className="pt-2 border-t">
+                              <p className="text-sm text-muted-foreground">{product.description}</p>
+                            </div>
+                          )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>SKU</TableHead>
+                        <TableHead>Unidad</TableHead>
+                        <TableHead>Descripción</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredProducts.map((product) => (
+                        <TableRow key={product.id}>
+                          <TableCell className="font-medium">{product.name}</TableCell>
+                          <TableCell>{product.sku || "-"}</TableCell>
+                          <TableCell>{product.unit}</TableCell>
+                          <TableCell>{product.description || "-"}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

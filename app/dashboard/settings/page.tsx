@@ -143,7 +143,7 @@ function SettingsContent() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle>Sucursales y Fábricas</CardTitle>
                 <CardDescription>Administra las ubicaciones del sistema</CardDescription>
@@ -155,6 +155,7 @@ function SettingsContent() {
                       setEditingBranch(null)
                       setFormData({ name: "", address: "", type: "branch" })
                     }}
+                    className="w-full sm:w-auto"
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     Nueva Sucursal
@@ -224,47 +225,77 @@ function SettingsContent() {
                 />
               </div>
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Dirección</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredBranches.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                      No hay sucursales disponibles
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredBranches.map((branch) => (
-                    <TableRow key={branch.id}>
-                      <TableCell className="font-medium">{branch.name}</TableCell>
-                      <TableCell>{branch.address}</TableCell>
-                      <TableCell>
-                        <Badge variant={branch.type === "factory" ? "default" : "secondary"}>
-                          {branch.type === "factory" ? "Fábrica" : "Sucursal"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(branch)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(branch.id)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+            {filteredBranches.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No hay sucursales disponibles</p>
+            ) : (
+              <>
+                {/* Vista Mobile - Cards */}
+                <div className="block md:hidden space-y-4">
+                  {filteredBranches.map((branch) => (
+                    <Card key={branch.id} className="overflow-hidden">
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1 flex-1">
+                              <p className="font-semibold text-base">{branch.name}</p>
+                              <p className="text-sm text-muted-foreground">{branch.address}</p>
+                              <Badge variant={branch.type === "factory" ? "default" : "secondary"} className="text-xs">
+                                {branch.type === "factory" ? "Fábrica" : "Sucursal"}
+                              </Badge>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(branch)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(branch.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Vista Desktop - Table */}
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Dirección</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredBranches.map((branch) => (
+                        <TableRow key={branch.id}>
+                          <TableCell className="font-medium">{branch.name}</TableCell>
+                          <TableCell>{branch.address}</TableCell>
+                          <TableCell>
+                            <Badge variant={branch.type === "factory" ? "default" : "secondary"}>
+                              {branch.type === "factory" ? "Fábrica" : "Sucursal"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => handleEdit(branch)}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => handleDelete(branch.id)}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
