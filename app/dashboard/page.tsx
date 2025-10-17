@@ -707,10 +707,7 @@ function DashboardContent() {
   return (
     <ProtectedRoute>
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h2 className="text-xl sm:text-2xl font-bold">Bienvenido, {user?.name}</h2>
-          <p className="text-sm sm:text-base text-muted-foreground">Resumen de actividad</p>
-        </div>
+       
 
         <Tabs defaultValue="recibir" className="w-full">
           <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-gray-100">
@@ -737,29 +734,7 @@ function DashboardContent() {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="recibir" className="mt-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">Recibir</h3>
-                <p className="text-sm text-muted-foreground">Pedidos pendientes de preparación</p>
-              </div>
-              <div className="text-4xl font-bold">{stats.pendingToReceive}</div>
-              <p className="text-muted-foreground">Pendientes de preparación</p>
-              {stats.pendingToReceive > 0 && (
-                <Button 
-                  className="mt-4"
-                  onClick={async () => {
-                    if (!showPendingOrders) {
-                      await fetchPendingOrders()
-                    }
-                    setShowPendingOrders(!showPendingOrders)
-                  }}
-                >
-                  Ver detalles
-                </Button>
-              )}
-            </div>
-          </TabsContent>
+          
 
           <TabsContent value="armando" className="mt-6">
             <div className="space-y-4">
