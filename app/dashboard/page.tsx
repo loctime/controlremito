@@ -712,121 +712,75 @@ function DashboardContent() {
           <p className="text-sm sm:text-base text-muted-foreground">Resumen de actividad</p>
         </div>
 
-        <Tabs defaultValue="hacer-pedido" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-1 bg-gray-100">
-            <TabsTrigger 
-              value="hacer-pedido" 
-              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              <span>Hacer Pedido</span>
-            </TabsTrigger>
+        <Tabs defaultValue="recibir" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-gray-100">
             <TabsTrigger 
               value="recibir" 
-              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+              className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
             >
               <Clock className="h-4 w-4" />
               <span>Recibir</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="pendientes" 
-              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+              value="armando" 
+              className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
             >
               <Package className="h-4 w-4" />
-              <span>Pendientes</span>
+              <span>Armando</span>
             </TabsTrigger>
             <TabsTrigger 
               value="en-camino" 
-              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+              className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
             >
               <Truck className="h-4 w-4" />
               <span>En Camino</span>
             </TabsTrigger>
-            <TabsTrigger 
-              value="recibidos" 
-              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
-            >
-              <CheckCircle className="h-4 w-4" />
-              <span>Recibidos</span>
-            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="hacer-pedido" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Hacer Pedido</CardTitle>
-                <CardDescription>Borradores editables disponibles</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2">{stats.makeOrder}</div>
-                <p className="text-muted-foreground">Borradores editables</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="recibir" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recibir</CardTitle>
-                <CardDescription>Pedidos pendientes de preparación</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2">{stats.pendingToReceive}</div>
-                <p className="text-muted-foreground">Pendientes de preparación</p>
-                {stats.pendingToReceive > 0 && (
-                  <Button 
-                    className="mt-4"
-                    onClick={async () => {
-                      if (!showPendingOrders) {
-                        await fetchPendingOrders()
-                      }
-                      setShowPendingOrders(!showPendingOrders)
-                    }}
-                  >
-                    Ver detalles
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Recibir</h3>
+                <p className="text-sm text-muted-foreground">Pedidos pendientes de preparación</p>
+              </div>
+              <div className="text-4xl font-bold">{stats.pendingToReceive}</div>
+              <p className="text-muted-foreground">Pendientes de preparación</p>
+              {stats.pendingToReceive > 0 && (
+                <Button 
+                  className="mt-4"
+                  onClick={async () => {
+                    if (!showPendingOrders) {
+                      await fetchPendingOrders()
+                    }
+                    setShowPendingOrders(!showPendingOrders)
+                  }}
+                >
+                  Ver detalles
+                </Button>
+              )}
+            </div>
           </TabsContent>
 
-          <TabsContent value="pendientes" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Pendientes</CardTitle>
-                <CardDescription>Listos para recoger</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2">{stats.pendingProducts}</div>
-                <p className="text-muted-foreground">Listos para recoger</p>
-              </CardContent>
-            </Card>
+          <TabsContent value="armando" className="mt-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Armando</h3>
+                <p className="text-sm text-muted-foreground">Listos para recoger</p>
+              </div>
+              <div className="text-4xl font-bold">{stats.pendingProducts}</div>
+              <p className="text-muted-foreground">Listos para recoger</p>
+            </div>
           </TabsContent>
 
           <TabsContent value="en-camino" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>En Camino</CardTitle>
-                <CardDescription>Con el delivery</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2">{stats.onTheWay}</div>
-                <p className="text-muted-foreground">Con el delivery</p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="recibidos" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Recibidos</CardTitle>
-                <CardDescription>Completados hoy</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold mb-2">{stats.received}</div>
-                <p className="text-muted-foreground">Completados hoy</p>
-              </CardContent>
-            </Card>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">En Camino</h3>
+                <p className="text-sm text-muted-foreground">Con el delivery</p>
+              </div>
+              <div className="text-4xl font-bold">{stats.onTheWay}</div>
+              <p className="text-muted-foreground">Con el delivery</p>
+            </div>
           </TabsContent>
         </Tabs>
 
