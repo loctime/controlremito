@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X, CheckCheck, ChevronRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc } from "firebase/firestore"
@@ -42,6 +43,10 @@ function DashboardContent() {
   const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
   const [collapsedAssemblingTemplates, setCollapsedAssemblingTemplates] = useState<Set<string>>(new Set())
   const [collapsedInTransitTemplates, setCollapsedInTransitTemplates] = useState<Set<string>>(new Set())
+  const [showAcceptConfirmation, setShowAcceptConfirmation] = useState(false)
+  const [showAcceptAllConfirmation, setShowAcceptAllConfirmation] = useState(false)
+  const [orderToAccept, setOrderToAccept] = useState<(Order & { templateName: string }) | null>(null)
+  const [ordersToAcceptAll, setOrdersToAcceptAll] = useState<(Order & { templateName: string })[]>([])
 
   useEffect(() => {
     const fetchData = async () => {
@@ -586,6 +591,11 @@ function DashboardContent() {
     })
   }
 
+  const showAcceptOrderConfirmation = (order: Order & { templateName: string }) => {
+    setOrderToAccept(order)
+    setShowAcceptConfirmation(true)
+  }
+
   const acceptOrder = async (orderId: string) => {
     if (!user) return
 
@@ -607,6 +617,10 @@ function DashboardContent() {
         fetchPendingOrders(),
         fetchAssemblingOrders()
       ])
+
+      // Cerrar confirmación
+      setShowAcceptConfirmation(false)
+      setOrderToAccept(null)
     } catch (error) {
       console.error("Error al aceptar pedido:", error)
       toast({
@@ -615,6 +629,11 @@ function DashboardContent() {
         variant: "destructive",
       })
     }
+  }
+
+  const showAcceptAllOrdersConfirmation = (orders: (Order & { templateName: string })[]) => {
+    setOrdersToAcceptAll(orders)
+    setShowAcceptAllConfirmation(true)
   }
 
   const acceptAllOrdersFromTemplate = async (orders: (Order & { templateName: string })[]) => {
@@ -642,6 +661,10 @@ function DashboardContent() {
         fetchPendingOrders(),
         fetchAssemblingOrders()
       ])
+
+      // Cerrar confirmación
+      setShowAcceptAllConfirmation(false)
+      setOrdersToAcceptAll([])
     } catch (error) {
       console.error("Error al aceptar pedidos:", error)
       toast({
@@ -1038,7 +1061,7 @@ function DashboardContent() {
                                 className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
                                 onClick={(e) => {
                                   e.stopPropagation() // Prevenir que se colapse al hacer clic en el botón
-                                  acceptAllOrdersFromTemplate(orders)
+                                  showAcceptAllOrdersConfirmation(orders)
                                 }}
                               >
                                 <CheckCheck className="mr-1 h-3 w-3" />
@@ -1073,7 +1096,7 @@ function DashboardContent() {
                                         <Button 
                                           size="sm" 
                                           className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
-                                          onClick={() => acceptOrder(order.id)}
+                                          onClick={() => showAcceptOrderConfirmation(order)}
                                         >
                                           Aceptar
                                         </Button>
@@ -1316,6 +1339,152 @@ function DashboardContent() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Diálogo de confirmación para aceptar pedido individual */}
+        <Dialog open={showAcceptConfirmation} onOpenChange={setShowAcceptConfirmation}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                Confirmar Aceptación de Pedido
+              </DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que quieres aceptar este pedido? Se moverá al estado "Armando".
+              </DialogDescription>
+            </DialogHeader>
+            
+            {orderToAccept && (
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">Detalles del Pedido</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Plantilla:</span>
+                      <span className="font-medium">{orderToAccept.templateName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">De:</span>
+                      <span className="font-medium">{orderToAccept.fromBranchName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Productos:</span>
+                      <span className="font-medium">{orderToAccept.items.length} items</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Número:</span>
+                      <span className="font-medium">{orderToAccept.orderNumber}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {orderToAccept.items.length > 0 && (
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-medium text-blue-900 mb-2">Productos incluidos:</h5>
+                    <div className="space-y-1 text-sm">
+                      {orderToAccept.items.slice(0, 3).map((item, index) => (
+                        <div key={index} className="flex justify-between text-blue-800">
+                          <span>{item.productName}</span>
+                          <span>{item.quantity} {item.unit}</span>
+                        </div>
+                      ))}
+                      {orderToAccept.items.length > 3 && (
+                        <div className="text-blue-600 text-xs">
+                          +{orderToAccept.items.length - 3} productos más...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAcceptConfirmation(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => orderToAccept && acceptOrder(orderToAccept.id)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Aceptar Pedido
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Diálogo de confirmación para aceptar todos los pedidos */}
+        <Dialog open={showAcceptAllConfirmation} onOpenChange={setShowAcceptAllConfirmation}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCheck className="h-5 w-5 text-green-600" />
+                Confirmar Aceptación Múltiple
+              </DialogTitle>
+              <DialogDescription>
+                ¿Estás seguro de que quieres aceptar todos estos pedidos? Se moverán al estado "Armando".
+              </DialogDescription>
+            </DialogHeader>
+            
+            {ordersToAcceptAll.length > 0 && (
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">Resumen</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Plantilla:</span>
+                      <span className="font-medium">{ordersToAcceptAll[0].templateName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total de pedidos:</span>
+                      <span className="font-medium">{ordersToAcceptAll.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total de productos:</span>
+                      <span className="font-medium">
+                        {ordersToAcceptAll.reduce((sum, order) => sum + order.items.length, 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 p-4 rounded-lg max-h-48 overflow-y-auto">
+                  <h5 className="font-medium text-blue-900 mb-2">Pedidos a aceptar:</h5>
+                  <div className="space-y-2 text-sm">
+                    {ordersToAcceptAll.map((order, index) => (
+                      <div key={order.id} className="flex justify-between items-center text-blue-800 p-2 bg-white rounded">
+                        <div>
+                          <span className="font-medium">{order.fromBranchName}</span>
+                          <span className="text-blue-600 ml-2">({order.orderNumber})</span>
+                        </div>
+                        <span className="text-blue-600">{order.items.length} productos</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <DialogFooter className="gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowAcceptAllConfirmation(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => acceptAllOrdersFromTemplate(ordersToAcceptAll)}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <CheckCheck className="mr-2 h-4 w-4" />
+                Aceptar Todos ({ordersToAcceptAll.length})
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </ProtectedRoute>
