@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye, Send } from "lucide-react"
+import { Plus, Search, Eye, Send, CheckCircle } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -159,6 +159,34 @@ function OrdersContent() {
     }
   }
 
+  const handleAcceptOrder = async (order: Order) => {
+    if (!user) return
+
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", order.id), {
+        status: "ready",
+        acceptedAt: new Date(),
+        acceptedBy: user.id,
+        acceptedByName: user.name
+      })
+
+      toast({
+        title: "Pedido aceptado",
+        description: `El pedido ${order.orderNumber} fue aceptado correctamente`,
+      })
+
+      // Recargar la lista
+      fetchOrders()
+    } catch (error) {
+      console.error("Error al aceptar pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo aceptar el pedido",
+        variant: "destructive",
+      })
+    }
+  }
+
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -273,6 +301,19 @@ function OrdersContent() {
                                 Enviar
                               </Button>
                             )}
+                            {order.status === "sent" && 
+                             user?.role === "factory" && 
+                             order.toBranchId === user?.branchId && (
+                              <Button 
+                                variant="default" 
+                                size="sm" 
+                                onClick={() => handleAcceptOrder(order)}
+                                className="bg-green-600 hover:bg-green-700"
+                              >
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Aceptar
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>
@@ -316,6 +357,19 @@ function OrdersContent() {
                                 >
                                   <Send className="h-4 w-4 mr-1" />
                                   Enviar
+                                </Button>
+                              )}
+                              {order.status === "sent" && 
+                               user?.role === "factory" && 
+                               order.toBranchId === user?.branchId && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => handleAcceptOrder(order)}
+                                  className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Aceptar
                                 </Button>
                               )}
                               <Link href={`/dashboard/orders/${order.id}`}>

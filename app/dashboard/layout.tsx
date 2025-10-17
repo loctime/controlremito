@@ -34,7 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { name: "Inicio", href: "/dashboard", icon: Package, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
     { name: "Pedidos", href: "/dashboard/orders", icon: FileText, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
-    { name: "Productos", href: "/dashboard/products", icon: Boxes, roles: ["admin", "factory", "maxdev"] },
+    { name: "Productos", href: "/dashboard/products", icon: Boxes, roles: ["admin", "maxdev"] },
     {
       name: "Plantillas",
       href: "/dashboard/templates",

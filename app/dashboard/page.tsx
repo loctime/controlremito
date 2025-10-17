@@ -51,6 +51,12 @@ function DashboardContent() {
 
       // Para otros roles, cargar estadísticas
       await fetchStats()
+      
+      // Para factory, también cargar pedidos pendientes
+      if (user.role === "factory") {
+        await fetchPendingOrders()
+        setShowPendingOrders(true)
+      }
     }
 
     fetchData()
@@ -456,6 +462,66 @@ function DashboardContent() {
     })
   }
 
+  const acceptOrder = async (orderId: string) => {
+    if (!user) return
+
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        status: "ready",
+        acceptedAt: new Date(),
+        acceptedBy: user.id,
+        acceptedByName: user.name
+      })
+
+      toast({
+        title: "Pedido aceptado",
+        description: "El pedido fue aceptado correctamente",
+      })
+
+      // Recargar pedidos pendientes
+      await fetchPendingOrders()
+    } catch (error) {
+      console.error("Error al aceptar pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo aceptar el pedido",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const acceptAllOrdersFromTemplate = async (orders: (Order & { templateName: string })[]) => {
+    if (!user) return
+
+    try {
+      const updatePromises = orders.map(order => 
+        updateDoc(doc(db, "apps/controld/orders", order.id), {
+          status: "ready",
+          acceptedAt: new Date(),
+          acceptedBy: user.id,
+          acceptedByName: user.name
+        })
+      )
+
+      await Promise.all(updatePromises)
+
+      toast({
+        title: "Pedidos aceptados",
+        description: `${orders.length} pedidos fueron aceptados correctamente`,
+      })
+
+      // Recargar pedidos pendientes
+      await fetchPendingOrders()
+    } catch (error) {
+      console.error("Error al aceptar pedidos:", error)
+      toast({
+        title: "Error",
+        description: "No se pudieron aceptar los pedidos",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Si es sucursal, mostrar plantillas y borradores
   if (user?.role === "branch") {
     return (
@@ -734,7 +800,16 @@ function DashboardContent() {
             </TabsTrigger>
           </TabsList>
 
-          
+          <TabsContent value="recibir" className="mt-6">
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold">Recibir</h3>
+                <p className="text-sm text-muted-foreground">Pedidos pendientes de recibir</p>
+              </div>
+              <div className="text-4xl font-bold">{stats.pendingToReceive}</div>
+              <p className="text-muted-foreground">Pendientes de recibir</p>
+            </div>
+          </TabsContent>
 
           <TabsContent value="armando" className="mt-6">
             <div className="space-y-4">
@@ -802,8 +877,7 @@ function DashboardContent() {
                             className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
                             onClick={(e) => {
                               e.stopPropagation() // Prevenir que se colapse al hacer clic en el botón
-                              // TODO: Implementar aceptar todos los pedidos de esta plantilla
-                              console.log('Aceptar todos los pedidos de:', templateName, orders.map(o => o.id))
+                              acceptAllOrdersFromTemplate(orders)
                             }}
                           >
                             <CheckCheck className="mr-1 h-3 w-3" />
@@ -838,10 +912,7 @@ function DashboardContent() {
                                     <Button 
                                       size="sm" 
                                       className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
-                                      onClick={() => {
-                                        // TODO: Implementar aceptar pedido
-                                        console.log('Aceptar pedido:', order.id)
-                                      }}
+                                      onClick={() => acceptOrder(order.id)}
                                     >
                                       Aceptar
                                     </Button>
