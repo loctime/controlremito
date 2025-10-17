@@ -52,9 +52,14 @@ function DashboardContent() {
     const fetchData = async () => {
       if (!user) return
 
-      // Si es sucursal, cargar plantillas y borradores
+      // Si es sucursal, cargar plantillas, borradores y pedidos en armando/en camino
       if (user.role === "branch") {
-        await Promise.all([fetchTemplates(), fetchDraftOrders()])
+        await Promise.all([
+          fetchTemplates(), 
+          fetchDraftOrders(),
+          fetchAssemblingOrders(),
+          fetchInTransitOrders()
+        ])
         return
       }
 
@@ -79,14 +84,6 @@ function DashboardContent() {
         ])
       }
       
-      // Para branch, cargar pedidos en armando y en camino
-      if ((user.role as string) === "branch") {
-        await Promise.all([
-          fetchAssemblingOrders(),
-          fetchInTransitOrders()
-        ])
-        setShowPendingOrders(true)
-      }
     }
 
     fetchData()
@@ -256,8 +253,10 @@ function DashboardContent() {
 
       // Filtrar según el rol
       if (user.role === "branch" && user.branchId) {
+        console.log("🔍 [DEBUG] Cargando pedidos en armando para sucursal:", user.branchId)
         q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "assembling"))
       } else if ((user.role === "factory" || user.role === "delivery") && user.branchId) {
+        console.log("🔍 [DEBUG] Cargando pedidos en armando para fábrica/delivery:", user.branchId)
         q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "assembling"))
       }
 
@@ -298,8 +297,10 @@ function DashboardContent() {
 
       // Filtrar según el rol
       if (user.role === "branch" && user.branchId) {
+        console.log("🔍 [DEBUG] Cargando pedidos en camino para sucursal:", user.branchId)
         q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "in_transit"))
       } else if ((user.role === "factory" || user.role === "delivery") && user.branchId) {
+        console.log("🔍 [DEBUG] Cargando pedidos en camino para fábrica/delivery:", user.branchId)
         q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "in_transit"))
       }
 
