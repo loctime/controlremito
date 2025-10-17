@@ -78,6 +78,15 @@ function DashboardContent() {
           fetchInTransitOrders()
         ])
       }
+      
+      // Para branch, cargar pedidos en armando y en camino
+      if ((user.role as string) === "branch") {
+        await Promise.all([
+          fetchAssemblingOrders(),
+          fetchInTransitOrders()
+        ])
+        setShowPendingOrders(true)
+      }
     }
 
     fetchData()
@@ -749,6 +758,34 @@ function DashboardContent() {
             <p className="text-muted-foreground">Gestiona tus pedidos y plantillas</p>
           </div>
 
+          <Tabs defaultValue="plantillas" className="w-full">
+            <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-gray-100">
+              <TabsTrigger 
+                value="plantillas" 
+                className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Plantillas</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="armando" 
+                className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+              >
+                <Package className="h-4 w-4" />
+                <span>Armando</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="en-camino" 
+                className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+              >
+                <Truck className="h-4 w-4" />
+                <span>En Camino</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Contenido de la pestaña Plantillas */}
+            <TabsContent value="plantillas" className="mt-6">
+
           {/* Sección Unificada de Plantillas */}
           <div>
             <h3 className="text-lg font-semibold mb-4">📋 Plantillas</h3>
@@ -981,6 +1018,213 @@ function DashboardContent() {
               </Card>
             )}
           </div>
+          </TabsContent>
+
+          {/* Contenido de la pestaña Armando para sucursal */}
+          <TabsContent value="armando" className="mt-6">
+            <div>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">🔧 Mis Pedidos en Armando</h3>
+                <p className="text-sm text-muted-foreground">
+                  Pedidos que están siendo preparados por la fábrica
+                </p>
+              </div>
+              
+              {assemblingOrders.length > 0 ? (
+                <div className="space-y-6">
+                  {Object.entries(
+                    assemblingOrders.reduce((groups, order) => {
+                      const templateName = order.templateName
+                      if (!groups[templateName]) {
+                        groups[templateName] = []
+                      }
+                      groups[templateName].push(order)
+                      return groups
+                    }, {} as Record<string, (Order & { templateName: string })[]>)
+                  ).map(([templateName, orders]) => (
+                    <div key={templateName} className="space-y-3">
+                      <div className="border-b pb-2">
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                          <div 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={() => toggleAssemblingTemplateCollapse(templateName)}
+                          >
+                            {collapsedAssemblingTemplates.has(templateName) ? (
+                              <ChevronRight className="h-4 w-4 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                            )}
+                            <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Tabla responsive - solo visible si no está colapsada */}
+                      {!collapsedAssemblingTemplates.has(templateName) && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[300px]">
+                            <thead>
+                              <tr className="border-b bg-gray-50">
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Para</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Estado</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Aceptado por</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {orders.map((order) => (
+                                <tr key={order.id} className="border-b hover:bg-gray-50">
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm font-medium text-gray-900">{order.toBranchName}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.items.length}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm">
+                                      {order.preparedAt ? (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          ✓ Listo
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                          ⏳ En proceso
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.acceptedByName || "Sin asignar"}</div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No tienes pedidos en armando</h3>
+                    <p className="text-muted-foreground">
+                      Tus pedidos enviados aparecerán aquí cuando sean aceptados por la fábrica.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Contenido de la pestaña En Camino para sucursal */}
+          <TabsContent value="en-camino" className="mt-6">
+            <div>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">🚚 Mis Pedidos En Camino</h3>
+                <p className="text-sm text-muted-foreground">
+                  Pedidos que están siendo entregados
+                </p>
+              </div>
+              
+              {inTransitOrders.length > 0 ? (
+                <div className="space-y-6">
+                  {Object.entries(
+                    inTransitOrders.reduce((groups, order) => {
+                      const templateName = order.templateName
+                      if (!groups[templateName]) {
+                        groups[templateName] = []
+                      }
+                      groups[templateName].push(order)
+                      return groups
+                    }, {} as Record<string, (Order & { templateName: string })[]>)
+                  ).map(([templateName, orders]) => (
+                    <div key={templateName} className="space-y-3">
+                      <div className="border-b pb-2">
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                          <div 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={() => toggleInTransitTemplateCollapse(templateName)}
+                          >
+                            {collapsedInTransitTemplates.has(templateName) ? (
+                              <ChevronRight className="h-4 w-4 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                            )}
+                            <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Tabla responsive - solo visible si no está colapsada */}
+                      {!collapsedInTransitTemplates.has(templateName) && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[300px]">
+                            <thead>
+                              <tr className="border-b bg-gray-50">
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Para</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Delivery</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Tomado el</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {orders.map((order) => (
+                                <tr key={order.id} className="border-b hover:bg-gray-50">
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm font-medium text-gray-900">{order.toBranchName}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.items.length}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.deliveredByName || "Sin asignar"}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">
+                                      {order.deliveredAt ? 
+                                        new Date((order.deliveredAt as any).seconds * 1000).toLocaleDateString("es-AR", {
+                                          day: "2-digit",
+                                          month: "2-digit",
+                                          year: "numeric",
+                                          hour: "2-digit",
+                                          minute: "2-digit"
+                                        }) : 
+                                        "-"
+                                      }
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No tienes pedidos en camino</h3>
+                    <p className="text-muted-foreground">
+                      Tus pedidos aparecerán aquí cuando sean tomados por delivery.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
         </div>
       </ProtectedRoute>
     )

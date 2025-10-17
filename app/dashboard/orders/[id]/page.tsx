@@ -46,13 +46,6 @@ function OrderDetailContent() {
   const [issueType, setIssueType] = useState<"not_received" | "returned">("not_received")
   const [issueReason, setIssueReason] = useState("")
 
-  // Definir permisos según el rol del usuario
-  const canMarkItems = user?.role === "factory" && order?.status === "sent"
-  const canMarkReady = user?.role === "factory" && order?.status === "assembling"
-  const canTakeForDelivery = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
-  const canDeliveryMark = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
-  const canBranchReceive = user?.role === "branch" && order?.status === "in_transit"
-
   useEffect(() => {
     fetchOrder()
   }, [orderId])
@@ -387,6 +380,11 @@ function OrderDetailContent() {
   const canMarkInTransit = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
   const canMarkReceived = user?.role === "branch" && order?.status === "in_transit" && 
                          order?.fromBranchId === user?.branchId
+  
+  // Permisos para marcar items
+  const canMarkItems = user?.role === "factory" && order?.status === "sent"
+  const canDeliveryMark = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
+  const canBranchReceive = user?.role === "branch" && order?.status === "in_transit"
 
   if (loading) {
     return (

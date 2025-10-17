@@ -65,6 +65,9 @@ export interface Order {
   sentBy?: string
   sentByName?: string
   sentAt?: Timestamp
+  acceptedBy?: string
+  acceptedByName?: string
+  acceptedAt?: Timestamp
   preparedBy?: string
   preparedByName?: string
   preparedAt?: Timestamp
