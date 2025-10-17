@@ -713,24 +713,39 @@ function DashboardContent() {
         </div>
 
         <Tabs defaultValue="hacer-pedido" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
-            <TabsTrigger value="hacer-pedido" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+          <TabsList className="grid w-full grid-cols-5 h-auto p-1 bg-gray-100">
+            <TabsTrigger 
+              value="hacer-pedido" 
+              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            >
               <ShoppingCart className="h-4 w-4" />
               <span>Hacer Pedido</span>
             </TabsTrigger>
-            <TabsTrigger value="recibir" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+            <TabsTrigger 
+              value="recibir" 
+              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            >
               <Clock className="h-4 w-4" />
               <span>Recibir</span>
             </TabsTrigger>
-            <TabsTrigger value="pendientes" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+            <TabsTrigger 
+              value="pendientes" 
+              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            >
               <Package className="h-4 w-4" />
               <span>Pendientes</span>
             </TabsTrigger>
-            <TabsTrigger value="en-camino" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+            <TabsTrigger 
+              value="en-camino" 
+              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            >
               <Truck className="h-4 w-4" />
               <span>En Camino</span>
             </TabsTrigger>
-            <TabsTrigger value="recibidos" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+            <TabsTrigger 
+              value="recibidos" 
+              className="flex flex-col items-center gap-1 p-3 text-xs sm:flex-row sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            >
               <CheckCircle className="h-4 w-4" />
               <span>Recibidos</span>
             </TabsTrigger>
