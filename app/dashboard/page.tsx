@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X } from "lucide-react"
 import { useEffect, useState } from "react"
-import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Order, Template } from "@/lib/types"
 import Link from "next/link"
@@ -34,7 +34,7 @@ function DashboardContent() {
     items: { productId: string; productName: string; quantity: number; unit: string }[]
     notes: string
   }>({ items: [], notes: "" })
-  const [pendingOrders, setPendingOrders] = useState<Order[]>([])
+  const [pendingOrders, setPendingOrders] = useState<(Order & { templateName: string })[]>([])
   const [showPendingOrders, setShowPendingOrders] = useState(false)
 
   useEffect(() => {
@@ -183,8 +183,27 @@ function DashboardContent() {
       const snapshot = await getDocs(q)
       const pendingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
       
-      setPendingOrders(pendingOrdersData)
-      console.log("📦 [DEBUG] Pedidos pendientes encontrados:", pendingOrdersData.length)
+      // Obtener información de las plantillas para cada pedido
+      const ordersWithTemplates = await Promise.all(
+        pendingOrdersData.map(async (order) => {
+          if (order.templateId) {
+            try {
+              const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
+              const templateSnapshot = await getDoc(templateDocRef)
+              const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
+              console.log(`🔍 [DEBUG] Buscando plantilla ${order.templateId}:`, template?.name || "No encontrada")
+              return { ...order, templateName: template?.name || "Plantilla no encontrada" }
+            } catch (error) {
+              console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
+              return { ...order, templateName: "Error al cargar plantilla" }
+            }
+          }
+          return { ...order, templateName: "Sin plantilla" }
+        })
+      )
+      
+      setPendingOrders(ordersWithTemplates)
+      console.log("📦 [DEBUG] Pedidos pendientes encontrados:", ordersWithTemplates.length)
     } catch (error) {
       console.error("[v0] Error al cargar pedidos pendientes:", error)
     }
@@ -755,64 +774,62 @@ function DashboardContent() {
             </div>
             
             {pendingOrders.length > 0 ? (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {pendingOrders.map((order) => (
-                  <Card key={order.id} className="border-orange-200 bg-orange-50/50">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">{order.orderNumber}</CardTitle>
-                        <Clock className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <CardDescription>
-                        De: {order.fromBranchName} → Para: {order.toBranchName}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground mb-2">
-                            Productos ({order.items.length}):
-                          </p>
-                          <div className="space-y-1">
-                            {order.items.slice(0, 3).map((item, index) => (
-                              <div key={index} className="text-sm">
-                                <span className="font-medium">{item.productName}</span>
-                                <span className="text-muted-foreground ml-2">
-                                  {item.quantity} {item.unit}
-                                </span>
-                              </div>
-                            ))}
-                            {order.items.length > 3 && (
-                              <p className="text-sm text-muted-foreground">
-                                +{order.items.length - 3} productos más...
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {order.notes && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Notas:</p>
-                            <p className="text-sm text-gray-700">{order.notes}</p>
-                          </div>
-                        )}
-                        
-                        <div className="text-xs text-muted-foreground">
-                          {order.sentAt ? (
-                            <>
-                              Enviado: {new Date(order.sentAt.seconds * 1000).toLocaleDateString('es-ES')}
-                              {order.sentByName && ` por ${order.sentByName}`}
-                            </>
-                          ) : (
-                            <>
-                              Creado: {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString('es-ES') : 'N/A'}
-                              {order.createdByName && ` por ${order.createdByName}`}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <div className="space-y-6">
+                {Object.entries(
+                  pendingOrders.reduce((groups, order) => {
+                    const templateName = order.templateName
+                    if (!groups[templateName]) {
+                      groups[templateName] = []
+                    }
+                    groups[templateName].push(order)
+                    return groups
+                  }, {} as Record<string, (Order & { templateName: string })[]>)
+                ).map(([templateName, orders]) => (
+                  <div key={templateName} className="space-y-3">
+                    <div className="border-b pb-2">
+                      <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                      <p className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    
+                    {/* Tabla responsive */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[300px]">
+                        <thead>
+                          <tr className="border-b bg-gray-50">
+                            <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
+                            <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                            <th className="text-center py-3 px-2 text-sm font-medium text-gray-700">Acción</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {orders.map((order) => (
+                            <tr key={order.id} className="border-b hover:bg-gray-50">
+                              <td className="py-3 px-2">
+                                <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
+                              </td>
+                              <td className="py-3 px-2">
+                                <div className="text-sm text-gray-900">{order.items.length}</div>
+                              </td>
+                              <td className="py-3 px-2">
+                                <div className="flex justify-center">
+                                  <Button 
+                                    size="sm" 
+                                    className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                    onClick={() => {
+                                      // TODO: Implementar aceptar pedido
+                                      console.log('Aceptar pedido:', order.id)
+                                    }}
+                                  >
+                                    Aceptar
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (
