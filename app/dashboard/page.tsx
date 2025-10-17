@@ -4,7 +4,8 @@ import { ProtectedRoute } from "@/components/protected-route"
 import { useAuth } from "@/lib/auth-context"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X, CheckCheck, ChevronRight } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -36,6 +37,7 @@ function DashboardContent() {
   }>({ items: [], notes: "" })
   const [pendingOrders, setPendingOrders] = useState<(Order & { templateName: string })[]>([])
   const [showPendingOrders, setShowPendingOrders] = useState(false)
+  const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const fetchData = async () => {
@@ -442,6 +444,18 @@ function DashboardContent() {
     }
   }
 
+  const toggleTemplateCollapse = (templateName: string) => {
+    setCollapsedTemplates(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(templateName)) {
+        newSet.delete(templateName)
+      } else {
+        newSet.add(templateName)
+      }
+      return newSet
+    })
+  }
+
   // Si es sucursal, mostrar plantillas y borradores
   if (user?.role === "branch") {
     return (
@@ -698,70 +712,108 @@ function DashboardContent() {
           <p className="text-sm sm:text-base text-muted-foreground">Resumen de actividad</p>
         </div>
 
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hacer Pedido</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.makeOrder}</div>
-              <p className="text-xs text-muted-foreground mt-1">Borradores editables</p>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="hacer-pedido" className="w-full">
+          <TabsList className="grid w-full grid-cols-5 h-auto p-1">
+            <TabsTrigger value="hacer-pedido" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+              <ShoppingCart className="h-4 w-4" />
+              <span>Hacer Pedido</span>
+            </TabsTrigger>
+            <TabsTrigger value="recibir" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+              <Clock className="h-4 w-4" />
+              <span>Recibir</span>
+            </TabsTrigger>
+            <TabsTrigger value="pendientes" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+              <Package className="h-4 w-4" />
+              <span>Pendientes</span>
+            </TabsTrigger>
+            <TabsTrigger value="en-camino" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+              <Truck className="h-4 w-4" />
+              <span>En Camino</span>
+            </TabsTrigger>
+            <TabsTrigger value="recibidos" className="flex flex-col items-center gap-1 p-2 text-xs sm:flex-row sm:text-sm">
+              <CheckCircle className="h-4 w-4" />
+              <span>Recibidos</span>
+            </TabsTrigger>
+          </TabsList>
 
-          <Card 
-            className="hover:shadow-md transition-shadow cursor-pointer"
-            onClick={async () => {
-              if (!showPendingOrders) {
-                await fetchPendingOrders()
-              }
-              setShowPendingOrders(!showPendingOrders)
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recibir</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingToReceive}</div>
-              <p className="text-xs text-muted-foreground mt-1">Pendientes de prep.</p>
-            </CardContent>
-          </Card>
+          <TabsContent value="hacer-pedido" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Hacer Pedido</CardTitle>
+                <CardDescription>Borradores editables disponibles</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold mb-2">{stats.makeOrder}</div>
+                <p className="text-muted-foreground">Borradores editables</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pendientes</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.pendingProducts}</div>
-              <p className="text-xs text-muted-foreground mt-1">Listos para recoger</p>
-            </CardContent>
-          </Card>
+          <TabsContent value="recibir" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recibir</CardTitle>
+                <CardDescription>Pedidos pendientes de preparación</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold mb-2">{stats.pendingToReceive}</div>
+                <p className="text-muted-foreground">Pendientes de preparación</p>
+                {stats.pendingToReceive > 0 && (
+                  <Button 
+                    className="mt-4"
+                    onClick={async () => {
+                      if (!showPendingOrders) {
+                        await fetchPendingOrders()
+                      }
+                      setShowPendingOrders(!showPendingOrders)
+                    }}
+                  >
+                    Ver detalles
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En Camino</CardTitle>
-              <Truck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.onTheWay}</div>
-              <p className="text-xs text-muted-foreground mt-1">Con el delivery</p>
-            </CardContent>
-          </Card>
+          <TabsContent value="pendientes" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Pendientes</CardTitle>
+                <CardDescription>Listos para recoger</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold mb-2">{stats.pendingProducts}</div>
+                <p className="text-muted-foreground">Listos para recoger</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Card className="hover:shadow-md transition-shadow">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Recibidos</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.received}</div>
-              <p className="text-xs text-muted-foreground mt-1">Completados hoy</p>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="en-camino" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>En Camino</CardTitle>
+                <CardDescription>Con el delivery</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold mb-2">{stats.onTheWay}</div>
+                <p className="text-muted-foreground">Con el delivery</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="recibidos" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recibidos</CardTitle>
+                <CardDescription>Completados hoy</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold mb-2">{stats.received}</div>
+                <p className="text-muted-foreground">Completados hoy</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Sección de pedidos pendientes */}
         {showPendingOrders && (
@@ -787,48 +839,76 @@ function DashboardContent() {
                 ).map(([templateName, orders]) => (
                   <div key={templateName} className="space-y-3">
                     <div className="border-b pb-2">
-                      <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
-                      <p className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</p>
+                      <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                        <div 
+                          className="flex items-center gap-2 flex-1"
+                          onClick={() => toggleTemplateCollapse(templateName)}
+                        >
+                          {collapsedTemplates.has(templateName) ? (
+                            <ChevronRight className="h-4 w-4 text-gray-600" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-gray-600" />
+                          )}
+                          <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                          <Button
+                            size="sm"
+                            className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
+                            onClick={(e) => {
+                              e.stopPropagation() // Prevenir que se colapse al hacer clic en el botón
+                              // TODO: Implementar aceptar todos los pedidos de esta plantilla
+                              console.log('Aceptar todos los pedidos de:', templateName, orders.map(o => o.id))
+                            }}
+                          >
+                            <CheckCheck className="mr-1 h-3 w-3" />
+                            Aceptar todas
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                     
-                    {/* Tabla responsive */}
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[300px]">
-                        <thead>
-                          <tr className="border-b bg-gray-50">
-                            <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
-                            <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
-                            <th className="text-center py-3 px-2 text-sm font-medium text-gray-700">Acción</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {orders.map((order) => (
-                            <tr key={order.id} className="border-b hover:bg-gray-50">
-                              <td className="py-3 px-2">
-                                <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
-                              </td>
-                              <td className="py-3 px-2">
-                                <div className="text-sm text-gray-900">{order.items.length}</div>
-                              </td>
-                              <td className="py-3 px-2">
-                                <div className="flex justify-center">
-                                  <Button 
-                                    size="sm" 
-                                    className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
-                                    onClick={() => {
-                                      // TODO: Implementar aceptar pedido
-                                      console.log('Aceptar pedido:', order.id)
-                                    }}
-                                  >
-                                    Aceptar
-                                  </Button>
-                                </div>
-                              </td>
+                    {/* Tabla responsive - solo visible si no está colapsada */}
+                    {!collapsedTemplates.has(templateName) && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[300px]">
+                          <thead>
+                            <tr className="border-b bg-gray-50">
+                              <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
+                              <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                              <th className="text-center py-3 px-2 text-sm font-medium text-gray-700">Acción</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {orders.map((order) => (
+                              <tr key={order.id} className="border-b hover:bg-gray-50">
+                                <td className="py-3 px-2">
+                                  <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
+                                </td>
+                                <td className="py-3 px-2">
+                                  <div className="text-sm text-gray-900">{order.items.length}</div>
+                                </td>
+                                <td className="py-3 px-2">
+                                  <div className="flex justify-center">
+                                    <Button 
+                                      size="sm" 
+                                      className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                      onClick={() => {
+                                        // TODO: Implementar aceptar pedido
+                                        console.log('Aceptar pedido:', order.id)
+                                      }}
+                                    >
+                                      Aceptar
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
