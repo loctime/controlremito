@@ -48,7 +48,9 @@ function OrderDetailContent() {
 
   // Definir permisos según el rol del usuario
   const canMarkItems = user?.role === "factory" && order?.status === "sent"
-  const canDeliveryMark = user?.role === "delivery" && order?.status === "ready"
+  const canMarkReady = user?.role === "factory" && order?.status === "assembling"
+  const canTakeForDelivery = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
+  const canDeliveryMark = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
   const canBranchReceive = user?.role === "branch" && order?.status === "in_transit"
 
   useEffect(() => {
@@ -127,13 +129,10 @@ function OrderDetailContent() {
     setActionLoading(true)
     try {
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        status: "ready",
         preparedBy: user.id,
         preparedByName: user.name,
         preparedAt: new Date(),
       })
-
-      await updateRemitStatus(orderId, "ready", user)
 
       toast({
         title: "Pedido listo",
@@ -164,8 +163,6 @@ function OrderDetailContent() {
         deliveredByName: user.name,
         deliveredAt: new Date(),
       })
-
-      await updateRemitStatus(orderId, "in_transit", user)
 
       toast({
         title: "Pedido en camino",
@@ -334,7 +331,7 @@ function OrderDetailContent() {
     const statusConfig = {
       draft: { label: "Borrador", variant: "outline" as const, icon: Edit },
       sent: { label: "Enviado", variant: "secondary" as const, icon: Send },
-      ready: { label: "Listo", variant: "default" as const, icon: CheckCircle },
+      assembling: { label: "Armando", variant: "default" as const, icon: Package },
       in_transit: { label: "En camino", variant: "default" as const, icon: Truck },
       received: { label: "Recibido", variant: "default" as const, icon: CheckCircle },
     }
@@ -385,9 +382,9 @@ function OrderDetailContent() {
   const canEditDraft = user?.role === "branch" && order?.status === "draft" && order?.createdBy === user?.id
   const canSendDraft = user?.role === "branch" && order?.status === "draft" && order?.createdBy === user?.id && 
                       order?.allowedSendDays && isDayAllowed(order.allowedSendDays)
-  const canMarkReady = (user?.role === "factory" || user?.role === "branch") && order?.status === "sent" && 
-                      order?.toBranchId === user?.branchId
-  const canMarkInTransit = user?.role === "delivery" && order?.status === "ready"
+  const canMarkReady = user?.role === "factory" && order?.status === "assembling" && 
+                      order?.toBranchId === user?.branchId && !order?.preparedAt
+  const canMarkInTransit = user?.role === "delivery" && order?.status === "assembling" && order?.preparedAt
   const canMarkReceived = user?.role === "branch" && order?.status === "in_transit" && 
                          order?.fromBranchId === user?.branchId
 

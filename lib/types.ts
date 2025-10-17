@@ -2,7 +2,7 @@ import type { Timestamp } from "firebase/firestore"
 
 export type UserRole = "admin" | "factory" | "branch" | "delivery" | "maxdev"
 
-export type OrderStatus = "draft" | "sent" | "ready" | "in_transit" | "received"
+export type OrderStatus = "draft" | "sent" | "assembling" | "in_transit" | "received"
 
 export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"
 

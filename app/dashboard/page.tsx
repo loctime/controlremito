@@ -36,8 +36,12 @@ function DashboardContent() {
     notes: string
   }>({ items: [], notes: "" })
   const [pendingOrders, setPendingOrders] = useState<(Order & { templateName: string })[]>([])
+  const [assemblingOrders, setAssemblingOrders] = useState<(Order & { templateName: string })[]>([])
+  const [inTransitOrders, setInTransitOrders] = useState<(Order & { templateName: string })[]>([])
   const [showPendingOrders, setShowPendingOrders] = useState(false)
   const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
+  const [collapsedAssemblingTemplates, setCollapsedAssemblingTemplates] = useState<Set<string>>(new Set())
+  const [collapsedInTransitTemplates, setCollapsedInTransitTemplates] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const fetchData = async () => {
@@ -52,10 +56,22 @@ function DashboardContent() {
       // Para otros roles, cargar estadísticas
       await fetchStats()
       
-      // Para factory, también cargar pedidos pendientes
+      // Para factory, también cargar pedidos pendientes, en armando y en camino
       if (user.role === "factory") {
-        await fetchPendingOrders()
+        await Promise.all([
+          fetchPendingOrders(),
+          fetchAssemblingOrders(),
+          fetchInTransitOrders()
+        ])
         setShowPendingOrders(true)
+      }
+      
+      // Para delivery, cargar pedidos en armando y en camino
+      if (user.role === "delivery") {
+        await Promise.all([
+          fetchAssemblingOrders(),
+          fetchInTransitOrders()
+        ])
       }
     }
 
@@ -85,7 +101,7 @@ function DashboardContent() {
        setStats({
          makeOrder: orders.filter((o) => o.status === "draft").length,
          pendingToReceive: orders.filter((o) => o.status === "sent").length,
-         pendingProducts: orders.filter((o) => o.status === "ready").length,
+         pendingProducts: orders.filter((o) => o.status === "assembling").length,
          onTheWay: orders.filter((o) => o.status === "in_transit").length,
          received: orders.filter((o) => {
            if (o.status !== "received" || !o.receivedAt) return false
@@ -214,6 +230,90 @@ function DashboardContent() {
       console.log("📦 [DEBUG] Pedidos pendientes encontrados:", ordersWithTemplates.length)
     } catch (error) {
       console.error("[v0] Error al cargar pedidos pendientes:", error)
+    }
+  }
+
+  const fetchAssemblingOrders = async () => {
+    if (!user) return
+
+    try {
+      const ordersRef = collection(db, "apps/controld/orders")
+      let q = query(ordersRef, where("status", "==", "assembling"))
+
+      // Filtrar según el rol
+      if (user.role === "branch" && user.branchId) {
+        q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "assembling"))
+      } else if ((user.role === "factory" || user.role === "delivery") && user.branchId) {
+        q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "assembling"))
+      }
+
+      const snapshot = await getDocs(q)
+      const assemblingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+      
+      // Obtener información de las plantillas para cada pedido
+      const ordersWithTemplates = await Promise.all(
+        assemblingOrdersData.map(async (order) => {
+          if (order.templateId) {
+            try {
+              const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
+              const templateSnapshot = await getDoc(templateDocRef)
+              const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
+              return { ...order, templateName: template?.name || "Plantilla no encontrada" }
+            } catch (error) {
+              console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
+              return { ...order, templateName: "Error al cargar plantilla" }
+            }
+          }
+          return { ...order, templateName: "Sin plantilla" }
+        })
+      )
+      
+      setAssemblingOrders(ordersWithTemplates)
+      console.log("🔧 [DEBUG] Pedidos en armando encontrados:", ordersWithTemplates.length)
+    } catch (error) {
+      console.error("[v0] Error al cargar pedidos en armando:", error)
+    }
+  }
+
+  const fetchInTransitOrders = async () => {
+    if (!user) return
+
+    try {
+      const ordersRef = collection(db, "apps/controld/orders")
+      let q = query(ordersRef, where("status", "==", "in_transit"))
+
+      // Filtrar según el rol
+      if (user.role === "branch" && user.branchId) {
+        q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "in_transit"))
+      } else if ((user.role === "factory" || user.role === "delivery") && user.branchId) {
+        q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "in_transit"))
+      }
+
+      const snapshot = await getDocs(q)
+      const inTransitOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+      
+      // Obtener información de las plantillas para cada pedido
+      const ordersWithTemplates = await Promise.all(
+        inTransitOrdersData.map(async (order) => {
+          if (order.templateId) {
+            try {
+              const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
+              const templateSnapshot = await getDoc(templateDocRef)
+              const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
+              return { ...order, templateName: template?.name || "Plantilla no encontrada" }
+            } catch (error) {
+              console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
+              return { ...order, templateName: "Error al cargar plantilla" }
+            }
+          }
+          return { ...order, templateName: "Sin plantilla" }
+        })
+      )
+      
+      setInTransitOrders(ordersWithTemplates)
+      console.log("🚚 [DEBUG] Pedidos en camino encontrados:", ordersWithTemplates.length)
+    } catch (error) {
+      console.error("[v0] Error al cargar pedidos en camino:", error)
     }
   }
 
@@ -462,12 +562,36 @@ function DashboardContent() {
     })
   }
 
+  const toggleAssemblingTemplateCollapse = (templateName: string) => {
+    setCollapsedAssemblingTemplates(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(templateName)) {
+        newSet.delete(templateName)
+      } else {
+        newSet.add(templateName)
+      }
+      return newSet
+    })
+  }
+
+  const toggleInTransitTemplateCollapse = (templateName: string) => {
+    setCollapsedInTransitTemplates(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(templateName)) {
+        newSet.delete(templateName)
+      } else {
+        newSet.add(templateName)
+      }
+      return newSet
+    })
+  }
+
   const acceptOrder = async (orderId: string) => {
     if (!user) return
 
     try {
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        status: "ready",
+        status: "assembling",
         acceptedAt: new Date(),
         acceptedBy: user.id,
         acceptedByName: user.name
@@ -478,8 +602,11 @@ function DashboardContent() {
         description: "El pedido fue aceptado correctamente",
       })
 
-      // Recargar pedidos pendientes
-      await fetchPendingOrders()
+      // Recargar pedidos pendientes y en armando
+      await Promise.all([
+        fetchPendingOrders(),
+        fetchAssemblingOrders()
+      ])
     } catch (error) {
       console.error("Error al aceptar pedido:", error)
       toast({
@@ -496,7 +623,7 @@ function DashboardContent() {
     try {
       const updatePromises = orders.map(order => 
         updateDoc(doc(db, "apps/controld/orders", order.id), {
-          status: "ready",
+          status: "assembling",
           acceptedAt: new Date(),
           acceptedBy: user.id,
           acceptedByName: user.name
@@ -510,13 +637,80 @@ function DashboardContent() {
         description: `${orders.length} pedidos fueron aceptados correctamente`,
       })
 
-      // Recargar pedidos pendientes
-      await fetchPendingOrders()
+      // Recargar pedidos pendientes y en armando
+      await Promise.all([
+        fetchPendingOrders(),
+        fetchAssemblingOrders()
+      ])
     } catch (error) {
       console.error("Error al aceptar pedidos:", error)
       toast({
         title: "Error",
         description: "No se pudieron aceptar los pedidos",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Función para marcar pedido como listo (fábrica)
+  const markOrderAsReady = async (orderId: string) => {
+    if (!user) return
+
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        preparedAt: new Date(),
+        preparedBy: user.id,
+        preparedByName: user.name
+      })
+
+      toast({
+        title: "Pedido marcado como listo",
+        description: "El pedido está listo para ser enviado",
+      })
+
+      // Recargar estadísticas y pedidos en armando
+      await Promise.all([
+        fetchStats(),
+        fetchAssemblingOrders()
+      ])
+    } catch (error) {
+      console.error("Error al marcar pedido como listo:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el pedido como listo",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Función para que delivery tome pedido (pasar de assembling a in_transit)
+  const takeOrderForDelivery = async (orderId: string) => {
+    if (!user) return
+
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        status: "in_transit",
+        deliveredAt: new Date(),
+        deliveredBy: user.id,
+        deliveredByName: user.name
+      })
+
+      toast({
+        title: "Pedido tomado para entrega",
+        description: "El pedido está en camino",
+      })
+
+      // Recargar estadísticas, pedidos en armando y en camino
+      await Promise.all([
+        fetchStats(),
+        fetchAssemblingOrders(),
+        fetchInTransitOrders()
+      ])
+    } catch (error) {
+      console.error("Error al tomar pedido para entrega:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo tomar el pedido para entrega",
         variant: "destructive",
       })
     }
@@ -800,146 +994,329 @@ function DashboardContent() {
             </TabsTrigger>
           </TabsList>
 
+          {/* Contenido de la pestaña Recibir */}
           <TabsContent value="recibir" className="mt-6">
-            <div className="space-y-4">
+            {showPendingOrders && (
               <div>
-                <h3 className="text-lg font-semibold">Recibir</h3>
-                <p className="text-sm text-muted-foreground">Pedidos pendientes de recibir</p>
+                <div className="mb-4">
+                  <h3 className="text-lg font-semibold">📦 Pedidos Pendientes de Recibir</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Pedidos enviados que están esperando ser recibidos
+                  </p>
+                </div>
+                
+                {pendingOrders.length > 0 ? (
+                  <div className="space-y-6">
+                    {Object.entries(
+                      pendingOrders.reduce((groups, order) => {
+                        const templateName = order.templateName
+                        if (!groups[templateName]) {
+                          groups[templateName] = []
+                        }
+                        groups[templateName].push(order)
+                        return groups
+                      }, {} as Record<string, (Order & { templateName: string })[]>)
+                    ).map(([templateName, orders]) => (
+                      <div key={templateName} className="space-y-3">
+                        <div className="border-b pb-2">
+                          <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                            <div 
+                              className="flex items-center gap-2 flex-1"
+                              onClick={() => toggleTemplateCollapse(templateName)}
+                            >
+                              {collapsedTemplates.has(templateName) ? (
+                                <ChevronRight className="h-4 w-4 text-gray-600" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-gray-600" />
+                              )}
+                              <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                              <Button
+                                size="sm"
+                                className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                onClick={(e) => {
+                                  e.stopPropagation() // Prevenir que se colapse al hacer clic en el botón
+                                  acceptAllOrdersFromTemplate(orders)
+                                }}
+                              >
+                                <CheckCheck className="mr-1 h-3 w-3" />
+                                Aceptar todas
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Tabla responsive - solo visible si no está colapsada */}
+                        {!collapsedTemplates.has(templateName) && (
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[300px]">
+                              <thead>
+                                <tr className="border-b bg-gray-50">
+                                  <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
+                                  <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                                  <th className="text-center py-3 px-2 text-sm font-medium text-gray-700">Acción</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {orders.map((order) => (
+                                  <tr key={order.id} className="border-b hover:bg-gray-50">
+                                    <td className="py-3 px-2">
+                                      <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
+                                    </td>
+                                    <td className="py-3 px-2">
+                                      <div className="text-sm text-gray-900">{order.items.length}</div>
+                                    </td>
+                                    <td className="py-3 px-2">
+                                      <div className="flex justify-center">
+                                        <Button 
+                                          size="sm" 
+                                          className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                          onClick={() => acceptOrder(order.id)}
+                                        >
+                                          Aceptar
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No hay pedidos pendientes</h3>
+                      <p className="text-muted-foreground">
+                        No hay pedidos enviados esperando ser recibidos.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-              <div className="text-4xl font-bold">{stats.pendingToReceive}</div>
-              <p className="text-muted-foreground">Pendientes de recibir</p>
-            </div>
+            )}
           </TabsContent>
 
+          {/* Contenido de la pestaña Armando */}
           <TabsContent value="armando" className="mt-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">Armando</h3>
-                <p className="text-sm text-muted-foreground">Listos para recoger</p>
+            <div>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">🔧 Pedidos en Armando</h3>
+                <p className="text-sm text-muted-foreground">
+                  Pedidos aceptados que están siendo preparados
+                </p>
               </div>
-              <div className="text-4xl font-bold">{stats.pendingProducts}</div>
-              <p className="text-muted-foreground">Listos para recoger</p>
+              
+              {assemblingOrders.length > 0 ? (
+                <div className="space-y-6">
+                  {Object.entries(
+                    assemblingOrders.reduce((groups, order) => {
+                      const templateName = order.templateName
+                      if (!groups[templateName]) {
+                        groups[templateName] = []
+                      }
+                      groups[templateName].push(order)
+                      return groups
+                    }, {} as Record<string, (Order & { templateName: string })[]>)
+                  ).map(([templateName, orders]) => (
+                    <div key={templateName} className="space-y-3">
+                      <div className="border-b pb-2">
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                          <div 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={() => toggleAssemblingTemplateCollapse(templateName)}
+                          >
+                            {collapsedAssemblingTemplates.has(templateName) ? (
+                              <ChevronRight className="h-4 w-4 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                            )}
+                            <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Tabla responsive - solo visible si no está colapsada */}
+                      {!collapsedAssemblingTemplates.has(templateName) && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[300px]">
+                            <thead>
+                              <tr className="border-b bg-gray-50">
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Estado</th>
+                                <th className="text-center py-3 px-2 text-sm font-medium text-gray-700">Acción</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {orders.map((order) => (
+                                <tr key={order.id} className="border-b hover:bg-gray-50">
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.items.length}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm">
+                                      {order.preparedAt ? (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                          ✓ Listo
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                          ⏳ En proceso
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="flex justify-center gap-2">
+                                      {!order.preparedAt && user?.role === "factory" && (
+                                        <Button 
+                                          size="sm" 
+                                          className="text-xs px-3 py-1 h-auto bg-blue-600 hover:bg-blue-700"
+                                          onClick={() => markOrderAsReady(order.id)}
+                                        >
+                                          ✓ Listo
+                                        </Button>
+                                      )}
+                                      {order.preparedAt && user?.role === "delivery" && (
+                                        <Button 
+                                          size="sm" 
+                                          className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                          onClick={() => takeOrderForDelivery(order.id)}
+                                        >
+                                          🚚 Tomar
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No hay pedidos en armando</h3>
+                    <p className="text-muted-foreground">
+                      No hay pedidos siendo preparados en este momento.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
 
+          {/* Contenido de la pestaña En Camino */}
           <TabsContent value="en-camino" className="mt-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">En Camino</h3>
-                <p className="text-sm text-muted-foreground">Con el delivery</p>
+            <div>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">🚚 Pedidos En Camino</h3>
+                <p className="text-sm text-muted-foreground">
+                  Pedidos que están siendo entregados
+                </p>
               </div>
-              <div className="text-4xl font-bold">{stats.onTheWay}</div>
-              <p className="text-muted-foreground">Con el delivery</p>
+              
+              {inTransitOrders.length > 0 ? (
+                <div className="space-y-6">
+                  {Object.entries(
+                    inTransitOrders.reduce((groups, order) => {
+                      const templateName = order.templateName
+                      if (!groups[templateName]) {
+                        groups[templateName] = []
+                      }
+                      groups[templateName].push(order)
+                      return groups
+                    }, {} as Record<string, (Order & { templateName: string })[]>)
+                  ).map(([templateName, orders]) => (
+                    <div key={templateName} className="space-y-3">
+                      <div className="border-b pb-2">
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                          <div 
+                            className="flex items-center gap-2 flex-1"
+                            onClick={() => toggleInTransitTemplateCollapse(templateName)}
+                          >
+                            {collapsedInTransitTemplates.has(templateName) ? (
+                              <ChevronRight className="h-4 w-4 text-gray-600" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-gray-600" />
+                            )}
+                            <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Tabla responsive - solo visible si no está colapsada */}
+                      {!collapsedInTransitTemplates.has(templateName) && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[300px]">
+                            <thead>
+                              <tr className="border-b bg-gray-50">
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Para</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
+                                <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Delivery</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {orders.map((order) => (
+                                <tr key={order.id} className="border-b hover:bg-gray-50">
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.toBranchName}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.items.length}</div>
+                                  </td>
+                                  <td className="py-3 px-2">
+                                    <div className="text-sm text-gray-900">{order.deliveredByName || "Sin asignar"}</div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No hay pedidos en camino</h3>
+                    <p className="text-muted-foreground">
+                      No hay pedidos siendo entregados en este momento.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
         </Tabs>
 
-        {/* Sección de pedidos pendientes */}
-        {showPendingOrders && (
-          <div className="mt-6">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold">📦 Pedidos Pendientes de Recibir</h3>
-              <p className="text-sm text-muted-foreground">
-                Pedidos enviados que están esperando ser recibidos
-              </p>
-            </div>
-            
-            {pendingOrders.length > 0 ? (
-              <div className="space-y-6">
-                {Object.entries(
-                  pendingOrders.reduce((groups, order) => {
-                    const templateName = order.templateName
-                    if (!groups[templateName]) {
-                      groups[templateName] = []
-                    }
-                    groups[templateName].push(order)
-                    return groups
-                  }, {} as Record<string, (Order & { templateName: string })[]>)
-                ).map(([templateName, orders]) => (
-                  <div key={templateName} className="space-y-3">
-                    <div className="border-b pb-2">
-                      <div className="flex items-center justify-between cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
-                        <div 
-                          className="flex items-center gap-2 flex-1"
-                          onClick={() => toggleTemplateCollapse(templateName)}
-                        >
-                          {collapsedTemplates.has(templateName) ? (
-                            <ChevronRight className="h-4 w-4 text-gray-600" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-gray-600" />
-                          )}
-                          <h4 className="text-lg font-semibold text-gray-800">{templateName}</h4>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-muted-foreground">{orders.length} pedido{orders.length !== 1 ? 's' : ''}</span>
-                          <Button
-                            size="sm"
-                            className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
-                            onClick={(e) => {
-                              e.stopPropagation() // Prevenir que se colapse al hacer clic en el botón
-                              acceptAllOrdersFromTemplate(orders)
-                            }}
-                          >
-                            <CheckCheck className="mr-1 h-3 w-3" />
-                            Aceptar todas
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Tabla responsive - solo visible si no está colapsada */}
-                    {!collapsedTemplates.has(templateName) && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[300px]">
-                          <thead>
-                            <tr className="border-b bg-gray-50">
-                              <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">De</th>
-                              <th className="text-left py-3 px-2 text-sm font-medium text-gray-700">Productos</th>
-                              <th className="text-center py-3 px-2 text-sm font-medium text-gray-700">Acción</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {orders.map((order) => (
-                              <tr key={order.id} className="border-b hover:bg-gray-50">
-                                <td className="py-3 px-2">
-                                  <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
-                                </td>
-                                <td className="py-3 px-2">
-                                  <div className="text-sm text-gray-900">{order.items.length}</div>
-                                </td>
-                                <td className="py-3 px-2">
-                                  <div className="flex justify-center">
-                                    <Button 
-                                      size="sm" 
-                                      className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
-                                      onClick={() => acceptOrder(order.id)}
-                                    >
-                                      Aceptar
-                                    </Button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No hay pedidos pendientes</h3>
-                  <p className="text-muted-foreground">
-                    No hay pedidos enviados esperando ser recibidos.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        )}
       </div>
     </ProtectedRoute>
   )

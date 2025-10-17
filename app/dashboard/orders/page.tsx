@@ -57,7 +57,7 @@ function OrdersContent() {
           (a, b) => (b.createdAt as any)?.seconds - (a.createdAt as any)?.seconds
         )
       } else if (user.role === "delivery") {
-        const q = query(ordersRef, where("status", "in", ["ready", "received"]), orderBy("createdAt", "desc"))
+        const q = query(ordersRef, where("status", "in", ["assembling", "in_transit", "received"]), orderBy("createdAt", "desc"))
         const snapshot = await getDocs(q)
         ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
       } else {
@@ -84,7 +84,7 @@ function OrdersContent() {
     const statusConfig = {
       draft: { label: "Borrador", variant: "outline" as const },
       sent: { label: "Enviado", variant: "secondary" as const },
-      ready: { label: "Listo", variant: "default" as const },
+      assembling: { label: "Armando", variant: "default" as const },
       in_transit: { label: "En camino", variant: "default" as const },
       received: { label: "Recibido", variant: "default" as const },
     }
