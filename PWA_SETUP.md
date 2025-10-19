@@ -29,8 +29,18 @@ public/
 ├── icon-384x384.png
 └── icon-512x512.png
 
+hooks/
+└── use-install-pwa.ts        # Hook para instalación PWA
+
+components/
+└── install-pwa.tsx           # Componente botón/banner instalación
+
+app/
+├── layout.tsx                # Meta tags PWA
+└── dashboard/
+    └── layout.tsx            # Banner de instalación integrado
+
 next.config.mjs               # Configuración next-pwa
-app/layout.tsx                # Meta tags PWA
 scripts/generate-pwa-icons.js # Helper para generar iconos
 ```
 
@@ -62,16 +72,34 @@ scripts/generate-pwa-icons.js # Helper para generar iconos
 
 ### 📱 Cómo Instalar la PWA
 
-#### En Chrome (Android/Desktop):
-1. Visita la aplicación
-2. Busca el icono "+" o "Instalar app" en la barra de direcciones
-3. Click en "Instalar"
+#### 🎉 Banner de Instalación Integrado
+La app ahora incluye un **banner flotante personalizado** que aparece automáticamente cuando:
+- La PWA es instalable
+- El usuario aún no la ha instalado
+- El usuario no lo ha descartado previamente
 
-#### En Safari (iOS):
+El banner incluye:
+- ✨ Diseño moderno con gradiente
+- 📱 Icono de smartphone
+- 🔘 Botón "Instalar" 
+- ❌ Opción para descartar
+- 🔄 Auto-detección de instalación exitosa
+
+#### Instalación Manual
+
+##### En Chrome (Android/Desktop):
+1. Visita la aplicación
+2. Click en el banner flotante "Instalar Remito Control"
+3. O busca el icono "+" en la barra de direcciones
+4. Click en "Instalar"
+
+##### En Safari (iOS):
 1. Abre la app en Safari
 2. Tap en el botón "Compartir" (cuadrado con flecha)
 3. Scroll y selecciona "Agregar a Inicio"
 4. Tap "Agregar"
+
+**Nota:** El banner personalizado no funciona en iOS Safari debido a limitaciones de Apple. En iOS usa el método manual.
 
 ### ⚙️ Configuración PWA
 
@@ -92,6 +120,42 @@ withPWA({
 - **Theme**: Negro (#000000)
 - **Orientación**: portrait-primary
 - **Atajos**: Nueva Orden, Ver Remitos
+
+### 🎨 Componentes de Instalación
+
+#### Banner Flotante (Actual)
+```tsx
+import { InstallPWABanner } from "@/components/install-pwa"
+
+// En cualquier componente
+<InstallPWABanner />
+```
+
+#### Botón Simple
+```tsx
+import { InstallPWAButton } from "@/components/install-pwa"
+
+// En navbar, header, settings, etc.
+<InstallPWAButton className="..." />
+```
+
+#### Hook Personalizado
+```tsx
+import { useInstallPWA } from "@/hooks/use-install-pwa"
+
+function MyComponent() {
+  const { isInstallable, isInstalled, installPWA } = useInstallPWA()
+  
+  return (
+    <button 
+      onClick={installPWA}
+      disabled={!isInstallable || isInstalled}
+    >
+      {isInstalled ? "Ya instalado" : "Instalar App"}
+    </button>
+  )
+}
+```
 
 ### 🔧 Personalización
 

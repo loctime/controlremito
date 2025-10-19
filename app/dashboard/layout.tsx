@@ -11,6 +11,7 @@ import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu } 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { InstallPWABanner } from "@/components/install-pwa"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, changeRole } = useAuth()
@@ -179,6 +180,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main className="flex-1">{children}</main>
       </div>
+      
+      {/* Banner de instalación PWA */}
+      <InstallPWABanner />
     </div>
   )
 }
