@@ -150,17 +150,21 @@ export function BranchDashboard() {
         break
 
       case 'editable':
-        // Pedido enviado pero editable, mostrar opciones
-        setShowOrderOptionsDialog({
-          template,
-          lastSentOrder: templateStatus.lastSentOrder,
-          isOpen: true
-        })
+        // Pedido enviado pero editable, abrir directamente la edición
+        if (templateStatus.lastSentOrder) {
+          startEditing(templateStatus.lastSentOrder)
+        }
         break
 
       case 'recently_sent':
+        // Pedido enviado recientemente, abrir directamente la edición
+        if (templateStatus.lastSentOrder) {
+          startEditing(templateStatus.lastSentOrder)
+        }
+        break
+
       case 'accepted':
-        // Pedido enviado/reciente o aceptado, mostrar opciones limitadas
+        // Pedido aceptado, mostrar modal solo para pedido adicional
         setShowOrderOptionsDialog({
           template,
           lastSentOrder: templateStatus.lastSentOrder,
@@ -256,6 +260,21 @@ export function BranchDashboard() {
   const sendDraftOrder = useCallback(async (order: Order) => {
     if (!user) return
 
+    console.log("🔍 [DEBUG] Order object before sending:", order)
+    console.log("🔍 [DEBUG] Order ID:", order.id)
+    console.log("🔍 [DEBUG] parentOrderId exists?", !!order.parentOrderId)
+    console.log("🔍 [DEBUG] parentOrderId value:", order.parentOrderId)
+
+    // Verificar si el ID es temporal (empieza con 'temp-')
+    if (order.id.startsWith('temp-')) {
+      toast({
+        title: "Error",
+        description: "Este pedido tiene un ID temporal. Por favor, cancela y crea un nuevo pedido adicional.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       if (order.allowedSendDays && order.allowedSendDays.length > 0 && !isDayAllowed(order.allowedSendDays)) {
         toast({
@@ -266,12 +285,19 @@ export function BranchDashboard() {
         return
       }
       
-      await updateDoc(doc(db, "apps/controld/orders", order.id), {
+      const updateData: any = {
         status: "sent",
         sentAt: new Date(),
         sentBy: user.id,
         sentByName: user.name
-      })
+      }
+
+      // Preservar parentOrderId si existe (para pedidos adicionales)
+      if (order.parentOrderId) {
+        updateData.parentOrderId = order.parentOrderId
+      }
+
+      await updateDoc(doc(db, "apps/controld/orders", order.id), updateData)
 
       await createRemitMetadata({
         ...order,
@@ -300,76 +326,14 @@ export function BranchDashboard() {
   const createAdditionalOrder = useCallback(async (template: Template, parentOrder: Order) => {
     if (!user || !user.branchId) return
 
-    try {
-      const destinationBranchId = template.destinationBranchIds[0]
-      if (!destinationBranchId) {
-        toast({
-          title: "Error",
-          description: "La plantilla no tiene destino configurado",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const [fromBranchDoc, toBranchDoc] = await Promise.all([
-        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", user.branchId))),
-        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", destinationBranchId)))
-      ])
-
-      const fromBranchName = fromBranchDoc.docs[0]?.data()?.name || user.name
-      const toBranchName = toBranchDoc.docs[0]?.data()?.name || "Fábrica"
-
-      const additionalOrder: Order = {
-        id: `temp-${Date.now()}`,
-        orderNumber: `ORD-${Date.now()}`,
-        fromBranchId: user.branchId,
-        fromBranchName: fromBranchName,
-        toBranchId: destinationBranchId,
-        toBranchName: toBranchName,
-        status: "draft",
-        items: template.items.map((item) => ({
-          id: `${Date.now()}-${item.productId}`,
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unit: item.unit,
-          status: "pending" as const,
-        })),
-        createdAt: serverTimestamp() as any,
-        createdBy: user.id,
-        createdByName: user.name,
-        templateId: template.id,
-        allowedSendDays: template.allowedSendDays || [],
-        parentOrderId: parentOrder.id,
-        notes: `Pedido adicional a ${parentOrder.orderNumber}`,
-      }
-
-      setEditFormData({
-        items: template.items.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unit: item.unit,
-        })),
-        notes: `Pedido adicional a ${parentOrder.orderNumber}`
-      })
-
-      setEditingOrder(additionalOrder)
-
-      toast({
-        title: "Pedido adicional creado",
-        description: `Se creó un pedido adicional para ${parentOrder.orderNumber}. Ajusta las cantidades y guarda.`,
-      })
-
-    } catch (error) {
-      console.error("Error al crear pedido adicional:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo crear el pedido adicional",
-        variant: "destructive",
-      })
-    }
-  }, [user, toast])
+    // Simplemente crear un pedido nuevo normal (sin parentOrderId)
+    await createOrderFromTemplate(template)
+    
+    toast({
+      title: "Nuevo pedido creado",
+      description: `Se creó un nuevo pedido desde la plantilla "${template.name}".`,
+    })
+  }, [user, toast, createOrderFromTemplate])
 
   // Función para reemplazar pedido
   const replaceOrder = useCallback(async (template: Template, orderToCancel: Order) => {
@@ -504,6 +468,7 @@ export function BranchDashboard() {
   const cancelEditing = useCallback(() => {
     setEditingOrder(null)
     setEditFormData({ items: [], notes: "" })
+    console.log("🔍 [DEBUG] Editing cancelled - state cleared")
   }, [])
 
   const updateItemQuantity = useCallback((itemIndex: number, newQuantity: number) => {

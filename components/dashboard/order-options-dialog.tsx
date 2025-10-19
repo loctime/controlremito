@@ -28,6 +28,9 @@ export function OrderOptionsDialog({
 }: OrderOptionsDialogProps) {
   const sentDate = lastSentOrder.sentAt?.toDate()
   const hoursSinceSent = sentDate ? Math.floor((Date.now() - sentDate.getTime()) / (1000 * 60 * 60)) : 0
+  
+  // Determinar qué opción mostrar según el estado del pedido
+  const isAccepted = lastSentOrder.status === 'assembling' || lastSentOrder.status === 'in_transit' || lastSentOrder.status === 'received';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -40,11 +43,16 @@ export function OrderOptionsDialog({
             Ya enviaste un pedido hace {hoursSinceSent} {hoursSinceSent === 1 ? 'hora' : 'horas'}
             <br />
             <span className="font-medium text-foreground">Pedido: {lastSentOrder.orderNumber}</span>
+            <br />
+            <span className="text-sm text-muted-foreground">
+              {isAccepted ? "El pedido ya fue aceptado por la fábrica." : "El pedido aún no fue aceptado."}
+            </span>
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-3">
-          {canEdit && (
+          {!isAccepted ? (
+            // Pedido NO aceptado - Solo permitir editar
             <Button 
               onClick={onEditOrder}
               className="w-full justify-start h-auto p-4"
@@ -54,37 +62,22 @@ export function OrderOptionsDialog({
               <div className="text-left">
                 <div className="font-medium">Editar Pedido Original</div>
                 <div className="text-sm text-muted-foreground">
-                  Modificar {lastSentOrder.orderNumber} (solo si no fue aceptado)
+                  Modificar {lastSentOrder.orderNumber} (aún no fue aceptado)
                 </div>
               </div>
             </Button>
-          )}
-          
-          <Button 
-            onClick={onCreateAdditional}
-            className="w-full justify-start h-auto p-4"
-            variant="outline"
-          >
-            <Plus className="mr-3 h-5 w-5 flex-shrink-0" />
-            <div className="text-left">
-              <div className="font-medium">Pedido Adicional</div>
-              <div className="text-sm text-muted-foreground">
-                Agregar productos a {lastSentOrder.orderNumber}
-              </div>
-            </div>
-          </Button>
-          
-          {canEdit && (
+          ) : (
+            // Pedido SÍ aceptado - Solo permitir pedido adicional
             <Button 
-              onClick={onReplaceOrder}
+              onClick={onCreateAdditional}
               className="w-full justify-start h-auto p-4"
               variant="outline"
             >
-              <RefreshCw className="mr-3 h-5 w-5 flex-shrink-0" />
+              <Plus className="mr-3 h-5 w-5 flex-shrink-0" />
               <div className="text-left">
-                <div className="font-medium">Reemplazar Pedido</div>
+                <div className="font-medium">Pedido Adicional</div>
                 <div className="text-sm text-muted-foreground">
-                  Cancelar {lastSentOrder.orderNumber} y crear uno nuevo
+                  Agregar productos a {lastSentOrder.orderNumber} (ya fue aceptado)
                 </div>
               </div>
             </Button>
