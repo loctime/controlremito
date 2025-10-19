@@ -242,7 +242,7 @@ function OrderDetailContent() {
     if (!order || !user) return
 
     // Verificar que todos los items disponibles estén marcados como entregados
-    const availableItems = order.items.filter((item) => item.status === "available")
+    const availableItems = order.items.filter((item) => item.status === "available" && item.quantity > 0)
     const allDelivered = availableItems.every((item) => itemStatuses[item.id]?.status === "delivered")
 
     if (!allDelivered) {
@@ -439,7 +439,7 @@ function OrderDetailContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {order.items.map((item) => (
+                    {order.items.filter(item => item.quantity > 0).map((item) => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.productName}</TableCell>
                         <TableCell>

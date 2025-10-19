@@ -47,8 +47,10 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
   }
 
   const getOrderProgress = (order: OrderWithTemplate) => {
-    const totalItems = order.items.length
-    const processedItems = order.items.filter(item => 
+    // Solo considerar productos que realmente se pidieron (cantidad > 0)
+    const orderedItems = order.items.filter(item => item.quantity > 0)
+    const totalItems = orderedItems.length
+    const processedItems = orderedItems.filter(item => 
       item.assembledQuantity !== undefined && 
       item.assembledQuantity !== null
     ).length
@@ -133,7 +135,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                         </td>
                         <td className="py-3 px-2">
                           <div className="text-sm text-gray-900">
-                            {order.items.length} producto{order.items.length !== 1 ? 's' : ''}
+                            {order.items.filter(item => item.quantity > 0).length} producto{order.items.filter(item => item.quantity > 0).length !== 1 ? 's' : ''}
                             {user?.role === "factory" && (
                               <div className="text-xs text-gray-500 mt-1">
                                 Progreso: {getOrderProgress(order)}%
@@ -203,7 +205,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                           <td colSpan={user?.role === "branch" ? 5 : 4} className="p-0">
                             <OrderItemsDetail
                               orderId={order.id}
-                              items={order.items}
+                              items={order.items.filter(item => item.quantity > 0)}
                               user={user}
                               onItemsUpdated={() => {
                                 // No necesitamos recargar, el estado local se actualiza automáticamente

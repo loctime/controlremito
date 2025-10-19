@@ -158,9 +158,9 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
                           type="number"
                           min="0"
                           max={item.quantity}
-                          value={customQuantities[item.id] ?? ""}
+                          value={customQuantities[item.id] ?? 0}
                           onChange={(e) => handleCustomQuantity(item.id, Number(e.target.value))}
-                          placeholder="Cant."
+                          placeholder="0"
                           className="w-16 h-7 text-xs"
                         />
                         <Button

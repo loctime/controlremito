@@ -234,7 +234,7 @@ export function BranchDashboard() {
         items: template.items.map((item) => ({
           productId: item.productId,
           productName: item.productName,
-          quantity: item.quantity,
+          quantity: 0, // Siempre empezar en 0
           unit: item.unit,
         })),
         notes: ""
@@ -404,7 +404,7 @@ export function BranchDashboard() {
         items: template.items.map((item) => ({
           productId: item.productId,
           productName: item.productName,
-          quantity: item.quantity,
+          quantity: 0, // Siempre empezar en 0
           unit: item.unit,
         })),
         notes: `Pedido de reemplazo para ${orderToCancel.orderNumber}`

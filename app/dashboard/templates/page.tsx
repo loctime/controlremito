@@ -304,7 +304,7 @@ function TemplatesContent() {
         productId: product.id,
         productName: product.name,
         unit: product.unit,
-        quantity: 1, // Cantidad por defecto
+        quantity: 0, // Cantidad por defecto
       }
     })
 

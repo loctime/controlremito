@@ -446,11 +446,11 @@ function NewOrderContent() {
     }
 
     // Validar cantidades
-    const itemsWithInvalidQuantity = formData.items.filter(item => !item.quantity || item.quantity <= 0)
+    const itemsWithInvalidQuantity = formData.items.filter(item => item.quantity < 0)
     if (itemsWithInvalidQuantity.length > 0) {
       toast({
         title: "Cantidades inválidas",
-        description: "Todas las cantidades deben ser mayores a 0",
+        description: "Todas las cantidades deben ser mayores o iguales a 0",
         variant: "destructive",
       })
       return
@@ -571,7 +571,7 @@ function NewOrderContent() {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { productId: "", productName: "", quantity: 1, unit: "" }],
+      items: [...formData.items, { productId: "", productName: "", quantity: 0, unit: "" }],
     })
   }
 
@@ -635,7 +635,10 @@ function NewOrderContent() {
 
         setFormData({
           ...formData,
-          items: validItems.map((item) => ({ ...item })),
+          items: validItems.map((item) => ({ 
+            ...item, 
+            quantity: 0 // Siempre empezar en 0, no importa lo que tenga la plantilla
+          })),
           templateId: template.id,
           allowedSendDays: [], // Siempre empezar con array vacío para evitar errores
         })
@@ -1039,11 +1042,11 @@ function NewOrderContent() {
                             </Label>
                             <Input
                               type="number"
-                              min="1"
-                              placeholder="Cantidad"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
-                              className={`w-24 sm:w-32 ${(!item.quantity || item.quantity <= 0) ? "border-red-300 focus:border-red-500" : ""}`}
+                              min="0"
+                              placeholder="0"
+                              value={item.quantity || 0}
+                              onChange={(e) => updateItem(index, "quantity", Number(e.target.value) || 0)}
+                              className={`w-24 sm:w-32 ${item.quantity < 0 ? "border-red-300 focus:border-red-500" : ""}`}
                               required
                             />
                           </div>
@@ -1098,7 +1101,7 @@ function NewOrderContent() {
             </Button>
             <Button 
               type="submit" 
-              disabled={loading || !formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || !item.quantity || item.quantity <= 0)} 
+              disabled={loading || !formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || item.quantity < 0)} 
               className="w-full sm:w-auto"
             >
               {loading ? (
@@ -1115,7 +1118,7 @@ function NewOrderContent() {
           </div>
           
           {/* Indicador de validación */}
-          {(!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || !item.quantity || item.quantity <= 0)) && (
+          {(!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || item.quantity < 0)) && (
             <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
               ⚠️ Completa todos los campos requeridos antes de crear el pedido
             </div>
