@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, memo, useCallback } from "react"
+import { useState, memo, useCallback, Fragment } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, ChevronRight, Eye, EyeOff, CheckCircle } from "lucide-react"
@@ -158,8 +158,8 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                 </thead>
                 <tbody>
                   {templateOrders.map((order) => (
-                    <>
-                      <tr key={order.id} className="border-b hover:bg-gray-50">
+                    <Fragment key={order.id}>
+                      <tr className="border-b hover:bg-gray-50">
                         {user?.role === "branch" ? (
                           <>
                             <td className="py-3 px-2">
@@ -362,7 +362,7 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
