@@ -28,6 +28,7 @@ export function BranchDashboard() {
   // Hooks optimizados con loading/error states
   const { templates, loading: templatesLoading } = useTemplates(user)
   const { draftOrders, loading: draftsLoading } = useDraftOrders(user, templates)
+  const { orders: sentOrders, loading: sentLoading } = useOrders(user, "sent")
   const { orders: assemblingOrders, loading: assemblingLoading } = useOrders(user, "assembling")
   const { orders: inTransitOrders, loading: inTransitLoading } = useOrders(user, "in_transit")
   
@@ -67,7 +68,7 @@ export function BranchDashboard() {
     }
 
     // Buscar último pedido enviado de esta plantilla
-    const lastSentOrder = [...assemblingOrders, ...inTransitOrders].find(order => 
+    const lastSentOrder = [...sentOrders, ...assemblingOrders, ...inTransitOrders].find(order => 
       order.templateId === template.id && 
       (order.status === 'sent' || order.status === 'assembling')
     )
@@ -118,7 +119,7 @@ export function BranchDashboard() {
         color: 'bg-blue-200 text-blue-800'
       }
     }
-  }, [draftOrders, assemblingOrders, inTransitOrders, canEditSentOrder])
+  }, [draftOrders, sentOrders, assemblingOrders, inTransitOrders, canEditSentOrder])
 
   const startEditing = useCallback((order: Order) => {
     setEditingOrder(order)
@@ -276,6 +277,10 @@ export function BranchDashboard() {
         ...order,
         status: "sent"
       })
+
+      // Limpiar el estado de edición después de enviar
+      setEditingOrder(null)
+      setEditFormData({ items: [], notes: "" })
 
       toast({
         title: "Pedido enviado",

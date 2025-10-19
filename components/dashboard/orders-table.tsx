@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, memo } from "react"
+import React, { useState, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, CheckCheck } from "lucide-react"
 import type { Order } from "@/lib/types"
@@ -30,7 +30,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
     })
   }
 
-  // Agrupar por plantilla
+  // Agrupar por plantilla y organizar por relación padre-hijo
   const groupedOrders = orders.reduce((groups, order) => {
     const templateName = order.templateName
     if (!groups[templateName]) {
@@ -39,6 +39,39 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
     groups[templateName].push(order)
     return groups
   }, {} as Record<string, OrderWithTemplate[]>)
+
+  // Función para organizar pedidos por relación padre-hijo
+  const organizeOrdersByParent = (orders: OrderWithTemplate[]) => {
+    const parentOrders: OrderWithTemplate[] = []
+    const childOrders: OrderWithTemplate[] = []
+    
+    // Separar pedidos padre e hijo
+    orders.forEach(order => {
+      if (order.parentOrderId) {
+        childOrders.push(order)
+      } else {
+        parentOrders.push(order)
+      }
+    })
+    
+    // Organizar en estructura padre-hijo
+    const organizedOrders: { order: OrderWithTemplate; children: OrderWithTemplate[] }[] = []
+    
+    parentOrders.forEach(parent => {
+      const children = childOrders.filter(child => child.parentOrderId === parent.id)
+      organizedOrders.push({ order: parent, children })
+    })
+    
+    // Agregar pedidos huérfanos (sin padre conocido)
+    const orphanChildren = childOrders.filter(child => 
+      !parentOrders.some(parent => parent.id === child.parentOrderId)
+    )
+    orphanChildren.forEach(orphan => {
+      organizedOrders.push({ order: orphan, children: [] })
+    })
+    
+    return organizedOrders
+  }
 
   return (
     <div className="space-y-6">
@@ -86,26 +119,67 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                   </tr>
                 </thead>
                 <tbody>
-                  {templateOrders.map((order) => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 px-2">
-                        <div className="text-sm font-medium text-gray-900">{order.fromBranchName}</div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="text-sm text-gray-900">{order.items.length}</div>
-                      </td>
-                      <td className="py-3 px-2">
-                        <div className="flex justify-center">
-                          <Button 
-                            size="sm" 
-                            className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
-                            onClick={() => onAcceptOrder(order)}
-                          >
-                            Aceptar
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
+                  {organizeOrdersByParent(templateOrders).map(({ order: parentOrder, children }) => (
+                    <React.Fragment key={parentOrder.id}>
+                      {/* Pedido padre */}
+                      <tr className="border-b hover:bg-gray-50">
+                        <td className="py-3 px-2">
+                          <div className="text-sm font-medium text-gray-900">{parentOrder.fromBranchName}</div>
+                        </td>
+                        <td className="py-3 px-2">
+                          <div className="text-sm text-gray-900">{parentOrder.items.length}</div>
+                        </td>
+                        <td className="py-3 px-2">
+                          <div className="flex justify-center">
+                            <Button 
+                              size="sm" 
+                              className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
+                              onClick={() => onAcceptOrder(parentOrder)}
+                            >
+                              Aceptar
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                      
+                      {/* Pedidos hijos (adicionales) */}
+                      {children.map((childOrder) => (
+                        <tr key={childOrder.id} className="border-b hover:bg-blue-50 bg-blue-25 border-l-4 border-l-blue-300">
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 flex items-center justify-center">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              </div>
+                              <div className="text-sm text-gray-700">
+                                <span className="text-blue-600 font-medium">↳</span> {childOrder.fromBranchName}
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Adicional a {parentOrder.orderNumber}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm text-gray-700">{childOrder.items.length}</div>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                                Adicional
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="flex justify-center">
+                              <Button 
+                                size="sm" 
+                                className="text-xs px-4 py-1 h-auto bg-blue-600 hover:bg-blue-700"
+                                onClick={() => onAcceptOrder(childOrder)}
+                              >
+                                Aceptar
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
