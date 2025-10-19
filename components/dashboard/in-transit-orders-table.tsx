@@ -91,14 +91,35 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
     } else {
       setExpandedOrder(orderId)
       setOrderDetails("")
-      setItemQuantities({})
+      
+      // Inicializar con los valores que vienen de fábrica
+      const order = orders.find(o => o.id === orderId)
+      if (order) {
+        const initialQuantities: Record<string, { received: number; status: 'ok' | 'no' | 'pending'; comment?: string }> = {}
+        order.items.forEach(item => {
+          // Si fábrica armó 0, empezar con 0. Si armó algo, empezar con esa cantidad
+          const assembledQty = item.assembledQuantity || 0
+          initialQuantities[item.id] = {
+            received: assembledQty,
+            status: assembledQty === 0 ? 'no' : 'pending',
+            comment: assembledQty === 0 ? (item.assemblyNotes || 'No disponible en fábrica') : undefined
+          }
+        })
+        setItemQuantities(initialQuantities)
+      } else {
+        setItemQuantities({})
+      }
     }
   }
 
   const updateItemReceivedQuantity = (itemId: string, received: number) => {
     setItemQuantities(prev => ({
       ...prev,
-      [itemId]: { ...prev[itemId], received }
+      [itemId]: { 
+        ...prev[itemId], 
+        received,
+        status: prev[itemId]?.status || 'pending'
+      }
     }))
   }
 
@@ -312,10 +333,20 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                                 <span className="text-sm text-gray-900">{item.quantity}</span>
                                               </td>
                                               <td className="py-2 px-2 text-center">
+                                                <span className="text-sm text-gray-900">
+                                                  {item.assembledQuantity !== undefined ? item.assembledQuantity : item.quantity}
+                                                </span>
+                                                {item.assembledQuantity !== undefined && item.assembledQuantity !== item.quantity && (
+                                                  <div className="text-xs text-orange-600">
+                                                    (pedido: {item.quantity})
+                                                  </div>
+                                                )}
+                                              </td>
+                                              <td className="py-2 px-2 text-center">
                                                 <Input
                                                   type="number"
                                                   min="0"
-                                                  max={item.quantity}
+                                                  max={item.assembledQuantity !== undefined ? item.assembledQuantity : item.quantity}
                                                   value={itemData.received}
                                                   onChange={(e) => updateItemReceivedQuantity(item.id, parseInt(e.target.value) || 0)}
                                                   className="w-20 text-center"
