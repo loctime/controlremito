@@ -24,10 +24,24 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
   const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
   const [orderDetails, setOrderDetails] = useState<string>("")
-  const [itemQuantities, setItemQuantities] = useState<Record<string, { received: number; status: 'ok' | 'no' | 'pending' }>>({})
+  const [itemQuantities, setItemQuantities] = useState<Record<string, { received: number; status: 'ok' | 'no' | 'pending'; comment?: string }>>({})
 
   const markOrderAsReceived = useCallback(async (orderId: string) => {
     if (!user) return
+
+    // Validar que todos los productos NO tengan comentario
+    const hasIncompleteComments = Object.values(itemQuantities).some(item => 
+      item.status === 'no' && (!item.comment || item.comment.trim() === '')
+    )
+    
+    if (hasIncompleteComments) {
+      toast({
+        title: "Comentarios requeridos",
+        description: "Debes completar los comentarios de todos los productos marcados como NO",
+        variant: "destructive",
+      })
+      return
+    }
 
     try {
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
@@ -94,9 +108,20 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
       const newReceived = status === 'ok' ? current.received : 0
       return {
         ...prev,
-        [itemId]: { received: newReceived, status }
+        [itemId]: { 
+          received: newReceived, 
+          status,
+          comment: status === 'no' ? current.comment || '' : undefined
+        }
       }
     })
+  }
+
+  const updateItemComment = (itemId: string, comment: string) => {
+    setItemQuantities(prev => ({
+      ...prev,
+      [itemId]: { ...prev[itemId], comment }
+    }))
   }
 
   // Agrupar por plantilla
@@ -274,7 +299,8 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                         {order.items.map((item) => {
                                           const itemData = itemQuantities[item.id] || { received: 0, status: 'pending' as const }
                                           return (
-                                            <tr key={item.id} className={`border-b ${itemData.status === 'no' ? 'bg-red-50' : ''}`}>
+                                            <Fragment key={item.id}>
+                                            <tr className={`border-b ${itemData.status === 'no' ? 'bg-red-50' : ''}`}>
                                               <td className="py-2 px-2">
                                                 <div className="text-sm font-medium text-gray-900">{item.productName}</div>
                                                 <div className="text-xs text-gray-500">{item.unit}</div>
@@ -327,6 +353,32 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                                 </div>
                                               </td>
                                             </tr>
+                                            {/* Fila de comentario para productos marcados como NO */}
+                                            {itemData.status === 'no' && (
+                                              <tr className="bg-red-50">
+                                                <td colSpan={6} className="py-3 px-4">
+                                                  <div className="bg-white p-3 rounded-lg border border-red-200">
+                                                    <label className="block text-sm font-medium text-red-800 mb-2">
+                                                      📝 Motivo por el que NO se recibe (Obligatorio):
+                                                    </label>
+                                                    <textarea
+                                                      value={itemData.comment || ''}
+                                                      onChange={(e) => updateItemComment(item.id, e.target.value)}
+                                                      placeholder="Ej: Producto en mal estado, no llegó, no lo necesitamos..."
+                                                      className="w-full p-2 border border-red-300 rounded-lg resize-none text-sm"
+                                                      rows={2}
+                                                      required
+                                                    />
+                                                    {(!itemData.comment || itemData.comment.trim() === '') && (
+                                                      <p className="text-xs text-red-600 mt-1">
+                                                        ⚠️ Debes explicar por qué no recibes este producto
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            )}
+                                            </Fragment>
                                           )
                                         })}
                                       </tbody>
@@ -351,12 +403,26 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                   <Button
                                     onClick={() => markOrderAsReceived(order.id)}
                                     className="bg-green-600 hover:bg-green-700 text-white"
-                                    disabled={Object.keys(itemQuantities).length === 0}
+                                    disabled={Object.keys(itemQuantities).length === 0 || 
+                                             Object.values(itemQuantities).some(item => 
+                                               item.status === 'no' && (!item.comment || item.comment.trim() === '')
+                                             )}
                                   >
                                     <CheckCircle className="mr-2 h-4 w-4" />
                                     Marcar como Recibido
                                   </Button>
                                 </div>
+                                
+                                {/* Mensaje de validación */}
+                                {Object.values(itemQuantities).some(item => 
+                                  item.status === 'no' && (!item.comment || item.comment.trim() === '')
+                                ) && (
+                                  <div className="mt-2 p-3 bg-red-100 border border-red-300 rounded-lg">
+                                    <p className="text-sm text-red-800">
+                                      ⚠️ No puedes marcar el pedido como recibido hasta que completes los comentarios de todos los productos marcados como "NO"
+                                    </p>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
