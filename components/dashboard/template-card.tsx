@@ -1,0 +1,315 @@
+"use client"
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { FileText, Edit, Plus, Send, X, Save } from "lucide-react"
+import type { Template, Order } from "@/lib/types"
+import { isDayAllowed } from "@/lib/utils"
+
+interface TemplateCardProps {
+  template: Template
+  existingDraft: Order | null
+  templateStatus: {
+    status: 'draft' | 'available' | 'waiting'
+    label: string
+    color: string
+  }
+  isEditing: boolean
+  editFormData: {
+    items: { productId: string; productName: string; quantity: number; unit: string }[]
+    notes: string
+  }
+  onCreateOrder: () => void
+  onStartEditing: () => void
+  onCancelEditing: () => void
+  onSendOrder: () => void
+  onSaveChanges: () => void
+  onUpdateQuantity: (index: number, quantity: number) => void
+  onUpdateNotes: (notes: string) => void
+}
+
+export function TemplateCard({
+  template,
+  existingDraft,
+  templateStatus,
+  isEditing,
+  editFormData,
+  onCreateOrder,
+  onStartEditing,
+  onCancelEditing,
+  onSendOrder,
+  onSaveChanges,
+  onUpdateQuantity,
+  onUpdateNotes,
+}: TemplateCardProps) {
+  return (
+    <Card 
+      className={`hover:shadow-lg transition-all ${
+        templateStatus.status === 'draft'
+          ? "border-orange-200 bg-orange-50/50" 
+          : templateStatus.status === 'waiting'
+          ? "border-blue-200 bg-blue-50/50"
+          : "border-gray-200"
+      }`}
+    >
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {templateStatus.status === 'draft' ? (
+              <Edit className="h-5 w-5 text-orange-600" />
+            ) : (
+              <FileText className="h-5 w-5 text-primary" />
+            )}
+            <CardTitle className={`text-base sm:text-lg ${
+              templateStatus.status === 'draft' ? "text-orange-800" : 
+              templateStatus.status === 'waiting' ? "text-blue-800" : ""
+            }`}>
+              {template.name}
+            </CardTitle>
+          </div>
+          <span className={`text-xs px-2 py-1 rounded ${templateStatus.color}`}>
+            {templateStatus.label}
+          </span>
+        </div>
+        {template.description && (
+          <CardDescription className={`text-sm ${
+            templateStatus.status === 'draft' ? "text-orange-700" : 
+            templateStatus.status === 'waiting' ? "text-blue-700" : ""
+          }`}>
+            {existingDraft ? existingDraft.orderNumber : template.description}
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {/* Solo mostrar detalles de productos en desktop */}
+          <div className="hidden sm:block">
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Productos ({existingDraft ? existingDraft.items.length : template.items.length}):
+            </p>
+            <div className="space-y-1">
+              {(existingDraft ? existingDraft.items : template.items).slice(0, 3).map((item, index) => (
+                <div key={index} className="text-sm">
+                  <span className="font-medium">{item.productName}</span>
+                  <span className="text-muted-foreground ml-2">
+                    {item.quantity} {item.unit}
+                  </span>
+                </div>
+              ))}
+              {(existingDraft ? existingDraft.items : template.items).length > 3 && (
+                <p className="text-sm text-muted-foreground">
+                  +{(existingDraft ? existingDraft.items : template.items).length - 3} productos más...
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* En móvil, solo mostrar contador simple */}
+          <div className="sm:hidden">
+            <p className="text-sm text-muted-foreground">
+              {existingDraft ? existingDraft.items.length : template.items.length} productos
+            </p>
+          </div>
+          
+          {existingDraft ? (
+            // Botones para borrador existente
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={isEditing ? onCancelEditing : onStartEditing}
+                >
+                  {isEditing ? (
+                    <>
+                      <X className="mr-1 h-3 w-3" />
+                      <span className="hidden sm:inline">Cancelar</span>
+                    </>
+                  ) : (
+                    <>
+                      <Edit className="mr-1 h-3 w-3" />
+                      <span className="hidden sm:inline">Editar</span>
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  size="sm" 
+                  className={`flex-1 ${
+                    existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
+                  onClick={onSendOrder}
+                  disabled={existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)}
+                  title={
+                    existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)
+                      ? `Hoy no es un día permitido para enviar. Días permitidos: ${existingDraft.allowedSendDays.join(', ')}`
+                      : 'Enviar pedido'
+                  }
+                >
+                  <Send className="mr-1 h-3 w-3" />
+                  <span className="hidden sm:inline">
+                    {existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays) 
+                      ? 'No disponible' 
+                      : 'Enviar'
+                    }
+                  </span>
+                </Button>
+              </div>
+              
+              {/* Sección de edición expandible */}
+              {isEditing && (
+                <div className="border-t pt-3 space-y-3">
+                  <div>
+                    <Label className="text-sm font-medium">Notas del pedido</Label>
+                    <Input
+                      value={editFormData.notes}
+                      onChange={(e) => onUpdateNotes(e.target.value)}
+                      placeholder="Agregar notas..."
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm font-medium">Cantidades</Label>
+                    <div className="space-y-2 mt-2">
+                      {editFormData.items.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{item.productName}</span>
+                            <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                              disabled={item.quantity <= 0}
+                              className="h-6 w-6 p-0"
+                            >
+                              -
+                            </Button>
+                            <span className="w-8 text-center text-sm">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                              className="h-6 w-6 p-0"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={onSaveChanges}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <Save className="mr-1 h-3 w-3" />
+                      Guardar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : templateStatus.status === 'available' ? (
+            // Botón para crear nuevo (solo cuando está disponible)
+            <div className="space-y-3">
+              <Button 
+                onClick={onCreateOrder}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Crear pedido</span>
+                <span className="sm:hidden">Crear</span>
+              </Button>
+              
+              {/* Sección de edición expandible para pedidos temporales */}
+              {isEditing && (
+                <div className="border-t pt-3 space-y-3">
+                  <div>
+                    <Label className="text-sm font-medium">Notas del pedido</Label>
+                    <Input
+                      value={editFormData.notes}
+                      onChange={(e) => onUpdateNotes(e.target.value)}
+                      placeholder="Agregar notas..."
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm font-medium">Cantidades</Label>
+                    <div className="space-y-2 mt-2">
+                      {editFormData.items.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{item.productName}</span>
+                            <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                              disabled={item.quantity <= 0}
+                              className="h-6 w-6 p-0"
+                            >
+                              -
+                            </Button>
+                            <span className="w-8 text-center text-sm">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                              className="h-6 w-6 p-0"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={onCancelEditing}
+                      variant="outline"
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <X className="mr-1 h-3 w-3" />
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={onSaveChanges}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <Save className="mr-1 h-3 w-3" />
+                      Guardar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Cuando no está disponible, mostrar mensaje
+            <div className="w-full text-center text-sm text-muted-foreground py-2">
+              No disponible hoy
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
