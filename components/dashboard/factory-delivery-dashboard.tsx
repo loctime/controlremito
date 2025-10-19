@@ -167,24 +167,33 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-gray-100">
           <TabsTrigger 
             value="recibir" 
-            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
           >
             <Clock className="h-4 w-4" />
             <span>Recibir</span>
+            {pendingOrders.length > 0 && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+            )}
           </TabsTrigger>
           <TabsTrigger 
             value="armando" 
-            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
           >
             <Package className="h-4 w-4" />
             <span>Armando</span>
+            {assemblingOrders.length > 0 && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+            )}
           </TabsTrigger>
           <TabsTrigger 
             value="en-camino" 
-            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md"
+            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
           >
             <Truck className="h-4 w-4" />
             <span>En Camino</span>
+            {inTransitOrders.length > 0 && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+            )}
           </TabsTrigger>
         </TabsList>
 
