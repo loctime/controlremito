@@ -7,15 +7,16 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu } from "lucide-react"
+import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu, Download } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { InstallPWABanner } from "@/components/install-pwa"
+import { useInstallPWA } from "@/hooks/use-install-pwa"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, changeRole } = useAuth()
   const pathname = usePathname()
+  const { isInstallable, isInstalled, installPWA } = useInstallPWA()
 
   const handleRoleChange = async (newRole: string) => {
     await changeRole(newRole)
@@ -119,6 +120,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <h1 className="text-base sm:text-xl font-semibold">Control de Remitos</h1>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
+            {/* Botón Instalar PWA */}
+            {isInstallable && !isInstalled && (
+              <Button 
+                onClick={installPWA}
+                size="sm"
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white h-9"
+              >
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Instalar App</span>
+              </Button>
+            )}
+            
             {/* Selector de rol para desarrollo */}
             <Select value={user?.role} onValueChange={handleRoleChange}>
               <SelectTrigger className="w-[90px] sm:w-[120px] md:w-[140px] h-9 text-xs sm:text-sm bg-yellow-50 border-yellow-300">
@@ -180,9 +193,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main className="flex-1">{children}</main>
       </div>
-      
-      {/* Banner de instalación PWA */}
-      <InstallPWABanner />
     </div>
   )
 }

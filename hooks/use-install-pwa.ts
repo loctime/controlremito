@@ -19,6 +19,14 @@ export function useInstallPWA() {
       return
     }
 
+    // MODO DESARROLLO: Forzar que aparezca el botón para testing
+    // Elimina estas líneas en producción si no quieres el botón en desarrollo
+    if (process.env.NODE_ENV === "development") {
+      setIsInstallable(true)
+      console.log("🔧 PWA en modo desarrollo - Botón visible para testing")
+      console.log("💡 Para ver funcionamiento real, ejecuta: pnpm build && pnpm start")
+    }
+
     // Escuchar el evento beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       // Prevenir que Chrome 67 y anteriores muestren el prompt automáticamente
@@ -27,6 +35,7 @@ export function useInstallPWA() {
       const promptEvent = e as BeforeInstallPromptEvent
       setDeferredPrompt(promptEvent)
       setIsInstallable(true)
+      console.log("✅ PWA instalable - Botón activado")
     }
 
     // Escuchar cuando la app fue instalada
@@ -34,7 +43,7 @@ export function useInstallPWA() {
       setIsInstalled(true)
       setIsInstallable(false)
       setDeferredPrompt(null)
-      console.log("PWA instalada exitosamente")
+      console.log("🎉 PWA instalada exitosamente")
     }
 
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
@@ -48,7 +57,17 @@ export function useInstallPWA() {
 
   const installPWA = async () => {
     if (!deferredPrompt) {
-      console.log("No hay prompt de instalación disponible")
+      if (process.env.NODE_ENV === "development") {
+        console.log("⚠️ No hay prompt de instalación disponible en desarrollo")
+        console.log("📝 Para probar la instalación:")
+        console.log("   1. Ejecuta: pnpm build")
+        console.log("   2. Ejecuta: pnpm start")
+        console.log("   3. Abre la app en Chrome/Edge")
+        console.log("   4. El botón funcionará correctamente")
+        alert("⚠️ Instalación PWA solo funciona en producción\n\nPara probar:\n1. pnpm build\n2. pnpm start\n3. Abre en Chrome/Edge")
+      } else {
+        console.log("❌ No hay prompt de instalación disponible")
+      }
       return false
     }
 
@@ -58,7 +77,7 @@ export function useInstallPWA() {
     // Esperar a que el usuario responda
     const { outcome } = await deferredPrompt.userChoice
     
-    console.log(`Usuario ${outcome === "accepted" ? "aceptó" : "rechazó"} la instalación`)
+    console.log(`Usuario ${outcome === "accepted" ? "aceptó ✅" : "rechazó ❌"} la instalación`)
 
     // Limpiar el prompt usado
     setDeferredPrompt(null)
