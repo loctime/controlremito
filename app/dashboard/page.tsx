@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X, CheckCheck, ChevronRight, Eye, EyeOff } from "lucide-react"
 import { useEffect, useState } from "react"
-import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc } from "firebase/firestore"
+import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Order, Template } from "@/lib/types"
 import Link from "next/link"
@@ -375,8 +375,8 @@ function DashboardContent() {
       const existingDraft = draftOrders.find(order => order.templateId === template.id)
       
       if (existingDraft) {
-        // Si ya existe, redirigir a editar
-        window.location.href = `/dashboard/orders/${existingDraft.id}`
+        // Si ya existe, abrir el expandible de edición
+        startEditing(existingDraft)
         return
       }
 
@@ -400,8 +400,9 @@ function DashboardContent() {
       const fromBranchName = fromBranchDoc.docs[0]?.data()?.name || user.name
       const toBranchName = toBranchDoc.docs[0]?.data()?.name || "Fábrica"
 
-      // Crear el pedido borrador
-      const orderData = {
+      // Crear un pedido temporal en memoria (no en Firestore aún)
+      const tempOrder: Order = {
+        id: `temp-${Date.now()}`, // ID temporal
         orderNumber: `ORD-${Date.now()}`,
         fromBranchId: user.branchId,
         fromBranchName: fromBranchName,
@@ -416,33 +417,37 @@ function DashboardContent() {
           unit: item.unit,
           status: "pending" as const,
         })),
-        createdAt: new Date(),
+        createdAt: serverTimestamp() as any,
         createdBy: user.id,
         createdByName: user.name,
         templateId: template.id,
         allowedSendDays: template.allowedSendDays || [],
       }
 
-      console.log("🔍 [DEBUG] Creando borrador - Días permitidos de la plantilla:", template.allowedSendDays)
-      console.log("🔍 [DEBUG] Creando borrador - Días permitidos del pedido:", orderData.allowedSendDays)
-
-      const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
-      
-      toast({
-        title: "Borrador creado",
-        description: `Se creó un borrador para la plantilla "${template.name}"`,
+      // Pre-llenar el formulario de edición con los datos de la plantilla
+      setEditFormData({
+        items: template.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unit: item.unit,
+        })),
+        notes: ""
       })
 
-      // Recargar borradores
-      await fetchDraftOrders()
-      
-      // Redirigir a editar el pedido
-      window.location.href = `/dashboard/orders/${docRef.id}`
+      // Abrir el expandible de edición
+      setEditingOrder(tempOrder)
+
+      toast({
+        title: "Plantilla cargada",
+        description: `Se cargaron los productos de "${template.name}". Ajusta las cantidades y guarda el pedido.`,
+      })
+
     } catch (error) {
-      console.error("[v0] Error al crear borrador:", error)
+      console.error("[v0] Error al cargar plantilla:", error)
       toast({
         title: "Error",
-        description: "No se pudo crear el borrador",
+        description: "No se pudo cargar la plantilla",
         variant: "destructive",
       })
     }
@@ -538,26 +543,68 @@ function DashboardContent() {
     if (!editingOrder) return
 
     try {
-      const updatedItems = editFormData.items.map(item => ({
-        ...item,
-        id: `${Date.now()}-${item.productId}`,
-        status: "pending" as const,
-      }))
+      // Si es un pedido temporal (empieza con "temp-"), crear uno nuevo
+      if (editingOrder.id.startsWith('temp-')) {
+        const updatedItems = editFormData.items.map(item => ({
+          ...item,
+          id: `${Date.now()}-${item.productId}`,
+          status: "pending" as const,
+        }))
 
-      await updateDoc(doc(db, "apps/controld/orders", editingOrder.id), {
-        items: updatedItems,
-        notes: editFormData.notes
-      })
+        const orderData = {
+          orderNumber: editingOrder.orderNumber,
+          fromBranchId: editingOrder.fromBranchId,
+          fromBranchName: editingOrder.fromBranchName,
+          toBranchId: editingOrder.toBranchId,
+          toBranchName: editingOrder.toBranchName,
+          status: "draft",
+          items: updatedItems,
+          notes: editFormData.notes,
+          createdAt: serverTimestamp(),
+          createdBy: user?.id,
+          createdByName: user?.name,
+          templateId: editingOrder.templateId,
+          allowedSendDays: editingOrder.allowedSendDays,
+        }
 
-      toast({
-        title: "Cambios guardados",
-        description: "El pedido se actualizó correctamente",
-      })
+        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        
+        toast({
+          title: "Pedido creado",
+          description: "El pedido se creó correctamente",
+        })
 
-      // Recargar borradores
-      await fetchDraftOrders()
-      setEditingOrder(null)
-      setEditFormData({ items: [], notes: "" })
+        // Recargar borradores
+        await fetchDraftOrders()
+        
+        // Cerrar el expandible
+        setEditingOrder(null)
+        setEditFormData({ items: [], notes: "" })
+      } else {
+        // Si es un pedido existente, actualizarlo como antes
+        const updatedItems = editFormData.items.map(item => ({
+          ...item,
+          id: `${Date.now()}-${item.productId}`,
+          status: "pending" as const,
+        }))
+
+        await updateDoc(doc(db, "apps/controld/orders", editingOrder.id), {
+          items: updatedItems,
+          notes: editFormData.notes
+        })
+
+        toast({
+          title: "Cambios guardados",
+          description: "El pedido se actualizó correctamente",
+        })
+
+        // Recargar borradores
+        await fetchDraftOrders()
+        
+        // Cerrar el expandible
+        setEditingOrder(null)
+        setEditFormData({ items: [], notes: "" })
+      }
     } catch (error) {
       console.error("Error al guardar cambios:", error)
       toast({
@@ -1050,14 +1097,85 @@ function DashboardContent() {
                           </div>
                         ) : templateStatus.status === 'available' ? (
                           // Botón para crear nuevo (solo cuando está disponible)
-                          <Button 
-                            onClick={() => createOrderFromTemplate(template)}
-                            className="w-full"
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            <span className="hidden sm:inline">Crear pedido</span>
-                            <span className="sm:hidden">Crear</span>
-                          </Button>
+                          <div className="space-y-3">
+                            <Button 
+                              onClick={() => createOrderFromTemplate(template)}
+                              className="w-full"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              <span className="hidden sm:inline">Crear pedido</span>
+                              <span className="sm:hidden">Crear</span>
+                            </Button>
+                            
+                            {/* Sección de edición expandible para pedidos temporales */}
+                            {editingOrder?.id.startsWith('temp-') && editingOrder.templateId === template.id && (
+                              <div className="border-t pt-3 space-y-3">
+                                <div>
+                                  <Label className="text-sm font-medium">Notas del pedido</Label>
+                                  <Input
+                                    value={editFormData.notes}
+                                    onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                                    placeholder="Agregar notas..."
+                                    className="mt-1"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label className="text-sm font-medium">Cantidades</Label>
+                                  <div className="space-y-2 mt-2">
+                                    {editFormData.items.map((item, index) => (
+                                      <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                                        <div className="flex-1">
+                                          <span className="text-sm font-medium">{item.productName}</span>
+                                          <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateItemQuantity(index, item.quantity - 1)}
+                                            disabled={item.quantity <= 0}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            -
+                                          </Button>
+                                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => updateItemQuantity(index, item.quantity + 1)}
+                                            className="h-6 w-6 p-0"
+                                          >
+                                            +
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                  <Button 
+                                    onClick={cancelEditing}
+                                    variant="outline"
+                                    className="flex-1"
+                                    size="sm"
+                                  >
+                                    <X className="mr-1 h-3 w-3" />
+                                    Cancelar
+                                  </Button>
+                                  <Button 
+                                    onClick={saveChanges}
+                                    className="flex-1"
+                                    size="sm"
+                                  >
+                                    <Save className="mr-1 h-3 w-3" />
+                                    Guardar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           // Cuando no está disponible, mostrar mensaje
                           <div className="w-full text-center text-sm text-muted-foreground py-2">
