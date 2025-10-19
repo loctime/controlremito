@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileText, Package, Truck, Plus } from "lucide-react"
+import { FileText, Package, Truck, Plus, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { useTemplates } from "@/hooks/use-templates"
@@ -23,10 +23,12 @@ import { Button } from "@/components/ui/button"
 export function BranchDashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const templates = useTemplates(user)
-  const draftOrders = useDraftOrders(user, templates)
-  const assemblingOrders = useOrders(user, "assembling")
-  const inTransitOrders = useOrders(user, "in_transit")
+  
+  // Hooks optimizados con loading/error states
+  const { templates, loading: templatesLoading } = useTemplates(user)
+  const { draftOrders, loading: draftsLoading } = useDraftOrders(user, templates)
+  const { orders: assemblingOrders, loading: assemblingLoading } = useOrders(user, "assembling")
+  const { orders: inTransitOrders, loading: inTransitLoading } = useOrders(user, "in_transit")
   
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [editFormData, setEditFormData] = useState<{
@@ -34,7 +36,8 @@ export function BranchDashboard() {
     notes: string
   }>({ items: [], notes: "" })
 
-  const getTemplateStatus = (template: Template) => {
+  // Memoizar cálculo de estado de plantilla
+  const getTemplateStatus = useCallback((template: Template) => {
     const existingDraft = draftOrders.find(order => order.templateId === template.id)
     
     if (existingDraft) {
@@ -62,16 +65,26 @@ export function BranchDashboard() {
         color: 'bg-blue-200 text-blue-800'
       }
     }
-  }
+  }, [draftOrders])
 
-  const createOrderFromTemplate = async (template: Template) => {
+  // Optimizar con useCallback para evitar recrear funciones
+  const createOrderFromTemplate = useCallback(async (template: Template) => {
     if (!user || !user.branchId) return
 
     try {
       const existingDraft = draftOrders.find(order => order.templateId === template.id)
       
       if (existingDraft) {
-        startEditing(existingDraft)
+        setEditingOrder(existingDraft)
+        setEditFormData({
+          items: existingDraft.items.map(item => ({
+            productId: item.productId,
+            productName: item.productName,
+            quantity: item.quantity,
+            unit: item.unit
+          })),
+          notes: existingDraft.notes || ""
+        })
         return
       }
 
@@ -141,9 +154,9 @@ export function BranchDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [user, draftOrders, toast])
 
-  const sendDraftOrder = async (order: Order) => {
+  const sendDraftOrder = useCallback(async (order: Order) => {
     if (!user) return
 
     try {
@@ -180,9 +193,9 @@ export function BranchDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [user, toast])
 
-  const startEditing = (order: Order) => {
+  const startEditing = useCallback((order: Order) => {
     setEditingOrder(order)
     setEditFormData({
       items: order.items.map(item => ({
@@ -193,21 +206,27 @@ export function BranchDashboard() {
       })),
       notes: order.notes || ""
     })
-  }
+  }, [])
 
-  const cancelEditing = () => {
+  const cancelEditing = useCallback(() => {
     setEditingOrder(null)
     setEditFormData({ items: [], notes: "" })
-  }
+  }, [])
 
-  const updateItemQuantity = (itemIndex: number, newQuantity: number) => {
+  const updateItemQuantity = useCallback((itemIndex: number, newQuantity: number) => {
     if (newQuantity < 0) return
-    const newItems = [...editFormData.items]
-    newItems[itemIndex] = { ...newItems[itemIndex], quantity: newQuantity }
-    setEditFormData({ ...editFormData, items: newItems })
-  }
+    setEditFormData(prev => {
+      const newItems = [...prev.items]
+      newItems[itemIndex] = { ...newItems[itemIndex], quantity: newQuantity }
+      return { ...prev, items: newItems }
+    })
+  }, [])
 
-  const saveChanges = async () => {
+  const updateNotes = useCallback((notes: string) => {
+    setEditFormData(prev => ({ ...prev, notes }))
+  }, [])
+
+  const saveChanges = useCallback(async () => {
     if (!editingOrder) return
 
     try {
@@ -271,7 +290,36 @@ export function BranchDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [editingOrder, editFormData, user, toast])
+
+  // Memoizar el renderizado de tarjetas de plantillas
+  const templateCards = useMemo(() => {
+    return templates.map((template) => {
+      const existingDraft = draftOrders.find(order => order.templateId === template.id)
+      const templateStatus = getTemplateStatus(template)
+      
+      return (
+        <TemplateCard
+          key={template.id}
+          template={template}
+          existingDraft={existingDraft || null}
+          templateStatus={templateStatus}
+          isEditing={editingOrder?.templateId === template.id}
+          editFormData={editFormData}
+          onCreateOrder={() => createOrderFromTemplate(template)}
+          onStartEditing={() => existingDraft && startEditing(existingDraft)}
+          onCancelEditing={cancelEditing}
+          onSendOrder={() => existingDraft && sendDraftOrder(existingDraft)}
+          onSaveChanges={saveChanges}
+          onUpdateQuantity={updateItemQuantity}
+          onUpdateNotes={updateNotes}
+        />
+      )
+    })
+  }, [templates, draftOrders, editingOrder, editFormData, getTemplateStatus, createOrderFromTemplate, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes])
+
+  // Loading state
+  const isLoading = templatesLoading || draftsLoading
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -308,47 +356,36 @@ export function BranchDashboard() {
         <TabsContent value="plantillas" className="mt-6">
           <div>
             <h3 className="text-lg font-semibold mb-4">📋 Plantillas</h3>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-              {templates.map((template) => {
-                const existingDraft = draftOrders.find(order => order.templateId === template.id)
-                const templateStatus = getTemplateStatus(template)
-                
-                return (
-                  <TemplateCard
-                    key={template.id}
-                    template={template}
-                    existingDraft={existingDraft || null}
-                    templateStatus={templateStatus}
-                    isEditing={editingOrder?.templateId === template.id}
-                    editFormData={editFormData}
-                    onCreateOrder={() => createOrderFromTemplate(template)}
-                    onStartEditing={() => existingDraft && startEditing(existingDraft)}
-                    onCancelEditing={cancelEditing}
-                    onSendOrder={() => existingDraft && sendDraftOrder(existingDraft)}
-                    onSaveChanges={saveChanges}
-                    onUpdateQuantity={updateItemQuantity}
-                    onUpdateNotes={(notes) => setEditFormData({ ...editFormData, notes })}
-                  />
-                )
-              })}
-            </div>
+            
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Cargando plantillas...</span>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {templateCards}
+                </div>
 
-            {templates.length === 0 && (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No hay plantillas disponibles</h3>
-                  <p className="text-muted-foreground mb-4">
-                    El administrador aún no ha creado plantillas para tu sucursal.
-                  </p>
-                  <Button asChild>
-                    <Link href="/dashboard/orders/new">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Crear pedido manual
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                {templates.length === 0 && (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No hay plantillas disponibles</h3>
+                      <p className="text-muted-foreground mb-4">
+                        El administrador aún no ha creado plantillas para tu sucursal.
+                      </p>
+                      <Button asChild>
+                        <Link href="/dashboard/orders/new">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Crear pedido manual
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </div>
         </TabsContent>
@@ -362,7 +399,12 @@ export function BranchDashboard() {
               </p>
             </div>
             
-            {assemblingOrders.length > 0 ? (
+            {assemblingLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
+              </div>
+            ) : assemblingOrders.length > 0 ? (
               <AssemblingOrdersTable orders={assemblingOrders} user={user} />
             ) : (
               <Card>
@@ -387,8 +429,16 @@ export function BranchDashboard() {
               </p>
             </div>
             
-            {inTransitOrders.length > 0 ? (
-              <InTransitOrdersTable orders={inTransitOrders} user={user} />
+            {inTransitLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
+              </div>
+            ) : inTransitOrders.length > 0 ? (
+              <InTransitOrdersTable 
+                orders={inTransitOrders} 
+                user={user}
+              />
             ) : (
               <Card>
                 <CardContent className="text-center py-8">
@@ -406,4 +456,3 @@ export function BranchDashboard() {
     </div>
   )
 }
-

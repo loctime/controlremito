@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import type { Order, User } from "@/lib/types"
@@ -16,7 +16,7 @@ interface AssemblingOrdersTableProps {
   onTakeForDelivery?: (orderId: string) => void
 }
 
-export function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery }: AssemblingOrdersTableProps) {
+export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery }: AssemblingOrdersTableProps) {
   const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
 
   const toggleTemplateCollapse = (templateName: string) => {
@@ -152,5 +152,5 @@ export function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDe
       ))}
     </div>
   )
-}
+})
 

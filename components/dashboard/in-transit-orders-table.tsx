@@ -1,9 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, ChevronRight, Eye, EyeOff, CheckCircle } from "lucide-react"
+import { doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { useToast } from "@/hooks/use-toast"
 import type { Order, User } from "@/lib/types"
 
 interface OrderWithTemplate extends Order {
@@ -16,11 +19,43 @@ interface InTransitOrdersTableProps {
   onMarkAsReceived?: (orderId: string) => void
 }
 
-export function InTransitOrdersTable({ orders, user, onMarkAsReceived }: InTransitOrdersTableProps) {
+export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders, user }: InTransitOrdersTableProps) {
+  const { toast } = useToast()
   const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null)
   const [orderDetails, setOrderDetails] = useState<string>("")
   const [itemQuantities, setItemQuantities] = useState<Record<string, { received: number; status: 'ok' | 'no' | 'pending' }>>({})
+
+  const markOrderAsReceived = useCallback(async (orderId: string) => {
+    if (!user) return
+
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        status: "received",
+        receivedAt: new Date(),
+        receivedBy: user.id,
+        receivedByName: user.name,
+        receivedDetails: orderDetails,
+        itemQuantities: itemQuantities
+      })
+
+      toast({
+        title: "Pedido recibido",
+        description: "El pedido fue marcado como recibido correctamente",
+      })
+
+      setExpandedOrder(null)
+      setOrderDetails("")
+      setItemQuantities({})
+    } catch (error) {
+      console.error("Error al marcar pedido como recibido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo marcar el pedido como recibido",
+        variant: "destructive",
+      })
+    }
+  }, [user, orderDetails, itemQuantities, toast])
 
   const toggleTemplateCollapse = (templateName: string) => {
     setCollapsedTemplates(prev => {
@@ -314,7 +349,7 @@ export function InTransitOrdersTable({ orders, user, onMarkAsReceived }: InTrans
                                 {/* Botón para marcar como recibido */}
                                 <div className="flex justify-end">
                                   <Button
-                                    onClick={() => onMarkAsReceived && onMarkAsReceived(order.id)}
+                                    onClick={() => markOrderAsReceived(order.id)}
                                     className="bg-green-600 hover:bg-green-700 text-white"
                                     disabled={Object.keys(itemQuantities).length === 0}
                                   >
@@ -337,5 +372,5 @@ export function InTransitOrdersTable({ orders, user, onMarkAsReceived }: InTrans
       ))}
     </div>
   )
-}
+})
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, CheckCheck } from "lucide-react"
 import type { Order } from "@/lib/types"
@@ -15,7 +15,7 @@ interface OrdersTableProps {
   onAcceptAll: (orders: OrderWithTemplate[]) => void
 }
 
-export function OrdersTable({ orders, onAcceptOrder, onAcceptAll }: OrdersTableProps) {
+export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, onAcceptAll }: OrdersTableProps) {
   const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
 
   const toggleTemplateCollapse = (templateName: string) => {
@@ -115,5 +115,5 @@ export function OrdersTable({ orders, onAcceptOrder, onAcceptAll }: OrdersTableP
       ))}
     </div>
   )
-}
+})
 

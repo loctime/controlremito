@@ -1,5 +1,6 @@
 "use client"
 
+import { memo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,7 +31,7 @@ interface TemplateCardProps {
   onUpdateNotes: (notes: string) => void
 }
 
-export function TemplateCard({
+export const TemplateCard = memo(function TemplateCard({
   template,
   existingDraft,
   templateStatus,
@@ -311,5 +312,5 @@ export function TemplateCard({
       </CardContent>
     </Card>
   )
-}
+})
 

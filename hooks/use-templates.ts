@@ -3,11 +3,26 @@ import { collection, query, where, onSnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Template, User } from "@/lib/types"
 
-export function useTemplates(user: User | null) {
+interface UseTemplatesReturn {
+  templates: Template[]
+  loading: boolean
+  error: Error | null
+}
+
+export function useTemplates(user: User | null): UseTemplatesReturn {
   const [templates, setTemplates] = useState<Template[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    let isMounted = true
+    setLoading(true)
+    setError(null)
 
     try {
       const templatesRef = collection(db, "apps/controld/templates")
@@ -15,53 +30,70 @@ export function useTemplates(user: User | null) {
       console.log("🔍 [DEBUG] Cargando plantillas en tiempo real para rol:", user.role, "branchId:", user.branchId)
 
       if (user.role === "branch" && user.branchId) {
-        // Firestore no permite usar "in" con null, así que hacemos dos suscripciones separadas
         let globalTemplates: Template[] = []
         let branchTemplates: Template[] = []
         
-        // 1. Suscripción a plantillas globales (branchId == null)
         const globalQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", null))
         const unsubscribeGlobal = onSnapshot(globalQuery, (snapshot) => {
+          if (!isMounted) return
           globalTemplates = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
           console.log("📋 [DEBUG] Plantillas globales actualizadas:", globalTemplates.length)
           setTemplates([...globalTemplates, ...branchTemplates])
-        }, (error) => {
-          console.error("[v0] Error al escuchar plantillas globales:", error)
+          setLoading(false)
+        }, (err) => {
+          console.error("[v0] Error al escuchar plantillas globales:", err)
+          if (isMounted) {
+            setError(err as Error)
+            setLoading(false)
+          }
         })
         
-        // 2. Suscripción a plantillas específicas de esta sucursal (branchId == user.branchId)
         const branchQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", user.branchId))
         const unsubscribeBranch = onSnapshot(branchQuery, (snapshot) => {
+          if (!isMounted) return
           branchTemplates = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
           console.log("📋 [DEBUG] Plantillas de la sucursal actualizadas:", branchTemplates.length)
           setTemplates([...globalTemplates, ...branchTemplates])
-        }, (error) => {
-          console.error("[v0] Error al escuchar plantillas de sucursal:", error)
+          setLoading(false)
+        }, (err) => {
+          console.error("[v0] Error al escuchar plantillas de sucursal:", err)
+          if (isMounted) {
+            setError(err as Error)
+            setLoading(false)
+          }
         })
         
-        // Retornar función de limpieza para ambas suscripciones
         return () => {
+          isMounted = false
           unsubscribeGlobal()
           unsubscribeBranch()
         }
       } else {
-        // Para admin y otros roles, traer todas las activas
         const q = query(templatesRef, where("active", "==", true))
         const unsubscribe = onSnapshot(q, (snapshot) => {
+          if (!isMounted) return
           const templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
           console.log("📋 [DEBUG] Total plantillas actualizadas:", templatesData.length)
           setTemplates(templatesData)
-        }, (error) => {
-          console.error("[v0] Error al escuchar plantillas:", error)
+          setLoading(false)
+        }, (err) => {
+          console.error("[v0] Error al escuchar plantillas:", err)
+          if (isMounted) {
+            setError(err as Error)
+            setLoading(false)
+          }
         })
         
         return unsubscribe
       }
-    } catch (error) {
-      console.error("[v0] Error al configurar listeners de plantillas:", error)
+    } catch (err) {
+      console.error("[v0] Error al configurar listeners de plantillas:", err)
+      if (isMounted) {
+        setError(err as Error)
+        setLoading(false)
+      }
     }
-  }, [user])
+  }, [user?.id, user?.role, user?.branchId])
 
-  return templates
+  return { templates, loading, error }
 }
-

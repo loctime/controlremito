@@ -1,9 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, memo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Clock, Package, Truck } from "lucide-react"
+import { Clock, Package, Truck, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { useOrders } from "@/hooks/use-orders"
@@ -19,25 +19,25 @@ interface OrderWithTemplate extends Order {
   templateName: string
 }
 
-export function FactoryDeliveryDashboard() {
+export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
   
-  const pendingOrders = useOrders(user, "sent")
-  const assemblingOrders = useOrders(user, "assembling")
-  const inTransitOrders = useOrders(user, "in_transit")
+  const { orders: pendingOrders, loading: pendingLoading } = useOrders(user, "sent")
+  const { orders: assemblingOrders, loading: assemblingLoading } = useOrders(user, "assembling")
+  const { orders: inTransitOrders, loading: inTransitLoading } = useOrders(user, "in_transit")
   
   const [showAcceptConfirmation, setShowAcceptConfirmation] = useState(false)
   const [showAcceptAllConfirmation, setShowAcceptAllConfirmation] = useState(false)
   const [orderToAccept, setOrderToAccept] = useState<OrderWithTemplate | null>(null)
   const [ordersToAcceptAll, setOrdersToAcceptAll] = useState<OrderWithTemplate[]>([])
 
-  const showAcceptOrderConfirmation = (order: OrderWithTemplate) => {
+  const showAcceptOrderConfirmation = useCallback((order: OrderWithTemplate) => {
     setOrderToAccept(order)
     setShowAcceptConfirmation(true)
-  }
+  }, [])
 
-  const acceptOrder = async (orderId: string) => {
+  const acceptOrder = useCallback(async (orderId: string) => {
     if (!user) return
 
     try {
@@ -63,14 +63,14 @@ export function FactoryDeliveryDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [user, toast])
 
-  const showAcceptAllOrdersConfirmation = (orders: OrderWithTemplate[]) => {
+  const showAcceptAllOrdersConfirmation = useCallback((orders: OrderWithTemplate[]) => {
     setOrdersToAcceptAll(orders)
     setShowAcceptAllConfirmation(true)
-  }
+  }, [])
 
-  const acceptAllOrdersFromTemplate = async (orders: OrderWithTemplate[]) => {
+  const acceptAllOrdersFromTemplate = useCallback(async (orders: OrderWithTemplate[]) => {
     if (!user) return
 
     try {
@@ -100,9 +100,9 @@ export function FactoryDeliveryDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [user, toast])
 
-  const markOrderAsReady = async (orderId: string) => {
+  const markOrderAsReady = useCallback(async (orderId: string) => {
     if (!user) return
 
     try {
@@ -124,9 +124,9 @@ export function FactoryDeliveryDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [user, toast])
 
-  const takeOrderForDelivery = async (orderId: string) => {
+  const takeOrderForDelivery = useCallback(async (orderId: string) => {
     if (!user) return
 
     try {
@@ -149,7 +149,17 @@ export function FactoryDeliveryDashboard() {
         variant: "destructive",
       })
     }
-  }
+  }, [user, toast])
+
+  const handleCancelAccept = useCallback(() => {
+    setShowAcceptConfirmation(false)
+    setOrderToAccept(null)
+  }, [])
+
+  const handleCancelAcceptAll = useCallback(() => {
+    setShowAcceptAllConfirmation(false)
+    setOrdersToAcceptAll([])
+  }, [])
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -189,7 +199,12 @@ export function FactoryDeliveryDashboard() {
                 </p>
               </div>
               
-              {pendingOrders.length > 0 ? (
+              {pendingLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
+                </div>
+              ) : pendingOrders.length > 0 ? (
                 <OrdersTable 
                   orders={pendingOrders}
                   onAcceptOrder={showAcceptOrderConfirmation}
@@ -220,7 +235,12 @@ export function FactoryDeliveryDashboard() {
               </p>
             </div>
             
-            {assemblingOrders.length > 0 ? (
+            {assemblingLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
+              </div>
+            ) : assemblingOrders.length > 0 ? (
               <AssemblingOrdersTable 
                 orders={assemblingOrders}
                 user={user}
@@ -251,7 +271,12 @@ export function FactoryDeliveryDashboard() {
               </p>
             </div>
             
-            {inTransitOrders.length > 0 ? (
+            {inTransitLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
+              </div>
+            ) : inTransitOrders.length > 0 ? (
               <InTransitOrdersTable orders={inTransitOrders} user={user} />
             ) : (
               <Card>
@@ -273,22 +298,15 @@ export function FactoryDeliveryDashboard() {
         open={showAcceptConfirmation}
         order={orderToAccept}
         onConfirm={() => orderToAccept && acceptOrder(orderToAccept.id)}
-        onCancel={() => {
-          setShowAcceptConfirmation(false)
-          setOrderToAccept(null)
-        }}
+        onCancel={handleCancelAccept}
       />
 
       <AcceptAllOrdersDialog
         open={showAcceptAllConfirmation}
         orders={ordersToAcceptAll}
         onConfirm={() => acceptAllOrdersFromTemplate(ordersToAcceptAll)}
-        onCancel={() => {
-          setShowAcceptAllConfirmation(false)
-          setOrdersToAcceptAll([])
-        }}
+        onCancel={handleCancelAcceptAll}
       />
     </div>
   )
-}
-
+})
