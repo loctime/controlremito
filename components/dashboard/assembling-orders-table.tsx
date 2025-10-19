@@ -85,7 +85,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                 </thead>
                 <tbody>
                   {templateOrders.map((order) => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                    <tr key={order.id} className={`border-b hover:bg-gray-50 ${order.preparedAt && user?.role === "delivery" ? "bg-green-50 border-green-200" : ""}`}>
                       <td className="py-3 px-2">
                         <div className="text-sm font-medium text-gray-900">
                           {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
@@ -97,8 +97,8 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                       <td className="py-3 px-2">
                         <div className="text-sm">
                           {order.preparedAt ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              ✓ Listo
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
+                              ✓ Listo para retirar
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">

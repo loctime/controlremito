@@ -163,18 +163,20 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
 
   return (
     <div className="max-w-7xl mx-auto">
-      <Tabs defaultValue="recibir" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-gray-100">
-          <TabsTrigger 
-            value="recibir" 
-            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
-          >
-            <Clock className="h-4 w-4" />
-            <span>Recibir</span>
-            {pendingOrders.length > 0 && (
-              <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
-            )}
-          </TabsTrigger>
+      <Tabs defaultValue={user?.role === "factory" ? "recibir" : "armando"} className="w-full">
+        <TabsList className={`grid w-full ${user?.role === "factory" ? "grid-cols-3" : "grid-cols-2"} h-auto p-1 bg-gray-100`}>
+          {user?.role === "factory" && (
+            <TabsTrigger 
+              value="recibir" 
+              className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
+            >
+              <Clock className="h-4 w-4" />
+              <span>Recibir</span>
+              {pendingOrders.length > 0 && (
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+              )}
+            </TabsTrigger>
+          )}
           <TabsTrigger 
             value="armando" 
             className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
@@ -183,6 +185,9 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
             <span>Armando</span>
             {assemblingOrders.length > 0 && (
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
+            )}
+            {user?.role === "delivery" && assemblingOrders.some(order => order.preparedAt) && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
             )}
           </TabsTrigger>
           <TabsTrigger 
@@ -238,9 +243,19 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         <TabsContent value="armando" className="mt-6">
           <div>
             <div className="mb-4">
-              <h3 className="text-lg font-semibold">🔧 Pedidos en Armando</h3>
+              <h3 className="text-lg font-semibold">
+                🔧 Pedidos en Armando
+                {user?.role === "delivery" && assemblingOrders.some(order => order.preparedAt) && (
+                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
+                    🚚 ¡Listos para retirar!
+                  </span>
+                )}
+              </h3>
               <p className="text-sm text-muted-foreground">
-                Pedidos aceptados que están siendo preparados
+                {user?.role === "delivery" 
+                  ? "Pedidos que están siendo preparados o listos para retirar"
+                  : "Pedidos aceptados que están siendo preparados"
+                }
               </p>
             </div>
             
