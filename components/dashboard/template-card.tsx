@@ -13,9 +13,11 @@ interface TemplateCardProps {
   template: Template
   existingDraft: Order | null
   templateStatus: {
-    status: 'draft' | 'available' | 'waiting'
+    status: 'draft' | 'available' | 'waiting' | 'editable' | 'recently_sent' | 'accepted'
     label: string
     color: string
+    lastSentOrder?: Order
+    hoursSinceSent?: number
   }
   isEditing: boolean
   editFormData: {
@@ -231,6 +233,87 @@ export const TemplateCard = memo(function TemplateCard({
                 <Plus className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Crear pedido</span>
                 <span className="sm:hidden">Crear</span>
+              </Button>
+              
+              {/* Sección de edición expandible para pedidos temporales */}
+              {isEditing && (
+                <div className="border-t pt-3 space-y-3">
+                  <div>
+                    <Label className="text-sm font-medium">Notas del pedido</Label>
+                    <Input
+                      value={editFormData.notes}
+                      onChange={(e) => onUpdateNotes(e.target.value)}
+                      placeholder="Agregar notas..."
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label className="text-sm font-medium">Cantidades</Label>
+                    <div className="space-y-2 mt-2">
+                      {editFormData.items.map((item, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{item.productName}</span>
+                            <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                              disabled={item.quantity <= 0}
+                              className="h-6 w-6 p-0"
+                            >
+                              -
+                            </Button>
+                            <span className="w-8 text-center text-sm">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                              className="h-6 w-6 p-0"
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={onCancelEditing}
+                      variant="outline"
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <X className="mr-1 h-3 w-3" />
+                      Cancelar
+                    </Button>
+                    <Button 
+                      onClick={onSaveChanges}
+                      className="flex-1"
+                      size="sm"
+                    >
+                      <Save className="mr-1 h-3 w-3" />
+                      Guardar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : templateStatus.status === 'editable' || templateStatus.status === 'recently_sent' || templateStatus.status === 'accepted' ? (
+            // Botones para plantillas con pedidos enviados
+            <div className="space-y-3">
+              <Button 
+                onClick={onCreateOrder}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Ver opciones</span>
+                <span className="sm:hidden">Opciones</span>
               </Button>
               
               {/* Sección de edición expandible para pedidos temporales */}
