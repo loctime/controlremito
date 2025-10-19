@@ -179,10 +179,24 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
           )}
           <TabsTrigger 
             value="armando" 
-            className="flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative"
+            className={`flex items-center gap-2 p-3 text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md data-[state=active]:font-semibold transition-all duration-200 hover:bg-gray-200 rounded-md relative ${
+              user?.role === "delivery" && assemblingOrders.some(order => order.preparedAt) 
+                ? "bg-green-50 border-2 border-green-300 shadow-green-200" 
+                : ""
+            }`}
           >
             <Package className="h-4 w-4" />
-            <span>Armando</span>
+            <span>
+              Armando
+              {user?.role === "delivery" && assemblingOrders.some(order => order.preparedAt) && (
+                <span className="ml-1 text-green-600 font-bold">
+                  🚚 ¡Listos! 
+                  <span className="ml-1 bg-green-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {assemblingOrders.filter(order => order.preparedAt).length}
+                  </span>
+                </span>
+              )}
+            </span>
             {assemblingOrders.length > 0 && (
               <div className="absolute -top-1 -right-1 w-3 h-3 bg-orange-500 rounded-full border-2 border-white"></div>
             )}
