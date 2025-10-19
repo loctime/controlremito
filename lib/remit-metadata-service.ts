@@ -1,6 +1,6 @@
 import { doc, setDoc, getDoc, updateDoc, Timestamp } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Order, User, RemitMetadata, OrderStatus } from "./types"
+import type { Order, User, RemitMetadata, OrderStatus, Signature } from "./types"
 
 const REMIT_METADATA_COLLECTION = "apps/controld/remit-metadata"
 
@@ -9,31 +9,46 @@ const REMIT_METADATA_COLLECTION = "apps/controld/remit-metadata"
  */
 export function canTransitionTo(currentStatus: OrderStatus, newStatus: OrderStatus): boolean {
   const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-    draft: ["sent"],
-    sent: ["ready"],
-    ready: ["in_transit"],
+    draft: ["sent", "cancelled"],
+    sent: ["assembling", "cancelled"],
+    assembling: ["in_transit", "cancelled"],
     in_transit: ["received"],
-    received: [] // Estado final, no se puede cambiar
+    received: [], // Estado final, no se puede cambiar
+    cancelled: [] // Estado final
   }
 
   return validTransitions[currentStatus]?.includes(newStatus) || false
 }
 
 /**
+ * Crear signature object desde user
+ */
+function createSignature(user: User): Signature {
+  return {
+    userId: user.id,
+    userName: user.name,
+    timestamp: Timestamp.now(),
+    signatureImage: user.signature?.signatureImage,
+    position: user.signature?.position
+  }
+}
+
+/**
  * Crear metadata de remito al enviar un pedido
  */
-export async function createRemitMetadata(order: Order): Promise<void> {
+export async function createRemitMetadata(order: Order, user: User): Promise<void> {
   const remitData: RemitMetadata = {
     orderId: order.id,
     orderNumber: order.orderNumber,
     createdAt: Timestamp.now(),
     currentStatus: "sent",
+    sentSignature: createSignature(user),
     statusHistory: [
       {
         status: "sent",
         timestamp: Timestamp.now(),
-        userId: order.createdBy,
-        userName: order.createdByName
+        userId: user.id,
+        userName: user.name
       }
     ]
   }
@@ -64,11 +79,7 @@ export async function updateRemitStatus(
   }
 
   const timestamp = Timestamp.now()
-  const signature = {
-    userId: user.id,
-    userName: user.name,
-    timestamp
-  }
+  const signature = createSignature(user)
 
   // Actualizar según el estado
   const updates: Partial<RemitMetadata> = {
@@ -86,8 +97,11 @@ export async function updateRemitStatus(
 
   // Agregar firma específica según el estado
   switch (newStatus) {
-    case "ready":
-      updates.readySignature = signature
+    case "sent":
+      updates.sentSignature = signature
+      break
+    case "assembling":
+      updates.assemblingSignature = signature
       break
     case "in_transit":
       updates.inTransitSignature = signature
@@ -98,6 +112,24 @@ export async function updateRemitStatus(
   }
 
   await updateDoc(remitRef, updates)
+}
+
+/**
+ * Actualizar firma de "listo" (cuando fábrica termina de armar)
+ */
+export async function updateReadySignature(orderId: string, user: User): Promise<void> {
+  const remitRef = doc(db, REMIT_METADATA_COLLECTION, orderId)
+  const remitDoc = await getDoc(remitRef)
+
+  if (!remitDoc.exists()) {
+    throw new Error("Metadata del remito no encontrada")
+  }
+
+  const signature = createSignature(user)
+
+  await updateDoc(remitRef, {
+    readySignature: signature
+  })
 }
 
 /**

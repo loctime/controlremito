@@ -50,7 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       roles: ["admin", "factory", "branch", "delivery", "maxdev"],
     },
     { name: "Usuarios", href: "/dashboard/users", icon: Users, roles: ["admin", "maxdev"] },
-    { name: "Configuración", href: "/dashboard/settings", icon: Settings, roles: ["admin", "maxdev"] },
+    { name: "Configuración", href: "/dashboard/settings", icon: Settings, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
   ]
 
   const filteredNavigation = navigation.filter((item) => item.roles.includes(user?.role || ""))

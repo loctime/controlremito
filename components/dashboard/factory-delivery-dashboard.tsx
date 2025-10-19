@@ -14,6 +14,7 @@ import { AcceptOrderDialog, AcceptAllOrdersDialog } from "./confirmation-dialogs
 import type { Order } from "@/lib/types"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { updateRemitStatus, updateReadySignature } from "@/lib/remit-metadata-service"
 
 interface OrderWithTemplate extends Order {
   templateName: string
@@ -48,6 +49,9 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         acceptedByName: user.name
       })
 
+      // Agregar firma de aceptación al remit metadata
+      await updateRemitStatus(orderId, "assembling", user)
+
       toast({
         title: "Pedido aceptado",
         description: "El pedido fue aceptado correctamente",
@@ -74,14 +78,16 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
     if (!user) return
 
     try {
-      const updatePromises = orders.map(order => 
-        updateDoc(doc(db, "apps/controld/orders", order.id), {
+      const updatePromises = orders.map(async order => {
+        await updateDoc(doc(db, "apps/controld/orders", order.id), {
           status: "assembling",
           acceptedAt: new Date(),
           acceptedBy: user.id,
           acceptedByName: user.name
         })
-      )
+        // Agregar firma de aceptación al remit metadata
+        await updateRemitStatus(order.id, "assembling", user)
+      })
 
       await Promise.all(updatePromises)
 
@@ -112,6 +118,9 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         preparedByName: user.name
       })
 
+      // Agregar firma de "listo" al remit metadata
+      await updateReadySignature(orderId, user)
+
       toast({
         title: "Pedido marcado como listo",
         description: "El pedido está listo para ser enviado",
@@ -136,6 +145,9 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         deliveredBy: user.id,
         deliveredByName: user.name
       })
+
+      // Agregar firma de delivery al remit metadata
+      await updateRemitStatus(orderId, "in_transit", user)
 
       toast({
         title: "Pedido tomado para entrega",

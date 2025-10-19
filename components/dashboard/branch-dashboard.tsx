@@ -302,7 +302,7 @@ export function BranchDashboard() {
       await createRemitMetadata({
         ...order,
         status: "sent"
-      })
+      }, user)
 
       // Limpiar el estado de edición después de enviar
       setEditingOrder(null)

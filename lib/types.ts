@@ -8,6 +8,15 @@ export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "frida
 
 export type ItemStatus = "pending" | "available" | "not_available" | "delivered" | "not_received" | "returned"
 
+// Tipo reutilizable para firmas
+export interface Signature {
+  userId: string
+  userName: string
+  timestamp: Timestamp
+  signatureImage?: string // Base64 de firma dibujada (opcional)
+  position?: string // Cargo del firmante (opcional)
+}
+
 export interface User {
   id: string
   email: string
@@ -16,6 +25,13 @@ export interface User {
   branchId?: string // Para sucursales y fábricas
   createdAt: Timestamp
   active: boolean
+  // Configuración de firma
+  signature?: {
+    fullName: string // Nombre completo para aclaración
+    position?: string // Cargo (ej: "Encargado de Fábrica")
+    signatureImage?: string // Base64 del canvas con firma dibujada
+    createdAt: Timestamp
+  }
 }
 
 export interface Branch {
@@ -98,21 +114,30 @@ export interface DeliveryNote {
   id: string
   orderId: string
   orderNumber: string
+  fromBranchId: string
   fromBranchName: string
+  toBranchId: string
   toBranchName: string
-  deliverySignature: {
-    userId: string
-    userName: string
-    timestamp: Timestamp
-  }
-  branchSignature: {
-    userId: string
-    userName: string
-    timestamp: Timestamp
-  }
-  itemsDelivered: OrderItem[]
-  itemsReturned: OrderItem[]
-  itemsNotReceived: OrderItem[]
+  
+  // SECCIÓN 1: LO PEDIDO (items originales del pedido)
+  itemsRequested: OrderItem[]
+  requestedBySignature: Signature
+  
+  // SECCIÓN 2: LO ARMADO (items con assembledQuantity de la fábrica)
+  itemsAssembled: OrderItem[]
+  assembledBySignature: Signature
+  assemblyNotes?: string // Notas generales del armado
+  
+  // SECCIÓN 3: LO RECIBIDO (verificación final en destino)
+  itemsDelivered: OrderItem[]   // Items que llegaron OK
+  itemsPartial: OrderItem[]      // Items que llegaron parcialmente
+  itemsReturned: OrderItem[]     // Items devueltos/rechazados
+  itemsNotReceived: OrderItem[]  // Items que no llegaron
+  
+  deliverySignature: Signature   // Quien entregó (delivery)
+  receptionSignature: Signature  // Quien recibió (sucursal)
+  receptionNotes?: string         // Notas de la recepción
+  
   pdfUrl?: string
   createdAt: Timestamp
 }
@@ -140,10 +165,11 @@ export interface RemitMetadata {
   orderId: string
   orderNumber: string
   createdAt: Timestamp
-  sentSignature?: { userId: string; userName: string; timestamp: Timestamp }
-  readySignature?: { userId: string; userName: string; timestamp: Timestamp }
-  inTransitSignature?: { userId: string; userName: string; timestamp: Timestamp }
-  receivedSignature?: { userId: string; userName: string; timestamp: Timestamp }
+  sentSignature?: Signature
+  assemblingSignature?: Signature  // Cuando fábrica acepta
+  readySignature?: Signature        // Cuando fábrica termina de armar
+  inTransitSignature?: Signature    // Cuando delivery toma el pedido
+  receivedSignature?: Signature     // Cuando sucursal recibe
   currentStatus: OrderStatus
   statusHistory: { status: OrderStatus; timestamp: Timestamp; userId: string; userName: string }[]
 }

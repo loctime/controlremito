@@ -140,7 +140,7 @@ function OrdersContent() {
       await createRemitMetadata({
         ...order,
         status: "sent"
-      })
+      }, user)
 
       toast({
         title: "Pedido enviado",

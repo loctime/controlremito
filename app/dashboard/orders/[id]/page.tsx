@@ -23,7 +23,8 @@ import { useAuth } from "@/lib/auth-context"
 import type { Order } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { isDayAllowed } from "@/lib/utils"
-import { updateRemitStatus, getRemitMetadata } from "@/lib/remit-metadata-service"
+import { updateRemitStatus, getRemitMetadata, createRemitMetadata, updateReadySignature, hasRemitMetadata } from "@/lib/remit-metadata-service"
+import { createDeliveryNote } from "@/lib/delivery-note-service"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -93,10 +94,19 @@ function OrderDetailContent() {
     setActionLoading(true)
     try {
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        status: "sent"
+        status: "sent",
+        sentBy: user.id,
+        sentByName: user.name,
+        sentAt: new Date(),
       })
 
-      await updateRemitStatus(orderId, "sent", user)
+      // Crear remit metadata si no existe
+      const metadataExists = await hasRemitMetadata(orderId)
+      if (!metadataExists) {
+        await createRemitMetadata(order, user)
+      } else {
+        await updateRemitStatus(orderId, "sent", user)
+      }
 
       toast({
         title: "Pedido enviado",
@@ -127,6 +137,9 @@ function OrderDetailContent() {
         preparedAt: new Date(),
       })
 
+      // Actualizar firma de "listo" en el remit metadata
+      await updateReadySignature(orderId, user)
+
       toast({
         title: "Pedido listo",
         description: "El pedido está listo para recoger",
@@ -156,6 +169,9 @@ function OrderDetailContent() {
         deliveredByName: user.name,
         deliveredAt: new Date(),
       })
+
+      // Actualizar metadata del remito con firma de delivery
+      await updateRemitStatus(orderId, "in_transit", user)
 
       toast({
         title: "Pedido en camino",
@@ -292,6 +308,14 @@ function OrderDetailContent() {
     setActionLoading(true)
     try {
       // Actualizar pedido
+      const updatedOrder = {
+        ...order,
+        status: "received" as const,
+        receivedBy: user.id,
+        receivedByName: user.name,
+        receivedAt: new Date(),
+      }
+
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
         status: "received",
         receivedBy: user.id,
@@ -302,12 +326,31 @@ function OrderDetailContent() {
       // Actualizar metadata del remito
       await updateRemitStatus(orderId, "received", user)
 
-      toast({
-        title: "Recepción confirmada",
-        description: "El pedido fue recibido correctamente",
-      })
+      // Crear el DeliveryNote automáticamente
+      try {
+        const deliveryNoteId = await createDeliveryNote(
+          updatedOrder as Order,
+          user,
+          undefined, // El usuario de delivery se obtiene del order
+          "" // Notas de recepción (podríamos agregar un campo para esto)
+        )
 
-      router.push("/dashboard/orders")
+        toast({
+          title: "Recepción confirmada",
+          description: "El pedido fue recibido y el remito fue generado correctamente",
+        })
+
+        // Redirigir al remito generado
+        router.push(`/dashboard/delivery-notes/${deliveryNoteId}`)
+      } catch (deliveryNoteError) {
+        console.error("Error al crear delivery note:", deliveryNoteError)
+        toast({
+          title: "Recepción confirmada con advertencia",
+          description: "El pedido fue recibido pero hubo un error al generar el remito",
+          variant: "destructive",
+        })
+        router.push("/dashboard/orders")
+      }
     } catch (error) {
       console.error("Error al confirmar recepción:", error)
       toast({
