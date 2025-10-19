@@ -12,6 +12,7 @@ import { useOrders } from "@/hooks/use-orders"
 import { TemplateCard } from "./template-card"
 import { AssemblingOrdersTable } from "./assembling-orders-table"
 import { InTransitOrdersTable } from "./in-transit-orders-table"
+import { OrderOptionsDialog } from "./order-options-dialog"
 import type { Order, Template } from "@/lib/types"
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -35,6 +36,23 @@ export function BranchDashboard() {
     items: { productId: string; productName: string; quantity: number; unit: string }[]
     notes: string
   }>({ items: [], notes: "" })
+  const [showOrderOptionsDialog, setShowOrderOptionsDialog] = useState<{
+    template: Template | null
+    lastSentOrder: Order | null
+    isOpen: boolean
+  }>({
+    template: null,
+    lastSentOrder: null,
+    isOpen: false
+  })
+
+  // Función para verificar si se puede editar un pedido enviado
+  const canEditSentOrder = useCallback((order: Order) => {
+    // Solo permitir edición si:
+    // - El pedido está en estado "sent" (enviado)
+    // - No ha sido aceptado por la fábrica aún
+    return order.status === 'sent' && !order.acceptedAt
+  }, [])
 
   // Memoizar cálculo de estado de plantilla
   const getTemplateStatus = useCallback((template: Template) => {
@@ -45,6 +63,41 @@ export function BranchDashboard() {
         status: 'draft' as const,
         label: 'En Borrador',
         color: 'bg-orange-200 text-orange-800'
+      }
+    }
+
+    // Buscar último pedido enviado de esta plantilla
+    const lastSentOrder = [...assemblingOrders, ...inTransitOrders].find(order => 
+      order.templateId === template.id && 
+      (order.status === 'sent' || order.status === 'assembling')
+    )
+
+    if (lastSentOrder) {
+      const sentDate = lastSentOrder.sentAt?.toDate()
+      const hoursSinceSent = sentDate ? (Date.now() - sentDate.getTime()) / (1000 * 60 * 60) : 0
+      
+      if (canEditSentOrder(lastSentOrder)) {
+        return {
+          status: 'editable' as const,
+          label: 'Enviado (Editable)',
+          color: 'bg-yellow-200 text-yellow-800',
+          lastSentOrder: lastSentOrder,
+          hoursSinceSent: Math.floor(hoursSinceSent)
+        }
+      } else if (lastSentOrder.status === 'sent') {
+        return {
+          status: 'recently_sent' as const,
+          label: `Enviado hace ${Math.floor(hoursSinceSent)}h`,
+          color: 'bg-blue-200 text-blue-800',
+          lastSentOrder: lastSentOrder
+        }
+      } else if (lastSentOrder.status === 'assembling') {
+        return {
+          status: 'accepted' as const,
+          label: 'Aceptado (Solo Agregar)',
+          color: 'bg-purple-200 text-purple-800',
+          lastSentOrder: lastSentOrder
+        }
       }
     }
 
@@ -65,29 +118,72 @@ export function BranchDashboard() {
         color: 'bg-blue-200 text-blue-800'
       }
     }
-  }, [draftOrders])
+  }, [draftOrders, assemblingOrders, inTransitOrders, canEditSentOrder])
+
+  const startEditing = useCallback((order: Order) => {
+    setEditingOrder(order)
+    setEditFormData({
+      items: order.items.map(item => ({
+        productId: item.productId,
+        productName: item.productName,
+        quantity: item.quantity,
+        unit: item.unit
+      })),
+      notes: order.notes || ""
+    })
+  }, [])
+
+  // Función para manejar clics en plantillas con diferentes estados
+  const handleTemplateClick = useCallback(async (template: Template) => {
+    if (!user || !user.branchId) return
+
+    const templateStatus = getTemplateStatus(template)
+
+    switch (templateStatus.status) {
+      case 'draft':
+        // Ya existe un borrador, cargar para edición
+        const existingDraft = draftOrders.find(order => order.templateId === template.id)
+        if (existingDraft) {
+          startEditing(existingDraft)
+        }
+        break
+
+      case 'editable':
+        // Pedido enviado pero editable, mostrar opciones
+        setShowOrderOptionsDialog({
+          template,
+          lastSentOrder: templateStatus.lastSentOrder,
+          isOpen: true
+        })
+        break
+
+      case 'recently_sent':
+      case 'accepted':
+        // Pedido enviado/reciente o aceptado, mostrar opciones limitadas
+        setShowOrderOptionsDialog({
+          template,
+          lastSentOrder: templateStatus.lastSentOrder,
+          isOpen: true
+        })
+        break
+
+      case 'available':
+      case 'waiting':
+        // Crear nuevo pedido normalmente
+        await createOrderFromTemplate(template)
+        break
+
+      default:
+        await createOrderFromTemplate(template)
+        break
+    }
+  }, [user, getTemplateStatus, draftOrders, startEditing])
 
   // Optimizar con useCallback para evitar recrear funciones
   const createOrderFromTemplate = useCallback(async (template: Template) => {
     if (!user || !user.branchId) return
 
     try {
-      const existingDraft = draftOrders.find(order => order.templateId === template.id)
-      
-      if (existingDraft) {
-        setEditingOrder(existingDraft)
-        setEditFormData({
-          items: existingDraft.items.map(item => ({
-            productId: item.productId,
-            productName: item.productName,
-            quantity: item.quantity,
-            unit: item.unit
-          })),
-          notes: existingDraft.notes || ""
-        })
-        return
-      }
-
       const destinationBranchId = template.destinationBranchIds[0]
       if (!destinationBranchId) {
         toast({
@@ -154,7 +250,7 @@ export function BranchDashboard() {
         variant: "destructive",
       })
     }
-  }, [user, draftOrders, toast])
+  }, [user, toast])
 
   const sendDraftOrder = useCallback(async (order: Order) => {
     if (!user) return
@@ -195,18 +291,210 @@ export function BranchDashboard() {
     }
   }, [user, toast])
 
-  const startEditing = useCallback((order: Order) => {
-    setEditingOrder(order)
-    setEditFormData({
-      items: order.items.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unit: item.unit
-      })),
-      notes: order.notes || ""
-    })
-  }, [])
+  // Función para crear pedido adicional
+  const createAdditionalOrder = useCallback(async (template: Template, parentOrder: Order) => {
+    if (!user || !user.branchId) return
+
+    try {
+      const destinationBranchId = template.destinationBranchIds[0]
+      if (!destinationBranchId) {
+        toast({
+          title: "Error",
+          description: "La plantilla no tiene destino configurado",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const [fromBranchDoc, toBranchDoc] = await Promise.all([
+        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", user.branchId))),
+        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", destinationBranchId)))
+      ])
+
+      const fromBranchName = fromBranchDoc.docs[0]?.data()?.name || user.name
+      const toBranchName = toBranchDoc.docs[0]?.data()?.name || "Fábrica"
+
+      const additionalOrder: Order = {
+        id: `temp-${Date.now()}`,
+        orderNumber: `ORD-${Date.now()}`,
+        fromBranchId: user.branchId,
+        fromBranchName: fromBranchName,
+        toBranchId: destinationBranchId,
+        toBranchName: toBranchName,
+        status: "draft",
+        items: template.items.map((item) => ({
+          id: `${Date.now()}-${item.productId}`,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unit: item.unit,
+          status: "pending" as const,
+        })),
+        createdAt: serverTimestamp() as any,
+        createdBy: user.id,
+        createdByName: user.name,
+        templateId: template.id,
+        allowedSendDays: template.allowedSendDays || [],
+        parentOrderId: parentOrder.id,
+        notes: `Pedido adicional a ${parentOrder.orderNumber}`,
+      }
+
+      setEditFormData({
+        items: template.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unit: item.unit,
+        })),
+        notes: `Pedido adicional a ${parentOrder.orderNumber}`
+      })
+
+      setEditingOrder(additionalOrder)
+
+      toast({
+        title: "Pedido adicional creado",
+        description: `Se creó un pedido adicional para ${parentOrder.orderNumber}. Ajusta las cantidades y guarda.`,
+      })
+
+    } catch (error) {
+      console.error("Error al crear pedido adicional:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo crear el pedido adicional",
+        variant: "destructive",
+      })
+    }
+  }, [user, toast])
+
+  // Función para reemplazar pedido
+  const replaceOrder = useCallback(async (template: Template, orderToCancel: Order) => {
+    if (!user) return
+
+    try {
+      // Confirmar cancelación
+      const confirmed = window.confirm(
+        `¿Estás seguro de que deseas cancelar el pedido ${orderToCancel.orderNumber} y crear uno nuevo?\n\nEsta acción no se puede deshacer.`
+      )
+
+      if (!confirmed) return
+
+      // Cancelar pedido original
+      await updateDoc(doc(db, "apps/controld/orders", orderToCancel.id), {
+        status: "cancelled",
+        cancelledAt: new Date(),
+        cancelledBy: user.id,
+        cancelledByName: user.name,
+        cancelReason: "Reemplazado por nuevo pedido desde plantilla"
+      })
+
+      // Crear nuevo pedido de reemplazo
+      const destinationBranchId = template.destinationBranchIds[0]
+      if (!destinationBranchId) {
+        toast({
+          title: "Error",
+          description: "La plantilla no tiene destino configurado",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const [fromBranchDoc, toBranchDoc] = await Promise.all([
+        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", user.branchId))),
+        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", destinationBranchId)))
+      ])
+
+      const fromBranchName = fromBranchDoc.docs[0]?.data()?.name || user.name
+      const toBranchName = toBranchDoc.docs[0]?.data()?.name || "Fábrica"
+
+      const replacementOrder: Order = {
+        id: `temp-${Date.now()}`,
+        orderNumber: `ORD-${Date.now()}`,
+        fromBranchId: user.branchId,
+        fromBranchName: fromBranchName,
+        toBranchId: destinationBranchId,
+        toBranchName: toBranchName,
+        status: "draft",
+        items: template.items.map((item) => ({
+          id: `${Date.now()}-${item.productId}`,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unit: item.unit,
+          status: "pending" as const,
+        })),
+        createdAt: serverTimestamp() as any,
+        createdBy: user.id,
+        createdByName: user.name,
+        templateId: template.id,
+        allowedSendDays: template.allowedSendDays || [],
+        parentOrderId: orderToCancel.id,
+        notes: `Pedido de reemplazo para ${orderToCancel.orderNumber}`,
+      }
+
+      setEditFormData({
+        items: template.items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unit: item.unit,
+        })),
+        notes: `Pedido de reemplazo para ${orderToCancel.orderNumber}`
+      })
+
+      setEditingOrder(replacementOrder)
+
+      toast({
+        title: "Pedido reemplazado",
+        description: `El pedido ${orderToCancel.orderNumber} fue cancelado y se creó uno nuevo de reemplazo.`,
+      })
+
+    } catch (error) {
+      console.error("Error al reemplazar pedido:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo reemplazar el pedido",
+        variant: "destructive",
+      })
+    }
+  }, [user, toast])
+
+  // Función para editar pedido enviado
+  const editSentOrder = useCallback(async (order: Order) => {
+    if (!user) return
+
+    try {
+      const confirmed = window.confirm(
+        `¿Estás seguro de que deseas editar el pedido ${order.orderNumber}?\n\n⚠️ Este pedido ya fue enviado a la fábrica. Los cambios pueden afectar el proceso de armado.`
+      )
+
+      if (!confirmed) return
+
+      // Cargar el pedido existente para edición
+      setEditingOrder(order)
+      setEditFormData({
+        items: order.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+          unit: item.unit
+        })),
+        notes: order.notes || ""
+      })
+
+      toast({
+        title: "Pedido cargado para edición",
+        description: `Puedes modificar el pedido ${order.orderNumber}. Los cambios se guardarán como una nueva versión.`,
+      })
+
+    } catch (error) {
+      console.error("Error al cargar pedido para edición:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo cargar el pedido para edición",
+        variant: "destructive",
+      })
+    }
+  }, [user, toast])
 
   const cancelEditing = useCallback(() => {
     setEditingOrder(null)
@@ -306,7 +594,7 @@ export function BranchDashboard() {
           templateStatus={templateStatus}
           isEditing={editingOrder?.templateId === template.id}
           editFormData={editFormData}
-          onCreateOrder={() => createOrderFromTemplate(template)}
+          onCreateOrder={() => handleTemplateClick(template)}
           onStartEditing={() => existingDraft && startEditing(existingDraft)}
           onCancelEditing={cancelEditing}
           onSendOrder={() => existingDraft && sendDraftOrder(existingDraft)}
@@ -316,7 +604,7 @@ export function BranchDashboard() {
         />
       )
     })
-  }, [templates, draftOrders, editingOrder, editFormData, getTemplateStatus, createOrderFromTemplate, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes])
+  }, [templates, draftOrders, editingOrder, editFormData, getTemplateStatus, handleTemplateClick, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes])
 
   // Loading state
   const isLoading = templatesLoading || draftsLoading
@@ -453,6 +741,29 @@ export function BranchDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* Diálogo de opciones para plantillas con pedidos enviados */}
+      {showOrderOptionsDialog.isOpen && showOrderOptionsDialog.template && showOrderOptionsDialog.lastSentOrder && (
+        <OrderOptionsDialog
+          template={showOrderOptionsDialog.template}
+          lastSentOrder={showOrderOptionsDialog.lastSentOrder}
+          isOpen={showOrderOptionsDialog.isOpen}
+          onClose={() => setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })}
+          onEditOrder={() => {
+            editSentOrder(showOrderOptionsDialog.lastSentOrder!)
+            setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })
+          }}
+          onCreateAdditional={() => {
+            createAdditionalOrder(showOrderOptionsDialog.template!, showOrderOptionsDialog.lastSentOrder!)
+            setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })
+          }}
+          onReplaceOrder={() => {
+            replaceOrder(showOrderOptionsDialog.template!, showOrderOptionsDialog.lastSentOrder!)
+            setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })
+          }}
+          canEdit={canEditSentOrder(showOrderOptionsDialog.lastSentOrder)}
+        />
+      )}
     </div>
   )
 }

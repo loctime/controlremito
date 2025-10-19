@@ -2,7 +2,7 @@ import type { Timestamp } from "firebase/firestore"
 
 export type UserRole = "admin" | "factory" | "branch" | "delivery" | "maxdev"
 
-export type OrderStatus = "draft" | "sent" | "assembling" | "in_transit" | "received"
+export type OrderStatus = "draft" | "sent" | "assembling" | "in_transit" | "received" | "cancelled"
 
 export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday"
 
@@ -81,6 +81,11 @@ export interface Order {
   notes?: string
   templateId?: string // referencia a la plantilla usada
   allowedSendDays?: DayOfWeek[] // heredado de la plantilla
+  // Campos para cancelación
+  cancelledAt?: Timestamp
+  cancelledBy?: string
+  cancelledByName?: string
+  cancelReason?: string
 }
 
 export interface DeliveryNote {
