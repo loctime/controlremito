@@ -48,6 +48,12 @@ export interface OrderItem {
   notAvailableReason?: string
   returnReason?: string
   notReceivedReason?: string
+  // Campos para armado
+  assembledQuantity?: number // cantidad armada
+  isFullyAssembled?: boolean // si se armó completamente
+  assemblyNotes?: string // notas sobre por qué no se pudo armar todo
+  assembledBy?: string // usuario que armó
+  assembledAt?: Timestamp // cuándo se armó
 }
 
 export interface Order {
