@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ShoppingCart, Clock, Package, Truck, CheckCircle, FileText, Plus, Send, Edit, ChevronDown, ChevronUp, Save, X, CheckCheck, ChevronRight, Eye, EyeOff } from "lucide-react"
 import { useEffect, useState } from "react"
-import { collection, query, where, getDocs, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc, serverTimestamp } from "firebase/firestore"
+import { collection, query, where, getDocs, onSnapshot, type Timestamp, addDoc, doc, updateDoc, documentId, getDoc, serverTimestamp } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Order, Template } from "@/lib/types"
 import Link from "next/link"
@@ -52,44 +52,56 @@ function DashboardContent() {
   const [itemQuantities, setItemQuantities] = useState<Record<string, { received: number; status: 'ok' | 'no' | 'pending' }>>({})
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!user) return
+    if (!user) return
 
-      // Si es sucursal, cargar plantillas, borradores y pedidos en armando/en camino
+    // Array para recolectar todas las funciones de cleanup
+    const unsubscribeFunctions: (() => void)[] = []
+
+    const setupListeners = async () => {
+      // Si es sucursal, configurar listeners para plantillas, borradores y pedidos
       if (user.role === "branch") {
-        await Promise.all([
-          fetchTemplates(), 
-          fetchDraftOrders(),
-          fetchAssemblingOrders(),
-          fetchInTransitOrders()
-        ])
+        const unsubTemplates = fetchTemplates()
+        const unsubDrafts = fetchDraftOrders()
+        const unsubAssembling = fetchAssemblingOrders()
+        const unsubInTransit = fetchInTransitOrders()
+        
+        unsubscribeFunctions.push(unsubTemplates, unsubDrafts, unsubAssembling, unsubInTransit)
         return
       }
 
-      // Para otros roles, cargar estadísticas
+      // Para otros roles, cargar estadísticas (solo una vez, no usa listeners)
       await fetchStats()
       
-      // Para factory, también cargar pedidos pendientes, en armando y en camino
+      // Para factory, también configurar listeners de pedidos pendientes, en armando y en camino
       if (user.role === "factory") {
-        await Promise.all([
-          fetchPendingOrders(),
-          fetchAssemblingOrders(),
-          fetchInTransitOrders()
-        ])
+        const unsubPending = fetchPendingOrders()
+        const unsubAssembling = fetchAssemblingOrders()
+        const unsubInTransit = fetchInTransitOrders()
+        
+        unsubscribeFunctions.push(unsubPending, unsubAssembling, unsubInTransit)
         setShowPendingOrders(true)
       }
       
-      // Para delivery, cargar pedidos en armando y en camino
+      // Para delivery, configurar listeners de pedidos en armando y en camino
       if (user.role === "delivery") {
-        await Promise.all([
-          fetchAssemblingOrders(),
-          fetchInTransitOrders()
-        ])
+        const unsubAssembling = fetchAssemblingOrders()
+        const unsubInTransit = fetchInTransitOrders()
+        
+        unsubscribeFunctions.push(unsubAssembling, unsubInTransit)
       }
-      
     }
 
-    fetchData()
+    setupListeners()
+
+    // Cleanup: desuscribirse de todos los listeners cuando el componente se desmonte o el user cambie
+    return () => {
+      console.log("🧹 [DEBUG] Limpiando listeners de Firebase...")
+      unsubscribeFunctions.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe()
+        }
+      })
+    }
   }, [user])
 
   const fetchStats = async () => {
@@ -128,49 +140,65 @@ function DashboardContent() {
     }
   }
 
-  const fetchTemplates = async () => {
-    if (!user) return
+  const fetchTemplates = () => {
+    if (!user) return () => {}
 
     try {
       const templatesRef = collection(db, "apps/controld/templates")
       
-      console.log("🔍 [DEBUG] Cargando plantillas para rol:", user.role, "branchId:", user.branchId)
-
-      let templatesData: Template[] = []
+      console.log("🔍 [DEBUG] Cargando plantillas en tiempo real para rol:", user.role, "branchId:", user.branchId)
 
       if (user.role === "branch" && user.branchId) {
-        // Firestore no permite usar "in" con null, así que hacemos dos consultas separadas
+        // Firestore no permite usar "in" con null, así que hacemos dos suscripciones separadas
+        let globalTemplates: Template[] = []
+        let branchTemplates: Template[] = []
         
-        // 1. Plantillas globales (branchId == null)
+        // 1. Suscripción a plantillas globales (branchId == null)
         const globalQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", null))
-        const globalSnapshot = await getDocs(globalQuery)
-        const globalTemplates = globalSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
-        console.log("📋 [DEBUG] Plantillas globales encontradas:", globalTemplates.length)
+        const unsubscribeGlobal = onSnapshot(globalQuery, (snapshot) => {
+          globalTemplates = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+          console.log("📋 [DEBUG] Plantillas globales actualizadas:", globalTemplates.length)
+          setTemplates([...globalTemplates, ...branchTemplates])
+        }, (error) => {
+          console.error("[v0] Error al escuchar plantillas globales:", error)
+        })
         
-        // 2. Plantillas específicas de esta sucursal (branchId == user.branchId)
+        // 2. Suscripción a plantillas específicas de esta sucursal (branchId == user.branchId)
         const branchQuery = query(templatesRef, where("active", "==", true), where("branchId", "==", user.branchId))
-        const branchSnapshot = await getDocs(branchQuery)
-        const branchTemplates = branchSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
-        console.log("📋 [DEBUG] Plantillas de la sucursal encontradas:", branchTemplates.length)
+        const unsubscribeBranch = onSnapshot(branchQuery, (snapshot) => {
+          branchTemplates = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+          console.log("📋 [DEBUG] Plantillas de la sucursal actualizadas:", branchTemplates.length)
+          setTemplates([...globalTemplates, ...branchTemplates])
+        }, (error) => {
+          console.error("[v0] Error al escuchar plantillas de sucursal:", error)
+        })
         
-        // Combinar ambas listas
-        templatesData = [...globalTemplates, ...branchTemplates]
+        // Retornar función de limpieza para ambas suscripciones
+        return () => {
+          unsubscribeGlobal()
+          unsubscribeBranch()
+        }
       } else {
         // Para admin y otros roles, traer todas las activas
         const q = query(templatesRef, where("active", "==", true))
-        const snapshot = await getDocs(q)
-        templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const templatesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Template[]
+          console.log("📋 [DEBUG] Total plantillas actualizadas:", templatesData.length)
+          setTemplates(templatesData)
+        }, (error) => {
+          console.error("[v0] Error al escuchar plantillas:", error)
+        })
+        
+        return unsubscribe
       }
-
-      console.log("📋 [DEBUG] Total plantillas encontradas:", templatesData.length, templatesData)
-      setTemplates(templatesData)
     } catch (error) {
-      console.error("[v0] Error al cargar plantillas:", error)
+      console.error("[v0] Error al configurar listeners de plantillas:", error)
+      return () => {}
     }
   }
 
-  const fetchDraftOrders = async () => {
-    if (!user || user.role !== "branch" || !user.branchId) return
+  const fetchDraftOrders = () => {
+    if (!user || user.role !== "branch" || !user.branchId) return () => {}
 
     try {
       const ordersRef = collection(db, "apps/controld/orders")
@@ -180,32 +208,39 @@ function DashboardContent() {
         where("status", "==", "draft"),
         where("createdBy", "==", user.id)
       )
-      const snapshot = await getDocs(q)
-      const draftOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
       
-      // Arreglar borradores que no tienen días permitidos
-      for (const draft of draftOrdersData) {
-        if (!draft.allowedSendDays || draft.allowedSendDays.length === 0) {
-          const template = templates.find(t => t.id === draft.templateId)
-          if (template && template.allowedSendDays) {
-            console.log("🔧 [DEBUG] Arreglando borrador sin días permitidos:", draft.id)
-            await updateDoc(doc(db, "apps/controld/orders", draft.id), {
-              allowedSendDays: template.allowedSendDays
-            })
-            draft.allowedSendDays = template.allowedSendDays
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const draftOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+        
+        // Arreglar borradores que no tienen días permitidos
+        for (const draft of draftOrdersData) {
+          if (!draft.allowedSendDays || draft.allowedSendDays.length === 0) {
+            const template = templates.find(t => t.id === draft.templateId)
+            if (template && template.allowedSendDays) {
+              console.log("🔧 [DEBUG] Arreglando borrador sin días permitidos:", draft.id)
+              await updateDoc(doc(db, "apps/controld/orders", draft.id), {
+                allowedSendDays: template.allowedSendDays
+              })
+              draft.allowedSendDays = template.allowedSendDays
+            }
           }
         }
-      }
+        
+        setDraftOrders(draftOrdersData)
+        console.log("📝 [DEBUG] Borradores actualizados en tiempo real:", draftOrdersData.length)
+      }, (error) => {
+        console.error("[v0] Error al escuchar borradores:", error)
+      })
       
-      setDraftOrders(draftOrdersData)
-      console.log("📝 [DEBUG] Borradores encontrados:", draftOrdersData.length)
+      return unsubscribe
     } catch (error) {
-      console.error("[v0] Error al cargar borradores:", error)
+      console.error("[v0] Error al configurar listener de borradores:", error)
+      return () => {}
     }
   }
 
-  const fetchPendingOrders = async () => {
-    if (!user) return
+  const fetchPendingOrders = () => {
+    if (!user) return () => {}
 
     try {
       const ordersRef = collection(db, "apps/controld/orders")
@@ -218,37 +253,42 @@ function DashboardContent() {
         q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "sent"))
       }
 
-      const snapshot = await getDocs(q)
-      const pendingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-      
-      // Obtener información de las plantillas para cada pedido
-      const ordersWithTemplates = await Promise.all(
-        pendingOrdersData.map(async (order) => {
-          if (order.templateId) {
-            try {
-              const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
-              const templateSnapshot = await getDoc(templateDocRef)
-              const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
-              console.log(`🔍 [DEBUG] Buscando plantilla ${order.templateId}:`, template?.name || "No encontrada")
-              return { ...order, templateName: template?.name || "Plantilla no encontrada" }
-            } catch (error) {
-              console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
-              return { ...order, templateName: "Error al cargar plantilla" }
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const pendingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+        
+        // Obtener información de las plantillas para cada pedido
+        const ordersWithTemplates = await Promise.all(
+          pendingOrdersData.map(async (order) => {
+            if (order.templateId) {
+              try {
+                const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
+                const templateSnapshot = await getDoc(templateDocRef)
+                const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
+                return { ...order, templateName: template?.name || "Plantilla no encontrada" }
+              } catch (error) {
+                console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
+                return { ...order, templateName: "Error al cargar plantilla" }
+              }
             }
-          }
-          return { ...order, templateName: "Sin plantilla" }
-        })
-      )
+            return { ...order, templateName: "Sin plantilla" }
+          })
+        )
+        
+        setPendingOrders(ordersWithTemplates)
+        console.log("📦 [DEBUG] Pedidos pendientes actualizados en tiempo real:", ordersWithTemplates.length)
+      }, (error) => {
+        console.error("[v0] Error al escuchar pedidos pendientes:", error)
+      })
       
-      setPendingOrders(ordersWithTemplates)
-      console.log("📦 [DEBUG] Pedidos pendientes encontrados:", ordersWithTemplates.length)
+      return unsubscribe
     } catch (error) {
-      console.error("[v0] Error al cargar pedidos pendientes:", error)
+      console.error("[v0] Error al configurar listener de pedidos pendientes:", error)
+      return () => {}
     }
   }
 
-  const fetchAssemblingOrders = async () => {
-    if (!user) return
+  const fetchAssemblingOrders = () => {
+    if (!user) return () => {}
 
     try {
       const ordersRef = collection(db, "apps/controld/orders")
@@ -256,43 +296,49 @@ function DashboardContent() {
 
       // Filtrar según el rol
       if (user.role === "branch" && user.branchId) {
-        console.log("🔍 [DEBUG] Cargando pedidos en armando para sucursal:", user.branchId)
+        console.log("🔍 [DEBUG] Configurando listener de pedidos en armando para sucursal:", user.branchId)
         q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "assembling"))
       } else if ((user.role === "factory" || user.role === "delivery") && user.branchId) {
-        console.log("🔍 [DEBUG] Cargando pedidos en armando para fábrica/delivery:", user.branchId)
+        console.log("🔍 [DEBUG] Configurando listener de pedidos en armando para fábrica/delivery:", user.branchId)
         q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "assembling"))
       }
 
-      const snapshot = await getDocs(q)
-      const assemblingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-      
-      // Obtener información de las plantillas para cada pedido
-      const ordersWithTemplates = await Promise.all(
-        assemblingOrdersData.map(async (order) => {
-          if (order.templateId) {
-            try {
-              const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
-              const templateSnapshot = await getDoc(templateDocRef)
-              const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
-              return { ...order, templateName: template?.name || "Plantilla no encontrada" }
-            } catch (error) {
-              console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
-              return { ...order, templateName: "Error al cargar plantilla" }
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const assemblingOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+        
+        // Obtener información de las plantillas para cada pedido
+        const ordersWithTemplates = await Promise.all(
+          assemblingOrdersData.map(async (order) => {
+            if (order.templateId) {
+              try {
+                const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
+                const templateSnapshot = await getDoc(templateDocRef)
+                const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
+                return { ...order, templateName: template?.name || "Plantilla no encontrada" }
+              } catch (error) {
+                console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
+                return { ...order, templateName: "Error al cargar plantilla" }
+              }
             }
-          }
-          return { ...order, templateName: "Sin plantilla" }
-        })
-      )
+            return { ...order, templateName: "Sin plantilla" }
+          })
+        )
+        
+        setAssemblingOrders(ordersWithTemplates)
+        console.log("🔧 [DEBUG] Pedidos en armando actualizados en tiempo real:", ordersWithTemplates.length)
+      }, (error) => {
+        console.error("[v0] Error al escuchar pedidos en armando:", error)
+      })
       
-      setAssemblingOrders(ordersWithTemplates)
-      console.log("🔧 [DEBUG] Pedidos en armando encontrados:", ordersWithTemplates.length)
+      return unsubscribe
     } catch (error) {
-      console.error("[v0] Error al cargar pedidos en armando:", error)
+      console.error("[v0] Error al configurar listener de pedidos en armando:", error)
+      return () => {}
     }
   }
 
-  const fetchInTransitOrders = async () => {
-    if (!user) return
+  const fetchInTransitOrders = () => {
+    if (!user) return () => {}
 
     try {
       const ordersRef = collection(db, "apps/controld/orders")
@@ -300,38 +346,44 @@ function DashboardContent() {
 
       // Filtrar según el rol
       if (user.role === "branch" && user.branchId) {
-        console.log("🔍 [DEBUG] Cargando pedidos en camino para sucursal:", user.branchId)
+        console.log("🔍 [DEBUG] Configurando listener de pedidos en camino para sucursal:", user.branchId)
         q = query(ordersRef, where("fromBranchId", "==", user.branchId), where("status", "==", "in_transit"))
       } else if ((user.role === "factory" || user.role === "delivery") && user.branchId) {
-        console.log("🔍 [DEBUG] Cargando pedidos en camino para fábrica/delivery:", user.branchId)
+        console.log("🔍 [DEBUG] Configurando listener de pedidos en camino para fábrica/delivery:", user.branchId)
         q = query(ordersRef, where("toBranchId", "==", user.branchId), where("status", "==", "in_transit"))
       }
 
-      const snapshot = await getDocs(q)
-      const inTransitOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-      
-      // Obtener información de las plantillas para cada pedido
-      const ordersWithTemplates = await Promise.all(
-        inTransitOrdersData.map(async (order) => {
-          if (order.templateId) {
-            try {
-              const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
-              const templateSnapshot = await getDoc(templateDocRef)
-              const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
-              return { ...order, templateName: template?.name || "Plantilla no encontrada" }
-            } catch (error) {
-              console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
-              return { ...order, templateName: "Error al cargar plantilla" }
+      const unsubscribe = onSnapshot(q, async (snapshot) => {
+        const inTransitOrdersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+        
+        // Obtener información de las plantillas para cada pedido
+        const ordersWithTemplates = await Promise.all(
+          inTransitOrdersData.map(async (order) => {
+            if (order.templateId) {
+              try {
+                const templateDocRef = doc(db, "apps/controld/templates", order.templateId)
+                const templateSnapshot = await getDoc(templateDocRef)
+                const template = templateSnapshot.exists() ? templateSnapshot.data() as Template : null
+                return { ...order, templateName: template?.name || "Plantilla no encontrada" }
+              } catch (error) {
+                console.error(`Error al obtener plantilla para pedido ${order.id}:`, error)
+                return { ...order, templateName: "Error al cargar plantilla" }
+              }
             }
-          }
-          return { ...order, templateName: "Sin plantilla" }
-        })
-      )
+            return { ...order, templateName: "Sin plantilla" }
+          })
+        )
+        
+        setInTransitOrders(ordersWithTemplates)
+        console.log("🚚 [DEBUG] Pedidos en camino actualizados en tiempo real:", ordersWithTemplates.length)
+      }, (error) => {
+        console.error("[v0] Error al escuchar pedidos en camino:", error)
+      })
       
-      setInTransitOrders(ordersWithTemplates)
-      console.log("🚚 [DEBUG] Pedidos en camino encontrados:", ordersWithTemplates.length)
+      return unsubscribe
     } catch (error) {
-      console.error("[v0] Error al cargar pedidos en camino:", error)
+      console.error("[v0] Error al configurar listener de pedidos en camino:", error)
+      return () => {}
     }
   }
 
@@ -493,8 +545,7 @@ function DashboardContent() {
         description: `El pedido ${order.orderNumber} fue enviado correctamente`,
       })
 
-      // Recargar borradores
-      await fetchDraftOrders()
+      // Los borradores se actualizarán automáticamente gracias al listener en tiempo real
     } catch (error) {
       console.error("Error al enviar pedido:", error)
       toast({
@@ -574,8 +625,7 @@ function DashboardContent() {
           description: "El pedido se creó correctamente",
         })
 
-        // Recargar borradores
-        await fetchDraftOrders()
+        // Los borradores se actualizarán automáticamente gracias al listener en tiempo real
         
         // Cerrar el expandible
         setEditingOrder(null)
@@ -598,8 +648,7 @@ function DashboardContent() {
           description: "El pedido se actualizó correctamente",
         })
 
-        // Recargar borradores
-        await fetchDraftOrders()
+        // Los borradores se actualizarán automáticamente gracias al listener en tiempo real
         
         // Cerrar el expandible
         setEditingOrder(null)
@@ -701,8 +750,7 @@ function DashboardContent() {
         description: "El pedido fue marcado como recibido correctamente",
       })
 
-      // Recargar pedidos en camino
-      await fetchInTransitOrders()
+      // Los pedidos se actualizarán automáticamente gracias al listener en tiempo real
       
       // Cerrar expansión
       setExpandedInTransitOrder(null)
@@ -739,11 +787,7 @@ function DashboardContent() {
         description: "El pedido fue aceptado correctamente",
       })
 
-      // Recargar pedidos pendientes y en armando
-      await Promise.all([
-        fetchPendingOrders(),
-        fetchAssemblingOrders()
-      ])
+      // Los pedidos se actualizarán automáticamente gracias a los listeners en tiempo real
 
       // Cerrar confirmación
       setShowAcceptConfirmation(false)
@@ -783,11 +827,7 @@ function DashboardContent() {
         description: `${orders.length} pedidos fueron aceptados correctamente`,
       })
 
-      // Recargar pedidos pendientes y en armando
-      await Promise.all([
-        fetchPendingOrders(),
-        fetchAssemblingOrders()
-      ])
+      // Los pedidos se actualizarán automáticamente gracias a los listeners en tiempo real
 
       // Cerrar confirmación
       setShowAcceptAllConfirmation(false)
@@ -818,11 +858,7 @@ function DashboardContent() {
         description: "El pedido está listo para ser enviado",
       })
 
-      // Recargar estadísticas y pedidos en armando
-      await Promise.all([
-        fetchStats(),
-        fetchAssemblingOrders()
-      ])
+      // Los pedidos se actualizarán automáticamente gracias a los listeners en tiempo real
     } catch (error) {
       console.error("Error al marcar pedido como listo:", error)
       toast({
@@ -850,12 +886,7 @@ function DashboardContent() {
         description: "El pedido está en camino",
       })
 
-      // Recargar estadísticas, pedidos en armando y en camino
-      await Promise.all([
-        fetchStats(),
-        fetchAssemblingOrders(),
-        fetchInTransitOrders()
-      ])
+      // Los pedidos se actualizarán automáticamente gracias a los listeners en tiempo real
     } catch (error) {
       console.error("Error al tomar pedido para entrega:", error)
       toast({
