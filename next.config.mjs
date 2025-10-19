@@ -19,6 +19,5 @@ export default withPWA({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   buildExcludes: [/middleware-manifest\.json$/],
-  reloadOnOnline: true,
-  swcMinify: true,
+  runtimeCaching: [],
 })(nextConfig)
