@@ -111,20 +111,20 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                 <tbody>
                   {templateOrders.map((order) => (
                     <React.Fragment key={order.id}>
-                      <tr className={`border-b hover:bg-gray-50 ${order.preparedAt && user?.role === "delivery" ? "bg-green-50 border-green-200" : ""}`}>
+                      <tr 
+                        className={`border-b hover:bg-gray-50 ${order.preparedAt && user?.role === "delivery" ? "bg-green-50 border-green-200" : ""} ${user?.role === "factory" ? "cursor-pointer" : ""}`}
+                        onClick={user?.role === "factory" ? () => toggleOrderExpansion(order.id) : undefined}
+                      >
                         <td className="py-3 px-2">
                           <div className="flex items-center gap-2">
                             {user?.role === "factory" && (
-                              <button
-                                onClick={() => toggleOrderExpansion(order.id)}
-                                className="p-1 hover:bg-gray-100 rounded"
-                              >
+                              <div className="p-1">
                                 {expandedOrders.has(order.id) ? (
                                   <ChevronDown className="h-4 w-4 text-gray-600" />
                                 ) : (
                                   <ChevronRight className="h-4 w-4 text-gray-600" />
                                 )}
-                              </button>
+                              </div>
                             )}
                             <div className="text-sm font-medium text-gray-900">
                               {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
@@ -161,7 +161,10 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                 <Button 
                                   size="sm" 
                                   className="text-xs px-3 py-1 h-auto bg-blue-600 hover:bg-blue-700"
-                                  onClick={() => onMarkAsReady(order.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onMarkAsReady(order.id)
+                                  }}
                                   disabled={getOrderProgress(order) < 100}
                                 >
                                   ✓ Listo
@@ -177,7 +180,10 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                 <Button 
                                   size="sm" 
                                   className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
-                                  onClick={() => onTakeForDelivery(order.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onTakeForDelivery(order.id)
+                                  }}
                                 >
                                   🚚 Tomar
                                 </Button>

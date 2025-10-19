@@ -9,7 +9,6 @@ import { CheckCircle, XCircle, AlertCircle } from "lucide-react"
 import type { OrderItem, User } from "@/lib/types"
 import { doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { useToast } from "@/hooks/use-toast"
 
 interface OrderItemsDetailProps {
   orderId: string
@@ -22,7 +21,6 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
   const [localItems, setLocalItems] = useState<OrderItem[]>(items)
   const [saving, setSaving] = useState(false)
   const [customQuantities, setCustomQuantities] = useState<Record<string, number>>({})
-  const { toast } = useToast()
 
   useEffect(() => {
     setLocalItems(items)
@@ -65,18 +63,8 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
       // Actualizar estado local después de guardar
       setLocalItems(updatedItems)
 
-      toast({
-        title: "Actualizado",
-        description: "Producto marcado correctamente",
-      })
-
     } catch (error) {
       console.error("Error al guardar:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo guardar",
-        variant: "destructive",
-      })
     } finally {
       setSaving(false)
     }
