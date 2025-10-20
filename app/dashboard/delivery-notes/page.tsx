@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Search, Eye } from "lucide-react"
+import { Search, Eye, RefreshCw } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -32,9 +32,10 @@ function DeliveryNotesContent() {
       const q = query(collection(db, "apps/controld/deliveryNotes"), orderBy("createdAt", "desc"))
       const snapshot = await getDocs(q)
       const notesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as DeliveryNote[]
+      console.log("📄 [DEBUG] Remitos cargados:", notesData.length)
       setDeliveryNotes(notesData)
     } catch (error) {
-      console.error("[v0] Error al cargar remitos:", error)
+      console.error("❌ Error al cargar remitos:", error)
       toast({
         title: "Error",
         description: "No se pudieron cargar los remitos",
@@ -74,21 +75,42 @@ function DeliveryNotesContent() {
 
         <Card>
           <CardHeader>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por número de pedido, sucursal..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por número de pedido, sucursal..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={fetchDeliveryNotes}
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Cargando remitos...</p>
             ) : filteredNotes.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No hay remitos disponibles</p>
+              <div className="text-center py-8 space-y-2">
+                <p className="text-muted-foreground">
+                  {deliveryNotes.length === 0 
+                    ? "No hay remitos generados todavía" 
+                    : "No se encontraron resultados para tu búsqueda"}
+                </p>
+                {deliveryNotes.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    Los remitos se generan automáticamente cuando un pedido es recibido
+                  </p>
+                )}
+              </div>
             ) : (
               <>
                 {/* Vista Mobile - Cards */}
@@ -101,11 +123,16 @@ function DeliveryNotesContent() {
                             <div className="space-y-1">
                               <p className="font-semibold text-base">{note.orderNumber}</p>
                               <div className="flex flex-wrap gap-1">
-                                <Badge variant="default" className="text-xs">{note.itemsDelivered.length} OK</Badge>
-                                {note.itemsReturned.length > 0 && (
+                                {note.itemsDelivered?.length > 0 && (
+                                  <Badge variant="default" className="text-xs">{note.itemsDelivered.length} OK</Badge>
+                                )}
+                                {note.itemsPartial?.length > 0 && (
+                                  <Badge variant="secondary" className="text-xs">{note.itemsPartial.length} Parcial</Badge>
+                                )}
+                                {note.itemsReturned?.length > 0 && (
                                   <Badge variant="destructive" className="text-xs">{note.itemsReturned.length} Dev</Badge>
                                 )}
-                                {note.itemsNotReceived.length > 0 && (
+                                {note.itemsNotReceived?.length > 0 && (
                                   <Badge variant="destructive" className="text-xs">{note.itemsNotReceived.length} NR</Badge>
                                 )}
                               </div>
@@ -158,12 +185,17 @@ function DeliveryNotesContent() {
                           <TableCell>{note.toBranchName}</TableCell>
                           <TableCell className="text-sm">{formatDate(note.createdAt)}</TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
-                              <Badge variant="default">{note.itemsDelivered.length} OK</Badge>
-                              {note.itemsReturned.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {note.itemsDelivered?.length > 0 && (
+                                <Badge variant="default">{note.itemsDelivered.length} OK</Badge>
+                              )}
+                              {note.itemsPartial?.length > 0 && (
+                                <Badge variant="secondary">{note.itemsPartial.length} Parcial</Badge>
+                              )}
+                              {note.itemsReturned?.length > 0 && (
                                 <Badge variant="destructive">{note.itemsReturned.length} Dev</Badge>
                               )}
-                              {note.itemsNotReceived.length > 0 && (
+                              {note.itemsNotReceived?.length > 0 && (
                                 <Badge variant="destructive">{note.itemsNotReceived.length} NR</Badge>
                               )}
                             </div>
