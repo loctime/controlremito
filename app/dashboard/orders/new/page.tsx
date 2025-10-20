@@ -21,6 +21,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { getReplacementQueue } from "@/lib/replacement-service"
 
 function NewOrderContent() {
   const { user } = useAuth()
@@ -41,7 +42,7 @@ function NewOrderContent() {
   const [formData, setFormData] = useState({
     toBranchId: "",
     notes: "",
-    items: [] as { productId: string; productName: string; quantity: number; unit: string }[],
+    items: [] as { productId: string; productName: string; quantity: number; unit: string; isPending?: boolean }[],
     templateId: "",
     allowedSendDays: [] as DayOfWeek[],
   })
@@ -72,7 +73,15 @@ function NewOrderContent() {
         const daysDiff = (now.getTime() - draftDate.getTime()) / (1000 * 60 * 60 * 24)
         
         if (daysDiff < 7) {
-          setFormData(draftData.formData)
+          // Asegurar que todos los items tengan el campo isPending
+          const formDataWithPending = {
+            ...draftData.formData,
+            items: draftData.formData.items?.map((item: any) => ({
+              ...item,
+              isPending: item.isPending || false,
+            })) || []
+          }
+          setFormData(formDataWithPending)
           setLastSaved(draftDate)
           
           // Si hay un ID de pedido guardado, cargar ese pedido
@@ -101,7 +110,13 @@ function NewOrderContent() {
     try {
       const draftKey = `order_draft_${user.branchId}_${user.id}`
       const draftData = {
-        formData: data,
+        formData: {
+          ...data,
+          items: data.items?.map((item: any) => ({
+            ...item,
+            isPending: item.isPending || false,
+          })) || []
+        },
         orderId: orderId || draftOrderIdRef.current,
         timestamp: new Date().toISOString(),
       }
@@ -149,6 +164,7 @@ function NewOrderContent() {
           ...item,
           id: item.id || `${Date.now()}-${Math.random()}`,
           status: "pending",
+          isPending: item.isPending || false,
         })),
         updatedAt: new Date(),
         createdBy: user.id,
@@ -486,6 +502,7 @@ function NewOrderContent() {
           ...item,
           id: `${Date.now()}-${Math.random()}`,
           status: "pending",
+          isPending: item.isPending || false,
         })),
         createdAt: new Date(),
         createdBy: user.id,
@@ -571,7 +588,7 @@ function NewOrderContent() {
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { productId: "", productName: "", quantity: 0, unit: "" }],
+      items: [...formData.items, { productId: "", productName: "", quantity: 0, unit: "", isPending: false }],
     })
   }
 
@@ -592,6 +609,7 @@ function NewOrderContent() {
           productId: product.id,
           productName: product.name,
           unit: product.unit,
+          isPending: false, // Reset pending status when manually selecting product
         }
       } else {
         console.warn(`[v0] Producto no encontrado con ID: ${value}`)
@@ -603,7 +621,7 @@ function NewOrderContent() {
   }
 
 
-  const loadTemplate = (templateId: string) => {
+  const loadTemplate = async (templateId: string) => {
     const template = templates.find((t) => t.id === templateId)
     if (template) {
       try {
@@ -634,19 +652,50 @@ function NewOrderContent() {
           })
         }
 
+        // Obtener productos pendientes para esta sucursal
+        let pendingProducts: { [productId: string]: number } = {}
+        if (user?.branchId) {
+          try {
+            const replacementQueue = await getReplacementQueue(user.branchId)
+            if (replacementQueue && replacementQueue.items) {
+              // Crear mapa de productos pendientes
+              replacementQueue.items
+                .filter(item => item.status === "pending")
+                .forEach(item => {
+                  pendingProducts[item.productId] = (pendingProducts[item.productId] || 0) + item.quantity
+                })
+            }
+          } catch (error) {
+            console.warn("Error al cargar productos pendientes:", error)
+            // Continuar sin productos pendientes si hay error
+          }
+        }
+
+        // Crear items con cantidades pre-llenadas si hay productos pendientes
+        const itemsWithPendingQuantities = validItems.map((item) => {
+          const pendingQuantity = pendingProducts[item.productId] || 0
+          return {
+            ...item,
+            quantity: pendingQuantity, // Pre-llenar con cantidad pendiente
+            isPending: pendingQuantity > 0 // Marcar si es pendiente
+          }
+        })
+
         setFormData({
           ...formData,
-          items: validItems.map((item) => ({ 
-            ...item, 
-            quantity: 0 // Siempre empezar en 0, no importa lo que tenga la plantilla
-          })),
+          items: itemsWithPendingQuantities,
           templateId: template.id,
           allowedSendDays: [], // Siempre empezar con array vacío para evitar errores
         })
         
+        const pendingCount = itemsWithPendingQuantities.filter(item => item.isPending).length
+        const message = pendingCount > 0 
+          ? `Se cargaron ${validItems.length} productos de la plantilla "${template.name}". ${pendingCount} productos tienen cantidades pendientes pre-llenadas.`
+          : `Se cargaron ${validItems.length} productos de la plantilla "${template.name}".`
+        
         toast({
           title: "✅ Plantilla cargada",
-          description: `Se cargaron ${validItems.length} productos de la plantilla "${template.name}". Revisa las sugerencias de productos pendientes arriba.`,
+          description: message,
         })
       } catch (error) {
         console.error("[v0] Error al cargar plantilla:", error)
@@ -682,6 +731,7 @@ function NewOrderContent() {
             productName: item.productName,
             quantity: item.quantity,
             unit: item.unit,
+            isPending: item.isPending || false,
           })) || [],
           templateId: orderData.templateId || "",
           allowedSendDays: orderData.allowedSendDays || [],
@@ -1018,12 +1068,21 @@ function NewOrderContent() {
                   </p>
                 ) : (
                   formData.items.map((item, index) => (
-                    <div key={index} className="space-y-2 sm:space-y-0 p-3 border rounded-lg bg-gray-50">
+                    <div key={index} className={`space-y-2 sm:space-y-0 p-3 border rounded-lg ${
+                      item.isPending ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
+                    }`}>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <div className="flex-1">
-                          <Label className="text-xs text-gray-600 mb-1 block">
-                            Producto <span className="text-red-500">*</span>
-                          </Label>
+                          <div className="flex items-center gap-2 mb-1">
+                            <Label className="text-xs text-gray-600">
+                              Producto <span className="text-red-500">*</span>
+                            </Label>
+                            {item.isPending && (
+                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                🔄 Auto-completado
+                              </Badge>
+                            )}
+                          </div>
                           <Select value={item.productId} onValueChange={(value) => updateItem(index, "productId", value)}>
                             <SelectTrigger className={!item.productId ? "border-red-300 focus:border-red-500" : ""}>
                               <SelectValue placeholder="Seleccionar producto" />
@@ -1048,7 +1107,9 @@ function NewOrderContent() {
                               placeholder="0"
                               value={item.quantity || 0}
                               onChange={(e) => updateItem(index, "quantity", Number(e.target.value) || 0)}
-                              className={`w-24 sm:w-32 ${item.quantity < 0 ? "border-red-300 focus:border-red-500" : ""}`}
+                              className={`w-24 sm:w-32 ${item.quantity < 0 ? "border-red-300 focus:border-red-500" : ""} ${
+                                item.isPending ? "border-blue-300 bg-blue-50" : ""
+                              }`}
                               required
                             />
                           </div>

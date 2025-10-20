@@ -9,6 +9,7 @@ import { FileText, Edit, Plus, Send, X, Save, AlertCircle } from "lucide-react"
 import type { Template, Order } from "@/lib/types"
 import { isDayAllowed } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { getReplacementQueue } from "@/lib/replacement-service"
 
 interface TemplateCardProps {
   template: Template
@@ -203,34 +204,48 @@ export const TemplateCard = memo(function TemplateCard({
                   <div>
                     <Label className="text-sm font-medium">Cantidades</Label>
                     <div className="space-y-2 mt-2">
-                      {editFormData.items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex-1">
-                            <span className="text-sm font-medium">{item.productName}</span>
-                            <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                      {editFormData.items.map((item, index) => {
+                        const isPending = pendingProducts.some(p => p.productId === item.productId)
+                        return (
+                          <div key={index} className={`flex items-center justify-between p-2 rounded ${
+                            isPending ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                          }`}>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{item.productName}</span>
+                                {isPending && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                    🔄 Auto-completado
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-500">({item.unit})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                                disabled={item.quantity <= 0}
+                                className="h-6 w-6 p-0"
+                              >
+                                -
+                              </Button>
+                              <span className={`w-8 text-center text-sm ${isPending ? 'text-blue-600 font-semibold' : ''}`}>
+                                {item.quantity}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                                className="h-6 w-6 p-0"
+                              >
+                                +
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                              disabled={item.quantity <= 0}
-                              className="h-6 w-6 p-0"
-                            >
-                              -
-                            </Button>
-                            <span className="w-8 text-center text-sm">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                              className="h-6 w-6 p-0"
-                            >
-                              +
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                   
@@ -275,34 +290,48 @@ export const TemplateCard = memo(function TemplateCard({
                   <div>
                     <Label className="text-sm font-medium">Cantidades</Label>
                     <div className="space-y-2 mt-2">
-                      {editFormData.items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex-1">
-                            <span className="text-sm font-medium">{item.productName}</span>
-                            <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                      {editFormData.items.map((item, index) => {
+                        const isPending = pendingProducts.some(p => p.productId === item.productId)
+                        return (
+                          <div key={index} className={`flex items-center justify-between p-2 rounded ${
+                            isPending ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                          }`}>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{item.productName}</span>
+                                {isPending && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                    🔄 Auto-completado
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-500">({item.unit})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                                disabled={item.quantity <= 0}
+                                className="h-6 w-6 p-0"
+                              >
+                                -
+                              </Button>
+                              <span className={`w-8 text-center text-sm ${isPending ? 'text-blue-600 font-semibold' : ''}`}>
+                                {item.quantity}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                                className="h-6 w-6 p-0"
+                              >
+                                +
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                              disabled={item.quantity <= 0}
-                              className="h-6 w-6 p-0"
-                            >
-                              -
-                            </Button>
-                            <span className="w-8 text-center text-sm">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                              className="h-6 w-6 p-0"
-                            >
-                              +
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                   
@@ -356,34 +385,48 @@ export const TemplateCard = memo(function TemplateCard({
                   <div>
                     <Label className="text-sm font-medium">Cantidades</Label>
                     <div className="space-y-2 mt-2">
-                      {editFormData.items.map((item, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div className="flex-1">
-                            <span className="text-sm font-medium">{item.productName}</span>
-                            <span className="text-xs text-gray-500 ml-2">({item.unit})</span>
+                      {editFormData.items.map((item, index) => {
+                        const isPending = pendingProducts.some(p => p.productId === item.productId)
+                        return (
+                          <div key={index} className={`flex items-center justify-between p-2 rounded ${
+                            isPending ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                          }`}>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium">{item.productName}</span>
+                                {isPending && (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                    🔄 Auto-completado
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-500">({item.unit})</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
+                                disabled={item.quantity <= 0}
+                                className="h-6 w-6 p-0"
+                              >
+                                -
+                              </Button>
+                              <span className={`w-8 text-center text-sm ${isPending ? 'text-blue-600 font-semibold' : ''}`}>
+                                {item.quantity}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onUpdateQuantity(index, item.quantity + 1)}
+                                className="h-6 w-6 p-0"
+                              >
+                                +
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onUpdateQuantity(index, item.quantity - 1)}
-                              disabled={item.quantity <= 0}
-                              className="h-6 w-6 p-0"
-                            >
-                              -
-                            </Button>
-                            <span className="w-8 text-center text-sm">{item.quantity}</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                              className="h-6 w-6 p-0"
-                            >
-                              +
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                   

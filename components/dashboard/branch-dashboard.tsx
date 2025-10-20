@@ -18,6 +18,7 @@ import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimest
 import { db } from "@/lib/firebase"
 import { getCurrentDayOfWeek, getNextAllowedDay, isDayAllowed } from "@/lib/utils"
 import { createRemitMetadata } from "@/lib/remit-metadata-service"
+import { getReplacementQueue } from "@/lib/replacement-service"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -210,7 +211,7 @@ export function BranchDashboard() {
       const tempOrder: Order = {
         id: `temp-${Date.now()}`,
         orderNumber: `ORD-${Date.now()}`,
-        fromBranchId: user.branchId,
+        fromBranchId: user.branchId!,
         fromBranchName: fromBranchName,
         toBranchId: destinationBranchId,
         toBranchName: toBranchName,
@@ -230,21 +231,46 @@ export function BranchDashboard() {
         allowedSendDays: template.allowedSendDays || [],
       }
 
+      // Obtener productos pendientes para esta sucursal
+      let pendingProducts: { [productId: string]: number } = {}
+      try {
+        const replacementQueue = await getReplacementQueue(user.branchId)
+        if (replacementQueue && replacementQueue.items) {
+          // Crear mapa de productos pendientes
+          replacementQueue.items
+            .filter(item => item.status === "pending")
+            .forEach(item => {
+              pendingProducts[item.productId] = (pendingProducts[item.productId] || 0) + item.quantity
+            })
+        }
+      } catch (error) {
+        console.warn("Error al cargar productos pendientes:", error)
+        // Continuar sin productos pendientes si hay error
+      }
+
       setEditFormData({
-        items: template.items.map((item) => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: 0, // Siempre empezar en 0
-          unit: item.unit,
-        })),
+        items: template.items.map((item) => {
+          const pendingQuantity = pendingProducts[item.productId] || 0
+          return {
+            productId: item.productId,
+            productName: item.productName,
+            quantity: pendingQuantity, // Pre-llenar con cantidad pendiente
+            unit: item.unit,
+          }
+        }),
         notes: ""
       })
 
       setEditingOrder(tempOrder)
 
+      const pendingCount = template.items.filter(item => pendingProducts[item.productId] > 0).length
+      const message = pendingCount > 0 
+        ? `Se cargaron los productos de "${template.name}". ${pendingCount} productos tienen cantidades pendientes pre-llenadas.`
+        : `Se cargaron los productos de "${template.name}". Ajusta las cantidades y guarda el pedido.`
+      
       toast({
         title: "Plantilla cargada",
-        description: `Se cargaron los productos de "${template.name}". Ajusta las cantidades y guarda el pedido.`,
+        description: message,
       })
 
     } catch (error) {
@@ -378,7 +404,7 @@ export function BranchDashboard() {
       const replacementOrder: Order = {
         id: `temp-${Date.now()}`,
         orderNumber: `ORD-${Date.now()}`,
-        fromBranchId: user.branchId,
+        fromBranchId: user.branchId!,
         fromBranchName: fromBranchName,
         toBranchId: destinationBranchId,
         toBranchName: toBranchName,

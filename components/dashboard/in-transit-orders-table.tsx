@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import type { Order, User } from "@/lib/types"
 import { updateRemitStatus } from "@/lib/remit-metadata-service"
 import { createDeliveryNote } from "@/lib/delivery-note-service"
+import { createReplacementItem } from "@/lib/replacement-service"
 
 interface OrderWithTemplate extends Order {
   templateName: string
@@ -178,6 +179,37 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
     setItemQuantities(prev => {
       const current = prev[itemId] || { received: 0, status: 'pending' as const }
       const newReceived = status === 'ok' ? current.received : 0
+      
+      // Si es OK pero hay diferencia entre pedido y recibido, crear item pendiente
+      if (status === 'ok' && current.received > 0) {
+        const order = orders.find(o => o.items.some(item => item.id === itemId))
+        const item = order?.items.find(item => item.id === itemId)
+        
+        if (item && current.received < item.quantity) {
+          const missingQuantity = item.quantity - current.received
+          // Crear item pendiente automáticamente
+          createReplacementItem(
+            { ...item, quantity: missingQuantity },
+            order!,
+            user!,
+            `Recepción parcial: se recibieron ${current.received} de ${item.quantity}`
+          ).then(() => {
+            // Mostrar notificación después de crear el item
+            toast({
+              title: "Item pendiente creado",
+              description: `Se creó automáticamente un item pendiente por ${missingQuantity} ${item.unit} faltantes de ${item.productName}`,
+            })
+          }).catch((error) => {
+            console.error("Error al crear item pendiente:", error)
+            toast({
+              title: "Error",
+              description: "No se pudo crear el item pendiente",
+              variant: "destructive"
+            })
+          })
+        }
+      }
+      
       return {
         ...prev,
         [itemId]: { 
@@ -372,7 +404,10 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                           const itemData = itemQuantities[item.id] || { received: 0, status: 'pending' as const }
                                           return (
                                             <Fragment key={item.id}>
-                                            <tr className={`border-b ${itemData.status === 'no' ? 'bg-red-50' : ''}`}>
+                                            <tr className={`border-b ${
+                                              itemData.status === 'no' ? 'bg-red-50' : 
+                                              itemData.status === 'ok' && itemData.received > 0 && itemData.received < item.quantity ? 'bg-blue-50' : ''
+                                            }`}>
                                               <td className="py-2 px-2">
                                                 <div className="text-sm font-medium text-gray-900">{item.productName}</div>
                                                 <div className="text-xs text-gray-500">{item.unit}</div>

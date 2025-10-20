@@ -10,6 +10,7 @@ import { CheckCircle, XCircle, AlertCircle, MessageSquare } from "lucide-react"
 import type { OrderItem, User, Order } from "@/lib/types"
 import { doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { createReplacementItem } from "@/lib/replacement-service"
 
 interface OrderItemsDetailProps {
   orderId: string
@@ -84,6 +85,29 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
       await updateDoc(orderRef, {
         items: updatedItems
       })
+
+      // Si se marca como no disponible (assembledQuantity = 0), crear item de reposición
+      if (assembledQuantity === 0) {
+        try {
+          const itemToReplace = localItems.find(item => item.id === itemId)
+          if (itemToReplace) {
+            // Obtener datos del pedido para crear el item de reposición
+            const orderDoc = await getDoc(orderRef)
+            if (orderDoc.exists()) {
+              const orderData = orderDoc.data() as Order
+              await createReplacementItem(
+                itemToReplace,
+                orderData,
+                user,
+                "Producto no disponible en fábrica"
+              )
+            }
+          }
+        } catch (error) {
+          console.error("Error al crear item de reposición:", error)
+          // No fallar la operación principal si hay error en la reposición
+        }
+      }
 
       // Actualizar estado local después de guardar
       setLocalItems(updatedItems)
