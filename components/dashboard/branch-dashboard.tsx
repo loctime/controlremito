@@ -730,9 +730,26 @@ export function BranchDashboard() {
               </div>
             ) : (
               <>
+                {/* Plantillas Oficiales */}
+                {officialTemplates.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                      🏢 Plantillas Oficiales
+                    </h4>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                      {officialTemplateCards}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Separador visual */}
+                {officialTemplates.length > 0 && personalTemplates.length > 0 && (
+                  <Separator className="my-6" />
+                )}
+                
                 {/* Plantillas Personales */}
                 {personalTemplates.length > 0 && (
-                  <div className="mb-6">
+                  <div>
                     <div className="flex items-center gap-2 mb-3">
                       <h4 className="text-sm font-medium text-muted-foreground">
                         👤 Mis Plantillas Personales
@@ -743,23 +760,6 @@ export function BranchDashboard() {
                     </div>
                     <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {personalTemplateCards}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Separador visual */}
-                {personalTemplates.length > 0 && officialTemplates.length > 0 && (
-                  <Separator className="my-6" />
-                )}
-                
-                {/* Plantillas Oficiales */}
-                {officialTemplates.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-3">
-                      🏢 Plantillas Oficiales
-                    </h4>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {officialTemplateCards}
                     </div>
                   </div>
                 )}

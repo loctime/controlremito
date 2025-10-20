@@ -842,16 +842,7 @@ function NewOrderContent() {
 
       toast({
         title: "✅ Plantilla personal creada",
-        description: `La plantilla "${templateName}" se creó correctamente y aparecerá en tu dashboard.`,
-      })
-
-      // Limpiar el formulario después de crear la plantilla
-      setFormData({
-        toBranchId: "",
-        notes: "",
-        items: [],
-        templateId: "",
-        allowedSendDays: [],
+        description: `La plantilla "${templateName}" se creó correctamente. Ahora puedes crear el pedido si lo deseas.`,
       })
     } catch (error) {
       console.error("Error al guardar plantilla personal:", error)
