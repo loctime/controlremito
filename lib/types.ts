@@ -8,6 +8,10 @@ export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "frida
 
 export type ItemStatus = "pending" | "available" | "not_available" | "delivered" | "not_received" | "returned"
 
+export type ReplacementStatus = "pending" | "urgent" | "in_queue" | "merged" | "completed" | "cancelled"
+
+export type ReplacementPriority = "low" | "normal" | "high" | "urgent"
+
 // Tipo reutilizable para firmas
 export interface Signature {
   userId: string
@@ -174,4 +178,38 @@ export interface RemitMetadata {
   receivedSignature?: Signature     // Cuando sucursal recibe
   currentStatus: OrderStatus
   statusHistory: { status: OrderStatus; timestamp: Timestamp; userId: string; userName: string }[]
+}
+
+// Sistema de Reposiciones
+export interface ReplacementItem {
+  id: string
+  productId: string
+  productName: string
+  quantity: number
+  unit: string
+  reason: string // Motivo por el cual se necesita reposición
+  originalOrderId: string // ID del pedido original donde faltó
+  originalOrderNumber: string
+  reportedBy: string // Usuario que reportó el problema
+  reportedByName: string
+  reportedAt: Timestamp
+  priority: ReplacementPriority
+  status: ReplacementStatus
+  mergedIntoOrderId?: string // Si se fusionó con otro pedido
+  mergedAt?: Timestamp
+  completedAt?: Timestamp
+  completedBy?: string
+  completedByName?: string
+}
+
+export interface ReplacementQueue {
+  id: string
+  branchId: string // Sucursal que necesita los productos
+  branchName: string
+  items: ReplacementItem[]
+  status: ReplacementStatus
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  autoMergeEnabled: boolean // Si se fusiona automáticamente con próximos pedidos
+  maxWaitDays: number // Máximo días de espera antes de crear pedido automático
 }

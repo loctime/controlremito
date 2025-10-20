@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 import { isDayAllowed } from "@/lib/utils"
 import { updateRemitStatus, getRemitMetadata, createRemitMetadata, updateReadySignature, hasRemitMetadata } from "@/lib/remit-metadata-service"
 import { createDeliveryNote } from "@/lib/delivery-note-service"
+import { createReplacementItem } from "@/lib/replacement-service"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -247,13 +248,44 @@ function OrderDetailContent() {
       [itemId]: { status: issueType, reason: issueReason },
     })
 
+    // Crear item de reposición si es necesario
+    if (issueType === "not_received" && order) {
+      try {
+        const item = order.items.find(i => i.id === itemId)
+        if (item) {
+          // Determinar prioridad basada en el tipo de producto o cantidad
+          const priority = item.quantity > 10 ? "high" : "normal"
+          
+          await createReplacementItem(
+            item,
+            order,
+            user!,
+            issueReason,
+            priority
+          )
+          
+          toast({
+            title: "Item marcado y reposición creada",
+            description: "Se creó automáticamente una reposición para este producto",
+          })
+        }
+      } catch (error) {
+        console.error("Error al crear reposición:", error)
+        toast({
+          title: "Item marcado con advertencia",
+          description: "El item se marcó pero hubo un error al crear la reposición",
+          variant: "destructive",
+        })
+      }
+    } else {
+      toast({
+        title: "Item marcado",
+        description: "El item se marcó correctamente",
+      })
+    }
+
     setIsMarkingIssue(null)
     setIssueReason("")
-
-    toast({
-      title: "Item marcado",
-      description: "El item se marcó correctamente",
-    })
   }
 
   const handleConfirmDelivery = async () => {
