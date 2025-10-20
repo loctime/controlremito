@@ -648,7 +648,15 @@ export function BranchDashboard() {
 
         <TabsContent value="plantillas" className="mt-6">
           <div>
-            <h3 className="text-lg font-semibold mb-4">📋 Plantillas</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">📋 Plantillas</h3>
+              <Button asChild>
+                <Link href="/dashboard/orders/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Crear pedido manual
+                </Link>
+              </Button>
+            </div>
             
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -666,15 +674,9 @@ export function BranchDashboard() {
                     <CardContent className="text-center py-8">
                       <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-lg font-medium mb-2">No hay plantillas disponibles</h3>
-                      <p className="text-muted-foreground mb-4">
-                        El administrador aún no ha creado plantillas para tu sucursal.
+                      <p className="text-muted-foreground">
+                        El administrador aún no ha creado plantillas para tu sucursal. Puedes crear un pedido manual usando el botón de arriba.
                       </p>
-                      <Button asChild>
-                        <Link href="/dashboard/orders/new">
-                          <Plus className="mr-2 h-4 w-4" />
-                          Crear pedido manual
-                        </Link>
-                      </Button>
                     </CardContent>
                   </Card>
                 )}
