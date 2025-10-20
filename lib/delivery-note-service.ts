@@ -4,16 +4,52 @@ import type { Order, User, DeliveryNote, OrderItem, Signature } from "./types"
 import { getRemitMetadata } from "./remit-metadata-service"
 
 /**
+ * Limpiar objeto removiendo campos undefined recursivamente
+ */
+function cleanUndefined<T extends Record<string, any>>(obj: T): T {
+  const cleaned: any = {}
+  
+  for (const [key, value] of Object.entries(obj)) {
+    if (value === undefined) {
+      continue // Saltar campos undefined
+    }
+    
+    if (Array.isArray(value)) {
+      // Limpiar arrays
+      cleaned[key] = value.map(item => 
+        typeof item === 'object' && item !== null ? cleanUndefined(item) : item
+      )
+    } else if (value !== null && typeof value === 'object' && !(value instanceof Timestamp)) {
+      // Limpiar objetos (excepto Timestamps)
+      cleaned[key] = cleanUndefined(value)
+    } else {
+      cleaned[key] = value
+    }
+  }
+  
+  return cleaned as T
+}
+
+/**
  * Crear firma desde usuario
  */
 function createSignature(user: User, timestamp?: Timestamp): Signature {
-  return {
+  const signature: Signature = {
     userId: user.id,
     userName: user.name,
     timestamp: timestamp || Timestamp.now(),
-    signatureImage: user.signature?.signatureImage,
-    position: user.signature?.position
   }
+  
+  // Solo agregar campos opcionales si tienen valor
+  if (user.signature?.signatureImage) {
+    signature.signatureImage = user.signature.signatureImage
+  }
+  
+  if (user.signature?.position) {
+    signature.position = user.signature.position
+  }
+  
+  return signature
 }
 
 /**
@@ -86,15 +122,15 @@ export async function createDeliveryNote(
       userId: order.createdBy,
       userName: order.createdByName,
       timestamp: order.createdAt,
-      // No tenemos acceso al user object original, así que no incluimos firma dibujada aquí
     }
 
     // Firma de quien armó (fábrica)
-    const assembledBySignature: Signature = metadata.readySignature || {
-      userId: order.preparedBy || "",
-      userName: order.preparedByName || "",
-      timestamp: order.preparedAt || Timestamp.now(),
-    }
+    const assembledBySignature: Signature = metadata.readySignature || 
+      (metadata.assemblingSignature ? metadata.assemblingSignature : {
+        userId: order.preparedBy || order.acceptedBy || "",
+        userName: order.preparedByName || order.acceptedByName || "",
+        timestamp: order.preparedAt || order.acceptedAt || Timestamp.now(),
+      })
 
     // Firma de delivery
     let deliverySignature: Signature
@@ -116,8 +152,8 @@ export async function createDeliveryNote(
     // Clasificar items
     const { delivered, partial, returned, notReceived } = classifyItems(order.items)
 
-    // Crear el delivery note
-    const deliveryNoteData: Omit<DeliveryNote, "id"> = {
+    // Crear el delivery note (sin campos undefined en itemsRequested)
+    const deliveryNoteData: any = {
       orderId: order.id,
       orderNumber: order.orderNumber,
       fromBranchId: order.toBranchId, // La fábrica/origen
@@ -125,22 +161,16 @@ export async function createDeliveryNote(
       toBranchId: order.fromBranchId, // La sucursal destino
       toBranchName: order.fromBranchName,
       
-      // SECCIÓN 1: LO PEDIDO
-      itemsRequested: order.items.map(item => ({
-        ...item,
-        // Resetear cantidades armadas para mostrar lo original
-        assembledQuantity: undefined,
-        isFullyAssembled: undefined,
-        assemblyNotes: undefined,
-        assembledBy: undefined,
-        assembledAt: undefined,
-      })),
+      // SECCIÓN 1: LO PEDIDO (sin campos de armado)
+      itemsRequested: order.items.map(item => {
+        const { assembledQuantity, isFullyAssembled, assemblyNotes, assembledBy, assembledAt, ...cleanItem } = item
+        return cleanItem
+      }),
       requestedBySignature,
       
       // SECCIÓN 2: LO ARMADO
       itemsAssembled: order.items,
       assembledBySignature,
-      assemblyNotes: order.notes,
       
       // SECCIÓN 3: LO RECIBIDO
       itemsDelivered: delivered,
@@ -150,15 +180,26 @@ export async function createDeliveryNote(
       
       deliverySignature,
       receptionSignature,
-      receptionNotes,
       
       createdAt: Timestamp.now(),
     }
+    
+    // Agregar campos opcionales solo si tienen valor
+    if (order.notes) {
+      deliveryNoteData.assemblyNotes = order.notes
+    }
+    
+    if (receptionNotes) {
+      deliveryNoteData.receptionNotes = receptionNotes
+    }
+    
+    // Limpiar cualquier undefined restante antes de guardar
+    const cleanedData = cleanUndefined(deliveryNoteData)
 
     // Guardar en Firestore
     const docRef = await addDoc(
       collection(db, "apps/controld/deliveryNotes"),
-      deliveryNoteData
+      cleanedData
     )
 
     return docRef.id
@@ -172,13 +213,9 @@ export async function createDeliveryNote(
  * Obtener items que fueron solicitados originalmente (sin modificaciones de armado)
  */
 export function getOriginalRequestedItems(items: OrderItem[]): OrderItem[] {
-  return items.map(item => ({
-    ...item,
-    assembledQuantity: undefined,
-    isFullyAssembled: undefined,
-    assemblyNotes: undefined,
-    assembledBy: undefined,
-    assembledAt: undefined,
-  }))
+  return items.map(item => {
+    const { assembledQuantity, isFullyAssembled, assemblyNotes, assembledBy, assembledAt, ...cleanItem } = item
+    return cleanItem as OrderItem
+  })
 }
 

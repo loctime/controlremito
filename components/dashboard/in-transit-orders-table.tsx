@@ -4,10 +4,12 @@ import { useState, memo, useCallback, Fragment } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronDown, ChevronRight, Eye, EyeOff, CheckCircle } from "lucide-react"
-import { doc, updateDoc } from "firebase/firestore"
+import { doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "@/hooks/use-toast"
 import type { Order, User } from "@/lib/types"
+import { updateRemitStatus } from "@/lib/remit-metadata-service"
+import { createDeliveryNote } from "@/lib/delivery-note-service"
 
 interface OrderWithTemplate extends Order {
   templateName: string
@@ -44,19 +46,68 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
     }
 
     try {
+      // Limpiar itemQuantities para eliminar campos undefined
+      const cleanedItemQuantities = Object.entries(itemQuantities).reduce((acc, [key, value]) => {
+        acc[key] = {
+          received: value.received,
+          status: value.status,
+          // Solo incluir comment si tiene un valor real (no undefined ni vacío)
+          ...(value.comment && value.comment.trim() ? { comment: value.comment } : {})
+        }
+        return acc
+      }, {} as Record<string, { received: number; status: 'ok' | 'no' | 'pending'; comment?: string }>)
+
+      // Obtener el pedido completo antes de actualizar
+      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+      if (!orderDoc.exists()) {
+        throw new Error("Pedido no encontrado")
+      }
+
+      const currentOrder = { id: orderDoc.id, ...orderDoc.data() } as Order
+
+      // Actualizar el pedido en Firestore
       await updateDoc(doc(db, "apps/controld/orders", orderId), {
         status: "received",
         receivedAt: new Date(),
         receivedBy: user.id,
         receivedByName: user.name,
-        receivedDetails: orderDetails,
-        itemQuantities: itemQuantities
+        receivedDetails: orderDetails || "",
+        itemQuantities: cleanedItemQuantities
       })
 
-      toast({
-        title: "Pedido recibido",
-        description: "El pedido fue marcado como recibido correctamente",
-      })
+      // Crear el pedido actualizado para el remito
+      const updatedOrder: Order = {
+        ...currentOrder,
+        status: "received",
+        receivedBy: user.id,
+        receivedByName: user.name,
+        receivedAt: new Date() as any,
+      }
+
+      // Actualizar metadata del remito
+      await updateRemitStatus(orderId, "received", user)
+
+      // Crear el DeliveryNote automáticamente
+      try {
+        await createDeliveryNote(
+          updatedOrder,
+          user,
+          undefined, // El usuario de delivery se obtiene del order
+          orderDetails || "" // Notas de recepción
+        )
+
+        toast({
+          title: "Pedido recibido y remito generado",
+          description: "El pedido fue recibido y el remito se generó correctamente",
+        })
+      } catch (deliveryNoteError) {
+        console.error("Error al crear delivery note:", deliveryNoteError)
+        toast({
+          title: "Pedido recibido con advertencia",
+          description: "El pedido fue recibido pero hubo un error al generar el remito",
+          variant: "destructive",
+        })
+      }
 
       setExpandedOrder(null)
       setOrderDetails("")
