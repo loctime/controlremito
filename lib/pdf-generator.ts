@@ -469,7 +469,7 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
   // Configuración
   let pageWidth = doc.internal.pageSize.getWidth()
   let pageHeight = doc.internal.pageSize.getHeight()
-  const margin = 5
+  const margin = 7
 
   // ========== ENCABEZADO ==========
   doc.setFontSize(18)
@@ -565,14 +565,15 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
 
   autoTable(doc, {
     startY: yPosition,
-    head: [["\nPedido", "Producto", "\nArmado", "\nRecibido", "Estado"]],
+    head: [["Pedido", "Producto", "Armado", "Recibido", "Estado"]],
     body: tableData,
     theme: "grid",
     headStyles: { 
       fillColor: [40, 40, 40],
-      fontSize: 8,
+      fontSize: 8.5,
       fontStyle: 'bold',
-      halign: 'center'
+      halign: 'center',
+      valign: 'middle'
     },
     styles: { 
       fontSize: 7,
@@ -580,11 +581,11 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
       overflow: 'linebreak'
     },
     columnStyles: {
-      0: { halign: 'center', cellWidth: 10 },
-      1: { halign: 'left', cellWidth: 26 },
-      2: { halign: 'center', cellWidth: 10 },
-      3: { halign: 'center', cellWidth: 10 },
-      4: { halign: 'center', cellWidth: 14, fontStyle: 'bold' }
+      0: { halign: 'center', valign: 'middle', cellWidth: 10 },
+      1: { halign: 'left',   valign: 'middle', cellWidth: 26 },
+      2: { halign: 'center', valign: 'middle', cellWidth: 10 },
+      3: { halign: 'center', valign: 'middle', cellWidth: 10 },
+      4: { halign: 'center', valign: 'middle', cellWidth: 10, fontStyle: 'bold' }
     },
     margin: { left: margin, right: margin },
   })
