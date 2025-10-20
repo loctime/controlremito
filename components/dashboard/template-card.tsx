@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Edit, Plus, Send, X, Save, AlertCircle } from "lucide-react"
+import { FileText, Edit, Plus, Send, X, Save, AlertCircle, Trash2 } from "lucide-react"
 import type { Template, Order } from "@/lib/types"
 import { isDayAllowed } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +34,7 @@ interface TemplateCardProps {
   onSaveChanges: () => void
   onUpdateQuantity: (index: number, quantity: number) => void
   onUpdateNotes: (notes: string) => void
+  onDeleteTemplate?: () => void // Para plantillas personales
 }
 
 export const TemplateCard = memo(function TemplateCard({
@@ -50,6 +51,7 @@ export const TemplateCard = memo(function TemplateCard({
   onSaveChanges,
   onUpdateQuantity,
   onUpdateNotes,
+  onDeleteTemplate,
 }: TemplateCardProps) {
   return (
     <Card 
@@ -76,9 +78,22 @@ export const TemplateCard = memo(function TemplateCard({
               {template.name}
             </CardTitle>
           </div>
-          <span className={`text-xs px-2 py-1 rounded ${templateStatus.color}`}>
-            {templateStatus.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs px-2 py-1 rounded ${templateStatus.color}`}>
+              {templateStatus.label}
+            </span>
+            {onDeleteTemplate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onDeleteTemplate}
+                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                title="Eliminar plantilla personal"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
         {template.description && (
           <CardDescription className={`text-sm ${

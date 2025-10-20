@@ -36,6 +36,42 @@ service cloud.firestore {
       return isAuthenticated() && userDocExists() && getUserData().role == 'delivery';
     }
     
+    // ===== REGLAS PARA CONTROLDAT (RED SOCIAL) =====
+    
+    match /apps/controlDat {
+      // Usuarios - todos autenticados pueden leer
+      match /users/{userId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && request.auth.uid == userId;
+        allow update: if isAuthenticated() && request.auth.uid == userId;
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+      
+      // Posts - todos autenticados pueden leer, cualquier usuario puede crear
+      match /posts/{postId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      }
+      
+      // Comentarios - todos autenticados pueden leer, cualquier usuario puede crear
+      match /comments/{commentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      }
+      
+      // Notificaciones - solo el propietario puede leer y escribir
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+        allow create: if isAuthenticated();
+        allow update: if isAuthenticated() && request.auth.uid == resource.data.userId;
+        allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      }
+    }
+    
     // ===== REGLAS PARA REMITOS (CONTROLD) =====
     
     match /apps/controld {
@@ -44,8 +80,11 @@ service cloud.firestore {
         // Permitir lectura a todos los autenticados (sin validar si existe su documento)
         allow read: if isAuthenticated();
         
-        // Permitir crear su propio documento de usuario (auto-registro)
-        allow create: if isAuthenticated() && request.auth.uid == userId;
+        // Permitir crear su propio documento de usuario (auto-registro) O si es admin/maxdev
+        allow create: if isAuthenticated() && (
+          request.auth.uid == userId ||
+          (userDocExists() && (getUserData().role == 'admin' || getUserData().role == 'maxdev'))
+        );
         
         // Permitir actualizar su propio perfil o si es admin/maxdev
         allow update: if isAuthenticated() && (
@@ -63,42 +102,85 @@ service cloud.firestore {
         allow write: if isMaxDev() || isAdmin();
       }
       
-      // Productos - todos autenticados pueden leer, admin/maxdev/factory pueden escribir
+      // Productos - todos autenticados pueden leer, admin/maxdev/factory pueden crear
       match /products/{productId} {
         allow read: if isAuthenticated();
         allow create: if isMaxDev() || isAdmin() || isFactory();
         allow update, delete: if isMaxDev() || isAdmin();
       }
       
-      // Pedidos - permisos basados en rol
+      // Pedidos - versión temporal simplificada
       match /orders/{orderId} {
         allow read: if isAuthenticated();
         allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
-        allow update: if isAuthenticated(); // Todos pueden actualizar estado
+        allow update: if isAuthenticated(); // Temporal - muy permisivo
         allow delete: if isMaxDev() || isAdmin();
       }
       
       // Remitos de entrega
       match /deliveryNotes/{noteId} {
         allow read: if isAuthenticated();
-        allow create: if isDelivery() || isMaxDev() || isAdmin();
+        // Permitir crear: branch (quien recibe), delivery, admin, maxdev
+        allow create: if isBranch() || isDelivery() || isMaxDev() || isAdmin();
         allow update: if isDelivery() || isMaxDev() || isAdmin();
         allow delete: if isMaxDev() || isAdmin();
       }
       
-      // Plantillas
+      // Plantillas - con soporte para plantillas personales
       match /templates/{templateId} {
-        allow read: if isAuthenticated();
-        allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
-        allow update, delete: if isAuthenticated() && 
-                                (resource.data.createdBy == request.auth.uid || isMaxDev() || isAdmin());
+        // Leer: todos pueden ver plantillas globales/branch, solo el creador puede ver sus plantillas personales
+        allow read: if isAuthenticated() && (
+          !exists(/databases/$(database)/documents/apps/controld/templates/$(templateId)) ||
+          resource.data.type != 'personal' ||
+          resource.data.createdBy == request.auth.uid ||
+          isMaxDev() ||
+          isAdmin()
+        );
+        
+        // Crear: branch/factory pueden crear plantillas personales, admin/maxdev pueden crear cualquier tipo
+        allow create: if isAuthenticated() && (
+          // Plantillas personales: cualquier usuario autenticado
+          (request.resource.data.type == 'personal' && 
+           request.resource.data.createdBy == request.auth.uid &&
+           request.resource.data.active == true) ||
+          // Plantillas globales/branch: solo admin/maxdev
+          (isAdmin() || isMaxDev())
+        );
+        
+        // Actualizar: solo el creador puede actualizar sus plantillas personales, admin/maxdev pueden actualizar cualquiera
+        allow update: if isAuthenticated() && (
+          (resource.data.type == 'personal' && resource.data.createdBy == request.auth.uid) ||
+          isMaxDev() ||
+          isAdmin()
+        );
+        
+        // Eliminar: solo el creador puede eliminar sus plantillas personales, admin/maxdev pueden eliminar cualquiera
+        allow delete: if isAuthenticated() && (
+          (resource.data.type == 'personal' && resource.data.createdBy == request.auth.uid) ||
+          isMaxDev() ||
+          isAdmin()
+        );
       }
       
       // Metadata de remitos (historial de estados y firmas)
       match /remit-metadata/{metadataId} {
         allow read: if isAuthenticated();
+        // Permitir crear: branch, factory, admin, maxdev
         allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
-        allow update: if isFactory() || isDelivery() || isMaxDev() || isAdmin();
+        // Permitir actualizar: branch (recepción), factory (armado), delivery (entrega), admin, maxdev
+        allow update: if isBranch() || isFactory() || isDelivery() || isMaxDev() || isAdmin();
+        allow delete: if isMaxDev() || isAdmin();
+      }
+      
+      // ===== NUEVAS REGLAS PARA SISTEMA DE REPOSICIONES =====
+      
+      // Colas de reposición - branch puede crear/leer su propia cola, factory/admin/maxdev pueden leer todas
+      match /replacementQueues/{queueId} {
+        allow read: if isAuthenticated() && (
+          isBranch() || isFactory() || isMaxDev() || isAdmin()
+        );
+        allow create: if isBranch() || isMaxDev() || isAdmin();
+        allow update: if isBranch() || isFactory() || isMaxDev() || isAdmin();
         allow delete: if isMaxDev() || isAdmin();
       }
     }
@@ -214,10 +296,18 @@ service cloud.firestore {
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
     }
     
+    // ===== REGLAS PARA CONTROLCICLO =====
+    
+    // Datos del usuario de ControlCiclo - solo el propietario puede acceder
+    match /apps/controlciclo/users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
     // Denegar acceso a cualquier otra colección por defecto
     match /{document=**} {
       allow read, write: if false;
     }
   }
 }
-

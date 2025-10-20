@@ -3,6 +3,8 @@
 import { useState, useCallback, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
 import { FileText, Package, Truck, Plus, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
@@ -497,6 +499,35 @@ export function BranchDashboard() {
     console.log("🔍 [DEBUG] Editing cancelled - state cleared")
   }, [])
 
+  // Función para eliminar plantilla personal
+  const handleDeletePersonalTemplate = useCallback(async (templateId: string, templateName: string) => {
+    if (!user) return
+
+    const confirmed = window.confirm(
+      `¿Estás seguro de que deseas eliminar la plantilla personal "${templateName}"?\n\nEsta acción no se puede deshacer.`
+    )
+
+    if (!confirmed) return
+
+    try {
+      await updateDoc(doc(db, "apps/controld/templates", templateId), {
+        active: false
+      })
+
+      toast({
+        title: "Plantilla eliminada",
+        description: `La plantilla "${templateName}" se eliminó correctamente.`,
+      })
+    } catch (error) {
+      console.error("Error al eliminar plantilla:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la plantilla",
+        variant: "destructive",
+      })
+    }
+  }, [user, toast])
+
   const updateItemQuantity = useCallback((itemIndex: number, newQuantity: number) => {
     if (newQuantity < 0) return
     setEditFormData(prev => {
@@ -576,9 +607,43 @@ export function BranchDashboard() {
     }
   }, [editingOrder, editFormData, user, toast])
 
-  // Memoizar el renderizado de tarjetas de plantillas
-  const templateCards = useMemo(() => {
-    return templates.map((template) => {
+  // Separar plantillas personales de las oficiales
+  const { personalTemplates, officialTemplates } = useMemo(() => {
+    const personal = templates.filter(t => t.type === "personal")
+    const official = templates.filter(t => t.type !== "personal")
+    return { personalTemplates: personal, officialTemplates: official }
+  }, [templates])
+
+  // Memoizar el renderizado de tarjetas de plantillas personales
+  const personalTemplateCards = useMemo(() => {
+    return personalTemplates.map((template) => {
+      const existingDraft = draftOrders.find(order => order.templateId === template.id)
+      const templateStatus = getTemplateStatus(template)
+      
+      return (
+        <TemplateCard
+          key={template.id}
+          template={template}
+          existingDraft={existingDraft || null}
+          templateStatus={templateStatus}
+          isEditing={editingOrder?.templateId === template.id}
+          editFormData={editFormData}
+          onCreateOrder={() => handleTemplateClick(template)}
+          onStartEditing={() => existingDraft && startEditing(existingDraft)}
+          onCancelEditing={cancelEditing}
+          onSendOrder={() => existingDraft && sendDraftOrder(existingDraft)}
+          onSaveChanges={saveChanges}
+          onUpdateQuantity={updateItemQuantity}
+          onUpdateNotes={updateNotes}
+          onDeleteTemplate={() => handleDeletePersonalTemplate(template.id, template.name)}
+        />
+      )
+    })
+  }, [personalTemplates, draftOrders, editingOrder, editFormData, getTemplateStatus, handleTemplateClick, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes, handleDeletePersonalTemplate])
+
+  // Memoizar el renderizado de tarjetas de plantillas oficiales
+  const officialTemplateCards = useMemo(() => {
+    return officialTemplates.map((template) => {
       const existingDraft = draftOrders.find(order => order.templateId === template.id)
       const templateStatus = getTemplateStatus(template)
       
@@ -600,7 +665,7 @@ export function BranchDashboard() {
         />
       )
     })
-  }, [templates, draftOrders, editingOrder, editFormData, getTemplateStatus, handleTemplateClick, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes])
+  }, [officialTemplates, draftOrders, editingOrder, editFormData, getTemplateStatus, handleTemplateClick, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes])
 
   // Loading state
   const isLoading = templatesLoading || draftsLoading
@@ -665,10 +730,41 @@ export function BranchDashboard() {
               </div>
             ) : (
               <>
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                  {templateCards}
-                </div>
+                {/* Plantillas Personales */}
+                {personalTemplates.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <h4 className="text-sm font-medium text-muted-foreground">
+                        👤 Mis Plantillas Personales
+                      </h4>
+                      <Badge variant="outline" className="text-xs">
+                        {personalTemplates.length}
+                      </Badge>
+                    </div>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                      {personalTemplateCards}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Separador visual */}
+                {personalTemplates.length > 0 && officialTemplates.length > 0 && (
+                  <Separator className="my-6" />
+                )}
+                
+                {/* Plantillas Oficiales */}
+                {officialTemplates.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">
+                      🏢 Plantillas Oficiales
+                    </h4>
+                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                      {officialTemplateCards}
+                    </div>
+                  </div>
+                )}
 
+                {/* Mensaje cuando no hay plantillas */}
                 {templates.length === 0 && (
                   <Card>
                     <CardContent className="text-center py-8">

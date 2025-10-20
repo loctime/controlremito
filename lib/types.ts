@@ -159,6 +159,7 @@ export interface Template {
   createdBy: string
   createdByName: string
   branchId?: string // si es de una sucursal específica
+  type?: "global" | "branch" | "personal" // tipo de plantilla (global=admin, branch=oficial, personal=usuario)
   createdAt: Timestamp
   active: boolean
   destinationBranchIds: string[] // múltiples destinos posibles

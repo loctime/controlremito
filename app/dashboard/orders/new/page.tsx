@@ -792,6 +792,121 @@ function NewOrderContent() {
     })
   }
 
+  // Función para crear plantilla personal desde el formulario
+  const handleSaveAsTemplate = async () => {
+    if (!user || !formData.toBranchId || formData.items.length === 0) {
+      toast({
+        title: "Datos insuficientes",
+        description: "Selecciona un destino y agrega al menos un producto para crear la plantilla",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Validar que todos los items tengan producto seleccionado
+    const itemsWithoutProduct = formData.items.filter(item => !item.productId || !item.productName)
+    if (itemsWithoutProduct.length > 0) {
+      toast({
+        title: "Productos incompletos",
+        description: "Todos los productos deben estar completamente seleccionados",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const templateName = prompt("Nombre para tu plantilla personal:", "Mi plantilla")
+      
+      if (!templateName) return // Usuario canceló
+
+      const templateData = {
+        name: templateName,
+        description: formData.notes || "",
+        items: formData.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: 0, // Empezar en 0, el usuario ingresará cantidades al usarla
+          unit: item.unit
+        })),
+        createdBy: user.id,
+        createdByName: user.name,
+        branchId: user.branchId,
+        type: "personal" as const,
+        createdAt: new Date(),
+        active: true,
+        destinationBranchIds: [formData.toBranchId],
+        allowedSendDays: formData.allowedSendDays || []
+      }
+
+      await addDoc(collection(db, "apps/controld/templates"), templateData)
+
+      toast({
+        title: "✅ Plantilla personal creada",
+        description: `La plantilla "${templateName}" se creó correctamente y aparecerá en tu dashboard.`,
+      })
+
+      // Limpiar el formulario después de crear la plantilla
+      setFormData({
+        toBranchId: "",
+        notes: "",
+        items: [],
+        templateId: "",
+        allowedSendDays: [],
+      })
+    } catch (error) {
+      console.error("Error al guardar plantilla personal:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo crear la plantilla personal",
+        variant: "destructive",
+      })
+    }
+  }
+
+  // Función para guardar el pedido como plantilla personal (desde vista de detalles)
+  const handleSaveAsPersonalTemplate = async () => {
+    if (!user || !orderDetails) return
+
+    try {
+      const templateName = prompt("Nombre para la plantilla personal:", `Plantilla ${orderDetails.orderNumber}`)
+      
+      if (!templateName) return // Usuario canceló
+
+      const templateData = {
+        name: templateName,
+        description: orderDetails.notes || "",
+        items: orderDetails.items.map(item => ({
+          productId: item.productId,
+          productName: item.productName,
+          quantity: 0, // Empezar en 0, el usuario ingresará cantidades al usarla
+          unit: item.unit
+        })),
+        createdBy: user.id,
+        createdByName: user.name,
+        branchId: user.branchId,
+        type: "personal" as const,
+        createdAt: new Date(),
+        active: true,
+        destinationBranchIds: [orderDetails.toBranchId],
+        allowedSendDays: []
+      }
+
+      await addDoc(collection(db, "apps/controld/templates"), templateData)
+
+      toast({
+        title: "✅ Plantilla personal creada",
+        description: `La plantilla "${templateName}" se creó correctamente y aparecerá en tu dashboard.`,
+      })
+    } catch (error) {
+      console.error("Error al guardar plantilla personal:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo crear la plantilla personal",
+        variant: "destructive",
+      })
+    }
+  }
+
   // Si se creó un pedido, mostrar la vista de detalles
   if (createdOrderId && orderDetails) {
     return (
@@ -899,15 +1014,20 @@ function NewOrderContent() {
             </Card>
 
             {/* Botones de acción */}
-            <div className="flex flex-col sm:flex-row justify-end gap-2">
-              <Button variant="outline" onClick={handleBackToForm}>
-                Crear otro pedido
+            <div className="flex flex-col sm:flex-row justify-between gap-2">
+              <Button variant="secondary" onClick={handleSaveAsPersonalTemplate}>
+                💾 Guardar como plantilla personal
               </Button>
-              <Link href="/dashboard/orders">
-                <Button>
-                  Ver todos los pedidos
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={handleBackToForm}>
+                  Crear otro pedido
                 </Button>
-              </Link>
+                <Link href="/dashboard/orders">
+                  <Button>
+                    Ver todos los pedidos
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -1147,20 +1267,11 @@ function NewOrderContent() {
             <Button 
               type="button" 
               variant="secondary"
-              onClick={handleSaveDraft}
-              disabled={saving || !formData.toBranchId || formData.items.length === 0}
+              onClick={handleSaveAsTemplate}
+              disabled={!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId)}
               className="w-full sm:w-auto"
             >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  💾 Guardar borrador
-                </>
-              )}
+              📋 Crear plantilla con esta base
             </Button>
             <Button 
               type="submit" 
@@ -1184,13 +1295,6 @@ function NewOrderContent() {
           {(!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId || item.quantity < 0)) && (
             <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
               ⚠️ Completa todos los campos requeridos antes de crear el pedido
-            </div>
-          )}
-          
-          {/* Información sobre guardado automático */}
-          {formData.toBranchId && formData.items.length > 0 && (
-            <div className="text-xs text-blue-600 bg-blue-50 p-2 rounded border border-blue-200">
-              💡 Tu pedido se guarda automáticamente cada 30 segundos. También puedes usar el botón "Guardar borrador" para guardar manualmente.
             </div>
           )}
         </form>
