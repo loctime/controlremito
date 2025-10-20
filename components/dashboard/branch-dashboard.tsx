@@ -607,7 +607,7 @@ export function BranchDashboard() {
 
   return (
     <div className="max-w-7xl mx-auto">
-      <div className="mb-6">
+      <div className="mb-6 hidden md:block">
         <h2 className="text-2xl font-bold">Bienvenido, {user?.name}</h2>
         <p className="text-muted-foreground">Gestiona tus pedidos y plantillas</p>
       </div>
