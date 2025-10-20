@@ -568,11 +568,8 @@ function OrderDetailContent() {
                         </TableCell>
                         <TableCell>
                           {getItemStatusBadge(item.id)}
-                          {itemStatuses[item.id]?.reason && (
-                            <p className="mt-1 text-xs text-muted-foreground">{itemStatuses[item.id].reason}</p>
-                          )}
                         </TableCell>
-                        {canMarkItems && (
+                        {canMarkItems && itemStatuses[item.id]?.status !== "not_available" && (
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               {itemStatuses[item.id]?.status !== "available" && (

@@ -415,24 +415,27 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                                 </span>
                                               </td>
                                               <td className="py-2 px-2 text-center">
-                                                <div className="flex gap-1 justify-center">
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="text-xs px-2 py-1 h-auto bg-green-600 hover:bg-green-700 text-white"
-                                                    onClick={() => updateItemStatus(item.id, 'ok')}
-                                                  >
-                                                    OK
-                                                  </Button>
-                                                  <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="text-xs px-2 py-1 h-auto bg-red-600 hover:bg-red-700 text-white"
-                                                    onClick={() => updateItemStatus(item.id, 'no')}
-                                                  >
-                                                    NO
-                                                  </Button>
-                                                </div>
+                                                {/* Solo mostrar botones si el producto no fue marcado como no disponible por la fábrica */}
+                                                {item.assembledQuantity !== 0 && (
+                                                  <div className="flex gap-1 justify-center">
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="text-xs px-2 py-1 h-auto bg-green-600 hover:bg-green-700 text-white"
+                                                      onClick={() => updateItemStatus(item.id, 'ok')}
+                                                    >
+                                                      OK
+                                                    </Button>
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      className="text-xs px-2 py-1 h-auto bg-red-600 hover:bg-red-700 text-white"
+                                                      onClick={() => updateItemStatus(item.id, 'no')}
+                                                    >
+                                                      NO
+                                                    </Button>
+                                                  </div>
+                                                )}
                                               </td>
                                             </tr>
                                             {/* Fila de comentario para productos marcados como NO */}
