@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast"
 import { isDayAllowed } from "@/lib/utils"
 import { updateRemitStatus, getRemitMetadata, createRemitMetadata, updateReadySignature, hasRemitMetadata } from "@/lib/remit-metadata-service"
 import { createDeliveryNote } from "@/lib/delivery-note-service"
-import { createReplacementItem } from "@/lib/replacement-service"
+import { createReplacementItem, getAllReplacementQueues } from "@/lib/replacement-service"
 import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -49,10 +49,24 @@ function OrderDetailContent() {
   const [isMarkingIssue, setIsMarkingIssue] = useState<string | null>(null)
   const [issueType, setIssueType] = useState<"not_received" | "returned">("not_received")
   const [issueReason, setIssueReason] = useState("")
+  const [pendingProducts, setPendingProducts] = useState<string[]>([]) // IDs de productos pendientes
 
   useEffect(() => {
     fetchOrder()
+    fetchPendingProducts()
   }, [orderId])
+
+  const fetchPendingProducts = async () => {
+    try {
+      const queues = await getAllReplacementQueues()
+      const pendingItems = queues.flatMap(queue => 
+        queue.items.filter(item => item.status === "pending")
+      )
+      setPendingProducts(pendingItems.map(item => item.productId))
+    } catch (error) {
+      console.error("Error al cargar productos pendientes:", error)
+    }
+  }
 
   const fetchOrder = async () => {
     setLoading(true)
@@ -253,15 +267,11 @@ function OrderDetailContent() {
       try {
         const item = order.items.find(i => i.id === itemId)
         if (item) {
-          // Determinar prioridad basada en el tipo de producto o cantidad
-          const priority = item.quantity > 10 ? "high" : "normal"
-          
           await createReplacementItem(
             item,
             order,
             user!,
-            issueReason,
-            priority
+            issueReason
           )
           
           toast({
@@ -514,6 +524,17 @@ function OrderDetailContent() {
               <CardHeader>
                 <CardTitle>Productos</CardTitle>
                 <CardDescription>Lista de productos del pedido</CardDescription>
+                {pendingProducts.length > 0 && (
+                  <div className="mt-2 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-orange-800">
+                      <span className="text-sm font-medium">🔄 Productos Pendientes</span>
+                    </div>
+                    <p className="text-sm text-orange-700 mt-1">
+                      Algunos productos en este pedido son reposiciones de faltantes anteriores. 
+                      Estos productos están marcados con el indicador "🔄 Pendiente".
+                    </p>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <Table>
@@ -528,9 +549,20 @@ function OrderDetailContent() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {order.items.filter(item => item.quantity > 0).map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.productName}</TableCell>
+                    {order.items.filter(item => item.quantity > 0).map((item) => {
+                      const isPending = pendingProducts.includes(item.productId)
+                      return (
+                        <TableRow key={item.id} className={isPending ? "bg-orange-50 border-l-4 border-l-orange-400" : ""}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              {item.productName}
+                              {isPending && (
+                                <Badge variant="secondary" className="bg-orange-100 text-orange-800 border-orange-200">
+                                  🔄 Pendiente
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
                         <TableCell>
                           {item.quantity} {item.unit}
                         </TableCell>
@@ -708,7 +740,8 @@ function OrderDetailContent() {
                           </TableCell>
                         )}
                       </TableRow>
-                    ))}
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

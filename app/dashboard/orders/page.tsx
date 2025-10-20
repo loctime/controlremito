@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Eye, Send, CheckCircle } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Plus, Search, Eye, Send, CheckCircle, Clock, Package, Truck } from "lucide-react"
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -26,6 +27,7 @@ function OrdersContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("recibir")
 
   useEffect(() => {
     fetchOrders()
@@ -187,14 +189,30 @@ function OrdersContent() {
     }
   }
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
+  // Filtrar por pestañas
+  const getOrdersByTab = (tab: string) => {
+    switch (tab) {
+      case "recibir":
+        return orders.filter(order => order.status === "sent")
+      case "armando":
+        return orders.filter(order => order.status === "ready")
+      case "pendientes":
+        return orders.filter(order => order.status === "draft" && order.items.some(item => item.isPending))
+      case "en-camino":
+        return orders.filter(order => order.status === "in_transit")
+      default:
+        return orders
+    }
+  }
+
+  const filteredOrders = getOrdersByTab(activeTab).filter((order) => {
+    const matchesSearch = 
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.fromBranchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.toBranchName.toLowerCase().includes(searchTerm.toLowerCase())
-
+    
     const matchesStatus = statusFilter === "all" || order.status === statusFilter
-
+    
     return matchesSearch && matchesStatus
   })
 
@@ -218,33 +236,53 @@ function OrdersContent() {
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por número, sucursal..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="recibir" className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Recibir
+            </TabsTrigger>
+            <TabsTrigger value="armando" className="flex items-center gap-2">
+              <Package className="h-4 w-4" />
+              Armando
+            </TabsTrigger>
+            <TabsTrigger value="pendientes" className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4" />
+              Pendientes
+            </TabsTrigger>
+            <TabsTrigger value="en-camino" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              En Camino
+            </TabsTrigger>
+          </TabsList>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por número, sucursal..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full md:w-48">
+                    <SelectValue placeholder="Filtrar por estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="draft">Borrador</SelectItem>
+                    <SelectItem value="sent">Enviado</SelectItem>
+                    <SelectItem value="ready">Listo</SelectItem>
+                    <SelectItem value="in_transit">En camino</SelectItem>
+                    <SelectItem value="received">Recibido</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Filtrar por estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="draft">Borrador</SelectItem>
-                  <SelectItem value="sent">Enviado</SelectItem>
-                  <SelectItem value="ready">Listo</SelectItem>
-                  <SelectItem value="in_transit">En camino</SelectItem>
-                  <SelectItem value="received">Recibido</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
+            </CardHeader>
           <CardContent>
             {loading ? (
               <p className="text-center text-muted-foreground py-8">Cargando pedidos...</p>
@@ -388,6 +426,7 @@ function OrdersContent() {
             )}
           </CardContent>
         </Card>
+        </Tabs>
       </div>
     </ProtectedRoute>
   )

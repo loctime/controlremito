@@ -5,9 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Edit, Plus, Send, X, Save } from "lucide-react"
+import { FileText, Edit, Plus, Send, X, Save, AlertCircle } from "lucide-react"
 import type { Template, Order } from "@/lib/types"
 import { isDayAllowed } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 
 interface TemplateCardProps {
   template: Template
@@ -24,6 +25,7 @@ interface TemplateCardProps {
     items: { productId: string; productName: string; quantity: number; unit: string }[]
     notes: string
   }
+  pendingProducts?: { productId: string; productName: string; quantity: number; unit: string }[]
   onCreateOrder: () => void
   onStartEditing: () => void
   onCancelEditing: () => void
@@ -39,6 +41,7 @@ export const TemplateCard = memo(function TemplateCard({
   templateStatus,
   isEditing,
   editFormData,
+  pendingProducts = [],
   onCreateOrder,
   onStartEditing,
   onCancelEditing,
@@ -92,15 +95,36 @@ export const TemplateCard = memo(function TemplateCard({
             <p className="text-sm font-medium text-muted-foreground mb-2">
               Productos ({existingDraft ? existingDraft.items.length : template.items.length}):
             </p>
-            <div className="space-y-1">
-              {(existingDraft ? existingDraft.items : template.items).slice(0, 3).map((item, index) => (
-                <div key={index} className="text-sm">
-                  <span className="font-medium">{item.productName}</span>
-                  <span className="text-muted-foreground ml-2">
-                    {item.quantity} {item.unit}
-                  </span>
+            {pendingProducts.length > 0 && (
+              <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                <div className="flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  <span className="font-medium">Productos Pendientes</span>
                 </div>
-              ))}
+                <p className="text-blue-700 mt-1">
+                  Algunos productos de esta plantilla son reposiciones de faltantes anteriores.
+                </p>
+              </div>
+            )}
+            <div className="space-y-1">
+              {(existingDraft ? existingDraft.items : template.items).slice(0, 3).map((item, index) => {
+                const isPending = pendingProducts.some(p => p.productId === item.productId)
+                return (
+                  <div key={index} className={`text-sm p-2 rounded ${isPending ? 'bg-blue-50 border border-blue-200' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{item.productName}</span>
+                      {isPending && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                          🔄 Pendiente
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground ml-2">
+                      {item.quantity} {item.unit}
+                    </span>
+                  </div>
+                )
+              })}
               {(existingDraft ? existingDraft.items : template.items).length > 3 && (
                 <p className="text-sm text-muted-foreground">
                   +{(existingDraft ? existingDraft.items : template.items).length - 3} productos más...

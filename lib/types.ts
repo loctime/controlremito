@@ -8,9 +8,7 @@ export type DayOfWeek = "monday" | "tuesday" | "wednesday" | "thursday" | "frida
 
 export type ItemStatus = "pending" | "available" | "not_available" | "delivered" | "not_received" | "returned"
 
-export type ReplacementStatus = "pending" | "urgent" | "in_queue" | "merged" | "completed" | "cancelled"
-
-export type ReplacementPriority = "low" | "normal" | "high" | "urgent"
+export type ReplacementStatus = "pending" | "merged" | "completed" | "cancelled"
 
 // Tipo reutilizable para firmas
 export interface Signature {
@@ -193,7 +191,6 @@ export interface ReplacementItem {
   reportedBy: string // Usuario que reportó el problema
   reportedByName: string
   reportedAt: Timestamp
-  priority: ReplacementPriority
   status: ReplacementStatus
   mergedIntoOrderId?: string // Si se fusionó con otro pedido
   mergedAt?: Timestamp
@@ -210,6 +207,4 @@ export interface ReplacementQueue {
   status: ReplacementStatus
   createdAt: Timestamp
   updatedAt: Timestamp
-  autoMergeEnabled: boolean // Si se fusiona automáticamente con próximos pedidos
-  maxWaitDays: number // Máximo días de espera antes de crear pedido automático
 }

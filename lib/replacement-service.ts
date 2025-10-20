@@ -30,8 +30,7 @@ export async function createReplacementItem(
   item: OrderItem,
   originalOrder: Order,
   reportingUser: User,
-  reason: string,
-  priority: ReplacementPriority = "normal"
+  reason: string
 ): Promise<string> {
   try {
     const replacementItem: Omit<ReplacementItem, "id"> = {
@@ -45,7 +44,6 @@ export async function createReplacementItem(
       reportedBy: reportingUser.id,
       reportedByName: reportingUser.name,
       reportedAt: Timestamp.now(),
-      priority,
       status: "pending"
     }
 
