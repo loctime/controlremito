@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle, XCircle, AlertCircle } from "lucide-react"
-import type { OrderItem, User } from "@/lib/types"
-import { doc, updateDoc } from "firebase/firestore"
+import { Textarea } from "@/components/ui/textarea"
+import { CheckCircle, XCircle, AlertCircle, MessageSquare } from "lucide-react"
+import type { OrderItem, User, Order } from "@/lib/types"
+import { doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface OrderItemsDetailProps {
@@ -21,10 +22,34 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
   const [localItems, setLocalItems] = useState<OrderItem[]>(items)
   const [saving, setSaving] = useState(false)
   const [customQuantities, setCustomQuantities] = useState<Record<string, number>>({})
+  const [orderNotes, setOrderNotes] = useState<string>("")
+  const [assemblyNotes, setAssemblyNotes] = useState<string>("")
+  const [loadingOrder, setLoadingOrder] = useState(true)
 
   useEffect(() => {
     setLocalItems(items)
   }, [items])
+
+  // Cargar comentarios del pedido
+  useEffect(() => {
+    const fetchOrderNotes = async () => {
+      try {
+        const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+        if (orderDoc.exists()) {
+          const orderData = orderDoc.data() as Order
+          setOrderNotes(orderData.notes || "")
+          // Cargar notas de armado existentes si las hay
+          setAssemblyNotes(orderData.assemblyNotes || "")
+        }
+      } catch (error) {
+        console.error("Error al cargar comentarios:", error)
+      } finally {
+        setLoadingOrder(false)
+      }
+    }
+    
+    fetchOrderNotes()
+  }, [orderId])
 
   const updateItem = async (itemId: string, assembledQuantity: number | null) => {
     if (!user) return
@@ -97,6 +122,21 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
     return totalItems > 0 ? Math.round((processedItems / totalItems) * 100) : 0
   }
 
+  const saveAssemblyNotes = async () => {
+    if (!user) return
+    
+    setSaving(true)
+    try {
+      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+        assemblyNotes: assemblyNotes
+      })
+    } catch (error) {
+      console.error("Error al guardar notas de armado:", error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Card className="mt-4">
       <CardHeader>
@@ -110,6 +150,45 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
         </div>
       </CardHeader>
       <CardContent>
+        {/* Comentarios del pedido original */}
+        {orderNotes && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <MessageSquare className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-blue-900 mb-1">
+                  💬 Comentarios del pedido:
+                </p>
+                <p className="text-sm text-blue-800 whitespace-pre-wrap">
+                  {orderNotes}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Campo para comentarios de armado */}
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          <label className="text-sm font-semibold text-orange-900 mb-2 block">
+            📝 Comentarios del armado (opcional):
+          </label>
+          <Textarea
+            value={assemblyNotes}
+            onChange={(e) => setAssemblyNotes(e.target.value)}
+            placeholder="Ej: Se cambió X producto por Y, falta stock de Z, etc..."
+            className="min-h-[80px] mb-2 bg-white"
+            disabled={saving}
+          />
+          <Button
+            size="sm"
+            onClick={saveAssemblyNotes}
+            disabled={saving}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            {saving ? "Guardando..." : "Guardar comentarios"}
+          </Button>
+        </div>
+
         <div className="space-y-3">
           {localItems.map((item) => {
             const status = getItemStatus(item)

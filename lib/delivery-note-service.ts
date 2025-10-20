@@ -107,7 +107,8 @@ export async function createDeliveryNote(
   order: Order,
   receivingUser: User,
   deliveryUser?: User, // Usuario que hizo la entrega (puede obtenerse del order)
-  receptionNotes?: string
+  receptionNotes?: string,
+  assemblyNotes?: string // Notas opcionales del armado (si no se proporcionan, se usan las del order)
 ): Promise<string> {
   try {
     // Obtener metadata del remito para las firmas
@@ -185,10 +186,17 @@ export async function createDeliveryNote(
     }
     
     // Agregar campos opcionales solo si tienen valor
+    // Comentarios originales del pedido (de la sucursal que pidió)
     if (order.notes) {
-      deliveryNoteData.assemblyNotes = order.notes
+      deliveryNoteData.requestNotes = order.notes
     }
     
+    // Comentarios del armado (de la fábrica)
+    if (assemblyNotes) {
+      deliveryNoteData.assemblyNotes = assemblyNotes
+    }
+    
+    // Comentarios de la recepción (de la sucursal que recibe)
     if (receptionNotes) {
       deliveryNoteData.receptionNotes = receptionNotes
     }

@@ -100,7 +100,8 @@ export interface Order {
   receivedByName?: string
   receivedAt?: Timestamp
   parentOrderId?: string // si fue generado automáticamente por items faltantes
-  notes?: string
+  notes?: string // Comentarios del pedido original (sucursal que pide)
+  assemblyNotes?: string // Comentarios del armado (fábrica)
   templateId?: string // referencia a la plantilla usada
   allowedSendDays?: DayOfWeek[] // heredado de la plantilla
   // Campos para cancelación
@@ -122,11 +123,12 @@ export interface DeliveryNote {
   // SECCIÓN 1: LO PEDIDO (items originales del pedido)
   itemsRequested: OrderItem[]
   requestedBySignature: Signature
+  requestNotes?: string          // Comentarios originales del pedido
   
   // SECCIÓN 2: LO ARMADO (items con assembledQuantity de la fábrica)
   itemsAssembled: OrderItem[]
   assembledBySignature: Signature
-  assemblyNotes?: string // Notas generales del armado
+  assemblyNotes?: string         // Notas generales del armado en fábrica
   
   // SECCIÓN 3: LO RECIBIDO (verificación final en destino)
   itemsDelivered: OrderItem[]   // Items que llegaron OK

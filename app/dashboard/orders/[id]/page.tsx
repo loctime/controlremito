@@ -40,6 +40,8 @@ function OrderDetailContent() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [itemStatuses, setItemStatuses] = useState<Record<string, { status: string; reason?: string }>>({})
+  const [showReceptionDialog, setShowReceptionDialog] = useState(false)
+  const [receptionNotes, setReceptionNotes] = useState("")
   const [isMarkingUnavailable, setIsMarkingUnavailable] = useState<string | null>(null)
   const [unavailableReason, setUnavailableReason] = useState("")
 
@@ -328,11 +330,16 @@ function OrderDetailContent() {
 
       // Crear el DeliveryNote automáticamente
       try {
+        // Obtener las notas de armado del pedido para pasarlas al remito
+        const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+        const orderData = orderDoc.data() as Order
+        
         const deliveryNoteId = await createDeliveryNote(
           updatedOrder as Order,
           user,
           undefined, // El usuario de delivery se obtiene del order
-          "" // Notas de recepción (podríamos agregar un campo para esto)
+          receptionNotes || undefined, // Notas de recepción
+          orderData.assemblyNotes || undefined // Notas de armado
         )
 
         toast({
@@ -360,7 +367,14 @@ function OrderDetailContent() {
       })
     } finally {
       setActionLoading(false)
+      setShowReceptionDialog(false)
+      setReceptionNotes("")
     }
+  }
+
+  const openReceptionDialog = () => {
+    setReceptionNotes("")
+    setShowReceptionDialog(true)
   }
 
   const getStatusBadge = (status: string) => {
@@ -773,7 +787,7 @@ function OrderDetailContent() {
                   </Button>
                 )}
                 {canMarkReceived && (
-                  <Button className="w-full" onClick={handleConfirmReception} disabled={actionLoading}>
+                  <Button className="w-full" onClick={openReceptionDialog} disabled={actionLoading}>
                     <FileText className="mr-2 h-4 w-4" />
                     Recibir pedido
                   </Button>
@@ -818,6 +832,47 @@ function OrderDetailContent() {
           </div>
         </div>
       </div>
+
+      {/* Dialog para comentarios de recepción */}
+      <Dialog open={showReceptionDialog} onOpenChange={setShowReceptionDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar recepción del pedido</DialogTitle>
+            <DialogDescription>
+              Opcionalmente puedes agregar comentarios sobre la recepción del pedido
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">
+                Comentarios de recepción (opcional):
+              </label>
+              <Textarea
+                value={receptionNotes}
+                onChange={(e) => setReceptionNotes(e.target.value)}
+                placeholder="Ej: Todo llegó en buen estado, hubo demora en la entrega, etc..."
+                className="min-h-[100px]"
+                disabled={actionLoading}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowReceptionDialog(false)}
+                disabled={actionLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmReception}
+                disabled={actionLoading}
+              >
+                {actionLoading ? "Procesando..." : "Confirmar recepción"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   )
 }

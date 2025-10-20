@@ -78,6 +78,21 @@ export async function generateDeliveryNotePDF(note: DeliveryNote) {
     yPosition = (doc as any).lastAutoTable.finalY + 5
   }
 
+  // Comentarios del pedido original
+  if (note.requestNotes) {
+    doc.setFontSize(9)
+    doc.setFont("helvetica", "italic")
+    doc.setTextColor(100, 100, 100)
+    const notes = doc.splitTextToSize(`💬 Comentarios: ${note.requestNotes}`, pageWidth - margin * 2)
+    notes.forEach((line: string) => {
+      checkAddPage(doc, yPosition, 10)
+      doc.text(line, margin, yPosition)
+      yPosition += 4
+    })
+    doc.setTextColor(0, 0, 0)
+    yPosition += 3
+  }
+
   // Firma de quien solicitó
   doc.setFontSize(9)
   doc.setFont("helvetica", "bold")
@@ -190,8 +205,9 @@ export async function generateDeliveryNotePDF(note: DeliveryNote) {
     doc.setFontSize(9)
     doc.setFont("helvetica", "italic")
     doc.setTextColor(100, 100, 100)
-    const notes = doc.splitTextToSize(`Notas: ${note.assemblyNotes}`, pageWidth - margin * 2)
+    const notes = doc.splitTextToSize(`📝 Notas del armado: ${note.assemblyNotes}`, pageWidth - margin * 2)
     notes.forEach((line: string) => {
+      checkAddPage(doc, yPosition, 10)
       doc.text(line, margin, yPosition)
       yPosition += 4
     })
@@ -333,8 +349,9 @@ export async function generateDeliveryNotePDF(note: DeliveryNote) {
     doc.setFontSize(9)
     doc.setFont("helvetica", "italic")
     doc.setTextColor(100, 100, 100)
-    const notes = doc.splitTextToSize(`Notas de recepción: ${note.receptionNotes}`, pageWidth - margin * 2)
+    const notes = doc.splitTextToSize(`✍️ Notas de recepción: ${note.receptionNotes}`, pageWidth - margin * 2)
     notes.forEach((line: string) => {
+      checkAddPage(doc, yPosition, 10)
       doc.text(line, margin, yPosition)
       yPosition += 4
     })

@@ -196,6 +196,12 @@ function DeliveryNoteDetailContent() {
                       ))}
                     </TableBody>
                   </Table>
+                  {note.requestNotes && (
+                    <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+                      <span className="font-medium text-blue-900">💬 Comentarios del pedido:</span>
+                      <p className="mt-1 text-blue-800 whitespace-pre-wrap">{note.requestNotes}</p>
+                    </div>
+                  )}
                   <div className="mt-4 pt-4 border-t text-sm text-muted-foreground">
                     ✍️ Solicitado por: <span className="font-medium">{note.requestedBySignature?.userName}</span>
                     {note.requestedBySignature?.position && ` - ${note.requestedBySignature.position}`}
@@ -252,8 +258,9 @@ function DeliveryNoteDetailContent() {
                     </TableBody>
                   </Table>
                   {note.assemblyNotes && (
-                    <div className="mt-3 p-3 bg-orange-50 rounded-lg text-sm">
-                      <span className="font-medium">Notas del armado:</span> {note.assemblyNotes}
+                    <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm">
+                      <span className="font-medium text-orange-900">📝 Notas del armado:</span>
+                      <p className="mt-1 text-orange-800 whitespace-pre-wrap">{note.assemblyNotes}</p>
                     </div>
                   )}
                   <div className="mt-4 pt-4 border-t text-sm text-muted-foreground">
@@ -418,6 +425,22 @@ function DeliveryNoteDetailContent() {
                       ))}
                     </TableBody>
                   </Table>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Notas de recepción */}
+            {note.receptionNotes && (
+              <Card className="border-green-200 bg-green-50/30">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2 text-green-900">
+                    ✍️ Notas de Recepción
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="p-3 bg-white border border-green-200 rounded-lg text-sm">
+                    <p className="text-green-800 whitespace-pre-wrap">{note.receptionNotes}</p>
+                  </div>
                 </CardContent>
               </Card>
             )}
