@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { generateDeliveryNotePDF } from "@/lib/pdf-generator"
+import { generateDeliveryNotePDF, generateSimplifiedDeliveryNotePDF } from "@/lib/pdf-generator"
 
 function DeliveryNoteDetailContent() {
   const { toast } = useToast()
@@ -62,13 +62,35 @@ function DeliveryNoteDetailContent() {
       await generateDeliveryNotePDF(note)
       toast({
         title: "PDF generado",
-        description: "El remito se descargó correctamente",
+        description: "El remito completo se descargó correctamente",
       })
     } catch (error) {
       console.error("[v0] Error al generar PDF:", error)
       toast({
         title: "Error",
         description: "No se pudo generar el PDF",
+        variant: "destructive",
+      })
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleDownloadSimplifiedPDF = async () => {
+    if (!note) return
+
+    setGenerating(true)
+    try {
+      await generateSimplifiedDeliveryNotePDF(note)
+      toast({
+        title: "PDF simplificado generado",
+        description: "El remito simplificado se descargó correctamente",
+      })
+    } catch (error) {
+      console.error("[v0] Error al generar PDF simplificado:", error)
+      toast({
+        title: "Error",
+        description: "No se pudo generar el PDF simplificado",
         variant: "destructive",
       })
     } finally {
@@ -112,15 +134,32 @@ function DeliveryNoteDetailContent() {
               Volver a remitos
             </Button>
           </Link>
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
             <div>
               <h2 className="text-2xl font-bold">Remito - Pedido {note.orderNumber}</h2>
               <p className="text-muted-foreground">Detalles del remito</p>
             </div>
-            <Button onClick={handleDownloadPDF} disabled={generating}>
-              <Download className="mr-2 h-4 w-4" />
-              {generating ? "Generando..." : "Descargar PDF"}
-            </Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button 
+                onClick={handleDownloadSimplifiedPDF} 
+                disabled={generating}
+                variant="outline"
+                className="flex-1 sm:flex-none"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">{generating ? "Generando..." : "PDF Simplificado"}</span>
+                <span className="sm:hidden">Simple</span>
+              </Button>
+              <Button 
+                onClick={handleDownloadPDF} 
+                disabled={generating}
+                className="flex-1 sm:flex-none"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">{generating ? "Generando..." : "PDF Completo"}</span>
+                <span className="sm:hidden">Completo</span>
+              </Button>
+            </div>
           </div>
         </div>
 

@@ -460,3 +460,216 @@ function checkAddPage(doc: jsPDF, yPosition: number, spaceNeeded: number) {
   }
   return yPosition
 }
+
+// ========== PDF SIMPLIFICADO ==========
+export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
+  // Formato ticket térmico 80mm de ancho (~72mm imprimible)
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 200] })
+
+  // Configuración
+  let pageWidth = doc.internal.pageSize.getWidth()
+  let pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 5
+
+  // ========== ENCABEZADO ==========
+  doc.setFontSize(18)
+  doc.setFont("helvetica", "bold")
+  doc.text("REMITO INTERNO", pageWidth / 2, 15, { align: "center" })
+
+  // Banda superior con borde
+  doc.setDrawColor(0)
+  doc.setLineWidth(0.3)
+  doc.rect(margin, 18, pageWidth - margin * 2, 11) // caja datos pedido
+
+  doc.setFontSize(8)
+  doc.setFont("helvetica", "normal")
+  doc.text(`Pedido: ${note.orderNumber}`, margin + 2, 25 - 2)
+  doc.text(`Fecha: ${formatDate(note.createdAt)}`, pageWidth - margin - 2, 25 - 2, { align: "right" })
+
+  // Origen y Destino en una línea
+  let yPosition = 33
+  // Cajas DE / HACIA
+  const half = (pageWidth - margin * 2) / 2
+  doc.rect(margin, yPosition - 6, half - 1, 8)
+  doc.rect(margin + half + 1, yPosition - 6, half - 1, 8)
+
+  doc.setFontSize(9)
+  doc.setFont("helvetica", "bold")
+  doc.text("DE:", margin + 2, yPosition - 2)
+  doc.setFont("helvetica", "normal")
+  doc.text(note.fromBranchName, margin + 12, yPosition - 2)
+
+  doc.setFont("helvetica", "bold")
+  doc.text("HACIA:", margin + half + 3, yPosition - 2)
+  doc.setFont("helvetica", "normal")
+  doc.text(note.toBranchName, margin + half + 3 + 15, yPosition - 2)
+
+  yPosition = 40
+
+  // ========== TABLA UNIFICADA ==========
+  const tableData: any[] = []
+
+  // Combinar todos los items en una sola tabla
+  const allProductIds = new Set<string>()
+  note.itemsRequested.forEach(item => allProductIds.add(item.productId))
+
+  Array.from(allProductIds).forEach(productId => {
+    const requested = note.itemsRequested.find(i => i.productId === productId)
+    const assembled = note.itemsAssembled.find(i => i.productId === productId)
+    
+    if (!requested) return
+
+    const assembledQty = assembled?.assembledQuantity ?? 0
+    
+    // Determinar cantidad recibida
+    let receivedQty = 0
+    let estado = ""
+    
+    const delivered = note.itemsDelivered?.find(i => i.productId === productId)
+    const partial = note.itemsPartial?.find(i => i.productId === productId)
+    const returned = note.itemsReturned?.find(i => i.productId === productId)
+    const notReceived = note.itemsNotReceived?.find(i => i.productId === productId)
+    
+    if (delivered) {
+      receivedQty = assembledQty
+      estado = "✓ OK"
+    } else if (partial) {
+      receivedQty = partial.quantity // La cantidad que finalmente se recibió
+      estado = "⚠️ Parcial"
+    } else if (returned) {
+      receivedQty = 0
+      estado = "↩️ Devuelto"
+    } else if (notReceived) {
+      receivedQty = 0
+      estado = "✗ No recibido"
+    } else {
+      // Por defecto, asumir que se recibió lo que se armó
+      receivedQty = assembledQty
+      estado = assembledQty > 0 ? "✓ OK" : "✗ No enviado"
+    }
+
+    tableData.push([
+      requested.quantity.toString(),
+      requested.productName,
+      `${assembledQty}`,
+      `${receivedQty}`,
+      estado
+    ])
+  })
+
+  autoTable(doc, {
+    startY: yPosition,
+    head: [["Cant.\nPedida", "Producto", "Cant.\nArmada", "Cant.\nRecibida", "Estado"]],
+    body: tableData,
+    theme: "grid",
+    headStyles: { 
+      fillColor: [40, 40, 40],
+      fontSize: 8,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    styles: { 
+      fontSize: 7,
+      cellPadding: 1.5,
+      overflow: 'linebreak'
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 10 },
+      1: { halign: 'left', cellWidth: 26 },
+      2: { halign: 'center', cellWidth: 10 },
+      3: { halign: 'center', cellWidth: 10 },
+      4: { halign: 'center', cellWidth: 14, fontStyle: 'bold' }
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  yPosition = (doc as any).lastAutoTable.finalY + 6
+
+  // ========== FIRMAS SIMPLIFICADAS ==========
+  // Posicionarlas inmediatamente después de la tabla
+  // Si no entra, crear nueva página del mismo tamaño y continuar
+  const need = 28
+  if (yPosition + need > doc.internal.pageSize.getHeight() - margin) {
+    doc.addPage([80, 200], 'p')
+    // actualizar métricas tras nueva página
+    pageWidth = doc.internal.pageSize.getWidth()
+    pageHeight = doc.internal.pageSize.getHeight()
+    yPosition = margin
+  }
+
+  doc.setDrawColor(0, 0, 0)
+  doc.setLineWidth(0.5)
+  // Caja firmas
+  doc.rect(margin, yPosition, pageWidth - margin * 2, 22)
+  // Línea divisoria centro
+  doc.line(pageWidth / 2, yPosition, pageWidth / 2, yPosition + 22)
+  yPosition += 4
+
+  // Firma 1: Quien preparó (Fábrica)
+  const col1X = margin + (pageWidth / 2 - margin) / 2
+  doc.setFontSize(8)
+  doc.setFont("helvetica", "bold")
+  doc.text("PREPARADO POR", col1X, yPosition, { align: "center" })
+  yPosition += 3
+
+  if (note.assembledBySignature?.signatureImage) {
+    try {
+      doc.addImage(note.assembledBySignature.signatureImage, "PNG", col1X - 18, yPosition, 36, 10)
+      yPosition += 12
+    } catch (error) {
+      doc.line(col1X - 18, yPosition + 7, col1X + 18, yPosition + 7)
+      yPosition += 9
+    }
+  } else {
+    doc.line(col1X - 18, yPosition + 7, col1X + 18, yPosition + 7)
+    yPosition += 9
+  }
+
+  doc.setFontSize(7)
+  doc.setFont("helvetica", "normal")
+  doc.text(note.assembledBySignature?.userName || "-", col1X, yPosition, { align: "center" })
+  if (note.assembledBySignature?.position) {
+    doc.setFontSize(6)
+    doc.setTextColor(80, 80, 80)
+    doc.text(note.assembledBySignature.position, col1X, yPosition + 3, { align: "center" })
+    doc.setTextColor(0, 0, 0)
+  }
+
+  // Firma 2: Quien recibió (Sucursal)
+  let y2 = (doc as any).lastAutoTable.finalY + 6 // mantener referencia por si yPosition mutó
+  const col2X = pageWidth - margin - (pageWidth / 2 - margin) / 2
+  // Basar segunda firma en la parte superior de la caja de firmas
+  const signaturesTop = (doc as any).lastAutoTable.finalY + 6 + 4
+  let yPos2 = signaturesTop
+
+  doc.setFontSize(8)
+  doc.setFont("helvetica", "bold")
+  doc.text("RECIBIDO POR", col2X, yPos2, { align: "center" })
+  yPos2 += 3
+
+  if (note.receptionSignature?.signatureImage) {
+    try {
+      doc.addImage(note.receptionSignature.signatureImage, "PNG", col2X - 18, yPos2, 36, 10)
+      yPos2 += 12
+    } catch (error) {
+      doc.line(col2X - 18, yPos2 + 7, col2X + 18, yPos2 + 7)
+      yPos2 += 9
+    }
+  } else {
+    doc.line(col2X - 18, yPos2 + 7, col2X + 18, yPos2 + 7)
+    yPos2 += 9
+  }
+
+  doc.setFontSize(7)
+  doc.setFont("helvetica", "normal")
+  doc.text(note.receptionSignature?.userName || "-", col2X, yPos2, { align: "center" })
+  if (note.receptionSignature?.position) {
+    doc.setFontSize(6)
+    doc.setTextColor(80, 80, 80)
+    doc.text(note.receptionSignature.position, col2X, yPos2 + 3, { align: "center" })
+    doc.setTextColor(0, 0, 0)
+  }
+
+  // Descargar PDF
+  doc.save(`remito-simplificado-${note.orderNumber}.pdf`)
+}
