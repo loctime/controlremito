@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu, Download, RefreshCw } from "lucide-react"
+import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu, Download, Clock } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -36,7 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navigation = [
     { name: "Inicio", href: "/dashboard", icon: Package, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
     { name: "Pedidos", href: "/dashboard/orders", icon: FileText, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
-    { name: "Reposiciones", href: "/dashboard/replacements", icon: RefreshCw, roles: ["admin", "factory", "branch", "maxdev"] },
+    { name: "Pendientes", href: "/dashboard/pending", icon: Clock, roles: ["admin", "factory", "maxdev"] },
     { name: "Productos", href: "/dashboard/products", icon: Boxes, roles: ["admin", "maxdev"] },
     {
       name: "Plantillas",

@@ -21,6 +21,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { PendingProductsSuggestions } from "@/components/dashboard/pending-products-suggestions"
 
 function NewOrderContent() {
   const { user } = useAuth()
@@ -602,6 +603,29 @@ function NewOrderContent() {
     setFormData({ ...formData, items: newItems })
   }
 
+  const handleAddPendingProducts = (products: { productId: string; productName: string; quantity: number; unit: string }[]) => {
+    const updatedItems = [...formData.items]
+    
+    products.forEach(pendingProduct => {
+      const existingItemIndex = updatedItems.findIndex(item => item.productId === pendingProduct.productId)
+      
+      if (existingItemIndex >= 0) {
+        // Actualizar cantidad existente
+        updatedItems[existingItemIndex].quantity += pendingProduct.quantity
+      } else {
+        // Agregar nuevo item
+        updatedItems.push(pendingProduct)
+      }
+    })
+    
+    setFormData({ ...formData, items: updatedItems })
+    
+    toast({
+      title: "Productos pendientes agregados",
+      description: `Se agregaron ${products.length} productos pendientes al pedido`,
+    })
+  }
+
   const loadTemplate = (templateId: string) => {
     const template = templates.find((t) => t.id === templateId)
     if (template) {
@@ -645,7 +669,7 @@ function NewOrderContent() {
         
         toast({
           title: "✅ Plantilla cargada",
-          description: `Se cargaron ${validItems.length} productos de la plantilla "${template.name}"`,
+          description: `Se cargaron ${validItems.length} productos de la plantilla "${template.name}". Revisa las sugerencias de productos pendientes arriba.`,
         })
       } catch (error) {
         console.error("[v0] Error al cargar plantilla:", error)
@@ -975,6 +999,9 @@ function NewOrderContent() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Sugerencias de productos pendientes */}
+          <PendingProductsSuggestions onAddProducts={handleAddPendingProducts} />
 
           <Card>
             <CardHeader>
