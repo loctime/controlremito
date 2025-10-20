@@ -441,22 +441,22 @@ export const InTransitOrdersTable = memo(function InTransitOrdersTable({ orders,
                                             {/* Fila de comentario para productos marcados como NO */}
                                             {itemData.status === 'no' && (
                                               <tr className="bg-red-50">
-                                                <td colSpan={6} className="py-3 px-4">
-                                                  <div className="bg-white p-3 rounded-lg border border-red-200">
-                                                    <label className="block text-sm font-medium text-red-800 mb-2">
-                                                      📝 Motivo por el que NO se recibe (Obligatorio):
-                                                    </label>
+                                                <td colSpan={6} className="py-2 px-3">
+                                                  <div className="bg-white p-2 rounded border border-red-200">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                      <span className="text-xs font-medium text-red-800">📝 Motivo:</span>
+                                                    </div>
                                                     <textarea
                                                       value={itemData.comment || ''}
                                                       onChange={(e) => updateItemComment(item.id, e.target.value)}
-                                                      placeholder="Ej: Producto en mal estado, no llegó, no lo necesitamos..."
-                                                      className="w-full p-2 border border-red-300 rounded-lg resize-none text-sm"
-                                                      rows={2}
+                                                      placeholder="Ej: Producto en mal estado, no llegó..."
+                                                      className="w-full p-1 border border-red-300 rounded text-xs resize-none"
+                                                      rows={1}
                                                       required
                                                     />
                                                     {(!itemData.comment || itemData.comment.trim() === '') && (
                                                       <p className="text-xs text-red-600 mt-1">
-                                                        ⚠️ Debes explicar por qué no recibes este producto
+                                                        ⚠️ Explica por qué no recibes este producto
                                                       </p>
                                                     )}
                                                   </div>
