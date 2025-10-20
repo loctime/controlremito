@@ -239,7 +239,7 @@ export async function generateDeliveryNotePDF(note: DeliveryNote) {
   yPosition += 5
 
   // Tabla de recepción
-  const receptionTableData = []
+  const receptionTableData: Array<[string, string, string, string]> = []
 
   // Items entregados OK
   note.itemsDelivered.forEach(item => {
@@ -285,7 +285,7 @@ export async function generateDeliveryNotePDF(note: DeliveryNote) {
     autoTable(doc, {
       startY: yPosition,
       head: [["Producto", "Enviado", "Recibido", "Estado"]],
-      body: receptionTableData,
+      body: receptionTableData as any,
       theme: "grid",
       headStyles: { fillColor: [34, 197, 94] },
       margin: { left: margin, right: margin },
@@ -476,35 +476,41 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
   doc.setFont("helvetica", "bold")
   doc.text("REMITO INTERNO", pageWidth / 2, 15, { align: "center" })
 
-  // Banda superior con borde
+  // Banda superior con borde (datos del pedido)
+  const headerTop = 18
+  const headerHeight = 14
   doc.setDrawColor(0)
-  doc.setLineWidth(0.3)
-  doc.rect(margin, 18, pageWidth - margin * 2, 11) // caja datos pedido
+  doc.setLineWidth(0.25)
+  doc.rect(margin, headerTop, pageWidth - margin * 2, headerHeight)
 
-  doc.setFontSize(8)
+  doc.setFontSize(7.5)
   doc.setFont("helvetica", "normal")
-  doc.text(`Pedido: ${note.orderNumber}`, margin + 2, 25 - 2)
-  doc.text(`Fecha: ${formatDate(note.createdAt)}`, pageWidth - margin - 2, 25 - 2, { align: "right" })
+  const headerTextY1 = headerTop + 5
+  const headerTextY2 = headerTop + 10
+  const pedidoText = `Pedido: ${note.orderNumber}`
+  const pedidoFitted = (doc as any).splitTextToSize(pedidoText, pageWidth - margin * 2 - 4)[0]
+  doc.text(pedidoFitted, margin + 2, headerTextY1)
+  doc.text(`Fecha: ${formatDate(note.createdAt)}`, pageWidth - margin - 2, headerTextY2, { align: "right" })
 
-  // Origen y Destino en una línea
-  let yPosition = 33
   // Cajas DE / HACIA
+  let yPosition = headerTop + headerHeight + 6 // separación visual
   const half = (pageWidth - margin * 2) / 2
-  doc.rect(margin, yPosition - 6, half - 1, 8)
-  doc.rect(margin + half + 1, yPosition - 6, half - 1, 8)
+  const boxHeight = 9
+  doc.rect(margin, yPosition, half - 1, boxHeight)
+  doc.rect(margin + half + 1, yPosition, half - 1, boxHeight)
 
   doc.setFontSize(9)
   doc.setFont("helvetica", "bold")
-  doc.text("DE:", margin + 2, yPosition - 2)
+  doc.text("DE:", margin + 2, yPosition + 3)
   doc.setFont("helvetica", "normal")
-  doc.text(note.fromBranchName, margin + 12, yPosition - 2)
+  doc.text(note.fromBranchName, margin + 12, yPosition + 3)
 
   doc.setFont("helvetica", "bold")
-  doc.text("HACIA:", margin + half + 3, yPosition - 2)
+  doc.text("HACIA:", margin + half + 3, yPosition + 3)
   doc.setFont("helvetica", "normal")
-  doc.text(note.toBranchName, margin + half + 3 + 15, yPosition - 2)
+  doc.text(note.toBranchName, margin + half + 3 + 15, yPosition + 3)
 
-  yPosition = 40
+  yPosition = yPosition + boxHeight + 6
 
   // ========== TABLA UNIFICADA ==========
   const tableData: any[] = []
@@ -559,7 +565,7 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
 
   autoTable(doc, {
     startY: yPosition,
-    head: [["Cant.\nPedida", "Producto", "Cant.\nArmada", "Cant.\nRecibida", "Estado"]],
+    head: [["\nPedido", "Producto", "\nArmado", "\nRecibido", "Estado"]],
     body: tableData,
     theme: "grid",
     headStyles: { 
@@ -600,17 +606,17 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
   doc.setDrawColor(0, 0, 0)
   doc.setLineWidth(0.5)
   // Caja firmas
-  doc.rect(margin, yPosition, pageWidth - margin * 2, 22)
+  doc.rect(margin, yPosition, pageWidth - margin * 2, 24)
   // Línea divisoria centro
-  doc.line(pageWidth / 2, yPosition, pageWidth / 2, yPosition + 22)
-  yPosition += 4
+  doc.line(pageWidth / 2, yPosition, pageWidth / 2, yPosition + 24)
+  yPosition += 5
 
   // Firma 1: Quien preparó (Fábrica)
   const col1X = margin + (pageWidth / 2 - margin) / 2
   doc.setFontSize(8)
   doc.setFont("helvetica", "bold")
   doc.text("PREPARADO POR", col1X, yPosition, { align: "center" })
-  yPosition += 3
+  yPosition += 4
 
   if (note.assembledBySignature?.signatureImage) {
     try {
@@ -639,7 +645,7 @@ export async function generateSimplifiedDeliveryNotePDF(note: DeliveryNote) {
   let y2 = (doc as any).lastAutoTable.finalY + 6 // mantener referencia por si yPosition mutó
   const col2X = pageWidth - margin - (pageWidth / 2 - margin) / 2
   // Basar segunda firma en la parte superior de la caja de firmas
-  const signaturesTop = (doc as any).lastAutoTable.finalY + 6 + 4
+  const signaturesTop = (doc as any).lastAutoTable.finalY + 6 + 5
   let yPos2 = signaturesTop
 
   doc.setFontSize(8)
