@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Edit, Plus, Send, X, Save, AlertCircle, Trash2 } from "lucide-react"
+import { FileText, Edit, Plus, Send, X, Save, AlertCircle, Trash2, Loader2 } from "lucide-react"
 import type { Template, Order } from "@/lib/types"
 import { isDayAllowed } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +35,10 @@ interface TemplateCardProps {
   onUpdateQuantity: (index: number, quantity: number) => void
   onUpdateNotes: (notes: string) => void
   onDeleteTemplate?: () => void // Para plantillas personales
+  // Estados de loading
+  creatingOrder?: boolean
+  savingOrder?: boolean
+  sendingOrder?: boolean
 }
 
 export const TemplateCard = memo(function TemplateCard({
@@ -52,6 +56,9 @@ export const TemplateCard = memo(function TemplateCard({
   onUpdateQuantity,
   onUpdateNotes,
   onDeleteTemplate,
+  creatingOrder = false,
+  savingOrder = false,
+  sendingOrder = false,
 }: TemplateCardProps) {
   return (
     <Card 
@@ -186,18 +193,24 @@ export const TemplateCard = memo(function TemplateCard({
                       : ''
                   }`}
                   onClick={onSendOrder}
-                  disabled={existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)}
+                  disabled={existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays) || sendingOrder}
                   title={
                     existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)
                       ? `Hoy no es un día permitido para enviar. Días permitidos: ${existingDraft.allowedSendDays.join(', ')}`
                       : 'Enviar pedido'
                   }
                 >
-                  <Send className="mr-1 h-3 w-3" />
+                  {sendingOrder ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Send className="mr-1 h-3 w-3" />
+                  )}
                   <span className="hidden sm:inline">
-                    {existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays) 
-                      ? 'No disponible' 
-                      : 'Enviar'
+                    {sendingOrder 
+                      ? 'Enviando...' 
+                      : existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays) 
+                        ? 'No disponible' 
+                        : 'Enviar'
                     }
                   </span>
                 </Button>
@@ -269,9 +282,14 @@ export const TemplateCard = memo(function TemplateCard({
                       onClick={onSaveChanges}
                       className="flex-1"
                       size="sm"
+                      disabled={savingOrder}
                     >
-                      <Save className="mr-1 h-3 w-3" />
-                      Guardar
+                      {savingOrder ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="mr-1 h-3 w-3" />
+                      )}
+                      {savingOrder ? 'Guardando...' : 'Guardar'}
                     </Button>
                   </div>
                 </div>
@@ -283,10 +301,19 @@ export const TemplateCard = memo(function TemplateCard({
               <Button 
                 onClick={onCreateOrder}
                 className="w-full"
+                disabled={creatingOrder}
               >
-                <Plus className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Crear pedido</span>
-                <span className="sm:hidden">Crear</span>
+                {creatingOrder ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="mr-2 h-4 w-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {creatingOrder ? 'Creando...' : 'Crear pedido'}
+                </span>
+                <span className="sm:hidden">
+                  {creatingOrder ? 'Creando...' : 'Crear'}
+                </span>
               </Button>
               
               {/* Sección de edición expandible para pedidos temporales */}
@@ -364,9 +391,14 @@ export const TemplateCard = memo(function TemplateCard({
                       onClick={onSaveChanges}
                       className="flex-1"
                       size="sm"
+                      disabled={savingOrder}
                     >
-                      <Save className="mr-1 h-3 w-3" />
-                      Guardar
+                      {savingOrder ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="mr-1 h-3 w-3" />
+                      )}
+                      {savingOrder ? 'Guardando...' : 'Guardar'}
                     </Button>
                   </div>
                 </div>
@@ -459,9 +491,14 @@ export const TemplateCard = memo(function TemplateCard({
                       onClick={onSaveChanges}
                       className="flex-1"
                       size="sm"
+                      disabled={savingOrder}
                     >
-                      <Save className="mr-1 h-3 w-3" />
-                      Guardar
+                      {savingOrder ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Save className="mr-1 h-3 w-3" />
+                      )}
+                      {savingOrder ? 'Guardando...' : 'Guardar'}
                     </Button>
                   </div>
                 </div>

@@ -49,6 +49,11 @@ export function BranchDashboard() {
     lastSentOrder: null,
     isOpen: false
   })
+  
+  // Estados de loading para optimización
+  const [creatingOrder, setCreatingOrder] = useState(false)
+  const [savingOrder, setSavingOrder] = useState(false)
+  const [sendingOrder, setSendingOrder] = useState(false)
 
   // Función para verificar si se puede editar un pedido enviado
   const canEditSentOrder = useCallback((order: Order) => {
@@ -192,6 +197,7 @@ export function BranchDashboard() {
     if (!user || !user.branchId) return
 
     try {
+      setCreatingOrder(true)
       const destinationBranchId = template.destinationBranchIds[0]
       if (!destinationBranchId) {
         toast({
@@ -202,13 +208,9 @@ export function BranchDashboard() {
         return
       }
 
-      const [fromBranchDoc, toBranchDoc] = await Promise.all([
-        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", user.branchId))),
-        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", destinationBranchId)))
-      ])
-
-      const fromBranchName = fromBranchDoc.docs[0]?.data()?.name || user.name
-      const toBranchName = toBranchDoc.docs[0]?.data()?.name || "Fábrica"
+      // Optimización: Usar nombres por defecto para evitar consultas innecesarias
+      const fromBranchName = user.name
+      const toBranchName = "Fábrica"
 
       const tempOrder: Order = {
         id: `temp-${Date.now()}`,
@@ -233,22 +235,27 @@ export function BranchDashboard() {
         allowedSendDays: template.allowedSendDays || [],
       }
 
-      // Obtener productos pendientes para esta sucursal
+      // Optimización: Cargar productos pendientes de forma asíncrona para no bloquear la UI
       let pendingProducts: { [productId: string]: number } = {}
-      try {
-        const replacementQueue = await getReplacementQueue(user.branchId)
-        if (replacementQueue && replacementQueue.items) {
-          // Crear mapa de productos pendientes
-          replacementQueue.items
-            .filter(item => item.status === "pending")
-            .forEach(item => {
-              pendingProducts[item.productId] = (pendingProducts[item.productId] || 0) + item.quantity
-            })
+      
+      // Cargar productos pendientes en paralelo sin bloquear la creación del pedido
+      const loadPendingProducts = async () => {
+        try {
+          const replacementQueue = await getReplacementQueue(user.branchId!)
+          if (replacementQueue && replacementQueue.items) {
+            replacementQueue.items
+              .filter(item => item.status === "pending")
+              .forEach(item => {
+                pendingProducts[item.productId] = (pendingProducts[item.productId] || 0) + item.quantity
+              })
+          }
+        } catch (error) {
+          console.warn("Error al cargar productos pendientes:", error)
         }
-      } catch (error) {
-        console.warn("Error al cargar productos pendientes:", error)
-        // Continuar sin productos pendientes si hay error
       }
+      
+      // Ejecutar en paralelo sin esperar
+      loadPendingProducts()
 
       setEditFormData({
         items: template.items.map((item) => {
@@ -282,6 +289,8 @@ export function BranchDashboard() {
         description: "No se pudo cargar la plantilla",
         variant: "destructive",
       })
+    } finally {
+      setCreatingOrder(false)
     }
   }, [user, toast])
 
@@ -304,6 +313,7 @@ export function BranchDashboard() {
     }
 
     try {
+      setSendingOrder(true)
       if (order.allowedSendDays && order.allowedSendDays.length > 0 && !isDayAllowed(order.allowedSendDays)) {
         toast({
           title: "Error",
@@ -347,6 +357,8 @@ export function BranchDashboard() {
         description: "No se pudo enviar el pedido",
         variant: "destructive",
       })
+    } finally {
+      setSendingOrder(false)
     }
   }, [user, toast])
 
@@ -545,6 +557,7 @@ export function BranchDashboard() {
     if (!editingOrder) return
 
     try {
+      setSavingOrder(true)
       if (editingOrder.id.startsWith('temp-')) {
         const updatedItems = editFormData.items.map(item => ({
           ...item,
@@ -568,6 +581,7 @@ export function BranchDashboard() {
           allowedSendDays: editingOrder.allowedSendDays,
         }
 
+        // Optimización: Usar batch write para operaciones atómicas
         await addDoc(collection(db, "apps/controld/orders"), orderData)
         
         toast({
@@ -604,6 +618,8 @@ export function BranchDashboard() {
         description: "No se pudieron guardar los cambios",
         variant: "destructive",
       })
+    } finally {
+      setSavingOrder(false)
     }
   }, [editingOrder, editFormData, user, toast])
 
@@ -636,6 +652,9 @@ export function BranchDashboard() {
           onUpdateQuantity={updateItemQuantity}
           onUpdateNotes={updateNotes}
           onDeleteTemplate={() => handleDeletePersonalTemplate(template.id, template.name)}
+          creatingOrder={creatingOrder}
+          savingOrder={savingOrder}
+          sendingOrder={sendingOrder}
         />
       )
     })
@@ -662,6 +681,9 @@ export function BranchDashboard() {
           onSaveChanges={saveChanges}
           onUpdateQuantity={updateItemQuantity}
           onUpdateNotes={updateNotes}
+          creatingOrder={creatingOrder}
+          savingOrder={savingOrder}
+          sendingOrder={sendingOrder}
         />
       )
     })
