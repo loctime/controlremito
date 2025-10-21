@@ -35,7 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const navigation = [
     { name: "Inicio", href: "/dashboard", icon: Package, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
-    { name: "Pedidos", href: "/dashboard/orders", icon: FileText, roles: ["admin", "factory", "branch", "delivery", "maxdev"] },
+    { name: "Pedidos", href: "/dashboard/orders", icon: FileText, roles: ["admin", "factory", "delivery", "maxdev"] },
     { name: "Productos", href: "/dashboard/products", icon: Boxes, roles: ["admin", "maxdev"] },
     {
       name: "Plantillas",
@@ -97,6 +97,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {filteredNavigation.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href
+                    const mobileLabel = item.name === "Configuración" ? "Config" : item.name
                     return (
                       <DropdownMenuItem key={item.href} asChild>
                         <Link
@@ -107,7 +108,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                           )}
                         >
                           <Icon className="h-4 w-4" />
-                          {item.name}
+                          {mobileLabel}
                         </Link>
                       </DropdownMenuItem>
                     )
@@ -164,6 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {filteredNavigation.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
+              const mobileLabel = item.name === "Configuración" ? "Config" : item.name
               return (
                 <Link
                   key={item.href}
@@ -176,7 +178,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.name}
+                  {mobileLabel}
                 </Link>
               )
             })}
