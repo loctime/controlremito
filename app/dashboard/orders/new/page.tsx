@@ -657,13 +657,28 @@ function NewOrderContent() {
         if (user?.branchId) {
           try {
             const replacementQueue = await getReplacementQueue(user.branchId)
+            
+            // Debug: Log para ver qué se está obteniendo
+            console.log("🔍 DEBUG - Cola de reposiciones:", replacementQueue)
+            
             if (replacementQueue && replacementQueue.items) {
+              // Debug: Ver todos los items antes de filtrar
+              console.log("🔍 DEBUG - Todos los items:", replacementQueue.items)
+              
               // Crear mapa de productos pendientes
               replacementQueue.items
-                .filter(item => item.status === "pending")
+                .filter(item => {
+                  const isPending = item.status === "pending"
+                  // Debug: Ver qué items se están filtrando
+                  console.log(`🔍 DEBUG - Item ${item.productName}: status=${item.status}, isPending=${isPending}`)
+                  return isPending
+                })
                 .forEach(item => {
                   pendingProducts[item.productId] = (pendingProducts[item.productId] || 0) + item.quantity
                 })
+              
+              // Debug: Ver el resultado final
+              console.log("🔍 DEBUG - Productos pendientes finales:", pendingProducts)
             }
           } catch (error) {
             console.warn("Error al cargar productos pendientes:", error)

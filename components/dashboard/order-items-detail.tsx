@@ -72,7 +72,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
             updatedItem.assembledQuantity = assembledQuantity
             updatedItem.isFullyAssembled = assembledQuantity === item.quantity
             updatedItem.assembledBy = user.id
-            updatedItem.assembledAt = new Date()
+            updatedItem.assembledAt = new Date() as any // Firebase convertirá a Timestamp
           }
           
           return updatedItem
@@ -94,17 +94,52 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
             // Obtener datos del pedido para crear el item de reposición
             const orderDoc = await getDoc(orderRef)
             if (orderDoc.exists()) {
-              const orderData = orderDoc.data() as Order
-              await createReplacementItem(
-                itemToReplace,
+              const rawData = orderDoc.data()
+              const orderData: Order = { 
+                id: orderId,
+                orderNumber: rawData.orderNumber || `PED-${Date.now()}`,
+                fromBranchId: rawData.fromBranchId || "",
+                fromBranchName: rawData.fromBranchName || "",
+                toBranchId: rawData.toBranchId || "",
+                toBranchName: rawData.toBranchName || "",
+                status: rawData.status || "draft",
+                items: rawData.items || [],
+                createdAt: rawData.createdAt,
+                createdBy: rawData.createdBy || "",
+                createdByName: rawData.createdByName || ""
+              }
+              
+              console.log("🔍 DEBUG - Creando item de reposición:", {
+                productName: itemToReplace.productName,
+                quantity: itemToReplace.quantity,
+                fromBranchId: orderData.fromBranchId,
+                fromBranchName: orderData.fromBranchName,
+                orderId: orderData.id,
+                orderNumber: orderData.orderNumber
+              })
+              
+              // Crear un OrderItem limpio con solo los campos necesarios (sin campos undefined)
+              const cleanItem: OrderItem = {
+                id: itemToReplace.id,
+                productId: itemToReplace.productId,
+                productName: itemToReplace.productName,
+                quantity: itemToReplace.quantity,
+                unit: itemToReplace.unit,
+                status: itemToReplace.status
+              }
+              
+              const queueId = await createReplacementItem(
+                cleanItem,
                 orderData,
                 user,
                 "Producto no disponible en fábrica"
               )
+              
+              console.log("✅ DEBUG - Item de reposición creado en cola:", queueId)
             }
           }
         } catch (error) {
-          console.error("Error al crear item de reposición:", error)
+          console.error("❌ Error al crear item de reposición:", error)
           // No fallar la operación principal si hay error en la reposición
         }
       }

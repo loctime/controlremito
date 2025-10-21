@@ -16,12 +16,36 @@ import { db } from "./firebase"
 import type { 
   ReplacementItem, 
   ReplacementQueue, 
-  ReplacementStatus, 
-  ReplacementPriority,
+  ReplacementStatus,
   Order,
   User,
   OrderItem
 } from "./types"
+
+/**
+ * Helper para eliminar campos undefined de un objeto antes de guardarlo en Firestore
+ */
+function removeUndefinedFields<T extends Record<string, any>>(obj: T): Partial<T> {
+  const cleaned: any = {}
+  
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value as any).toDate) {
+        cleaned[key] = removeUndefinedFields(value)
+      } else if (Array.isArray(value)) {
+        cleaned[key] = value.map(item => 
+          item !== null && typeof item === 'object' && !(item as any).toDate
+            ? removeUndefinedFields(item)
+            : item
+        )
+      } else {
+        cleaned[key] = value
+      }
+    }
+  }
+  
+  return cleaned
+}
 
 /**
  * Crear un item de reposición cuando se reporta un producto faltante
@@ -33,51 +57,139 @@ export async function createReplacementItem(
   reason: string
 ): Promise<string> {
   try {
+    console.log("🔍 DEBUG [createReplacementItem] - Iniciando creación:", {
+      productName: item.productName,
+      quantity: item.quantity,
+      branchId: originalOrder.fromBranchId,
+      branchName: originalOrder.fromBranchName
+    })
+    
     const replacementItem: Omit<ReplacementItem, "id"> = {
       productId: item.productId,
       productName: item.productName,
       quantity: item.quantity,
       unit: item.unit,
       reason,
-      originalOrderId: originalOrder.id,
-      originalOrderNumber: originalOrder.orderNumber,
+      originalOrderId: originalOrder.id || "",
+      originalOrderNumber: originalOrder.orderNumber || `PED-${Date.now()}`,
       reportedBy: reportingUser.id,
       reportedByName: reportingUser.name,
       reportedAt: Timestamp.now(),
       status: "pending"
     }
+    
+    console.log("🔍 DEBUG [createReplacementItem] - Item preparado con status:", replacementItem.status)
+    console.log("🔍 DEBUG [createReplacementItem] - ReplacementItem campos:", {
+      productId: replacementItem.productId,
+      productName: replacementItem.productName,
+      quantity: replacementItem.quantity,
+      unit: replacementItem.unit,
+      reason: replacementItem.reason,
+      originalOrderId: replacementItem.originalOrderId,
+      originalOrderNumber: replacementItem.originalOrderNumber,
+      reportedBy: replacementItem.reportedBy,
+      reportedByName: replacementItem.reportedByName,
+      status: replacementItem.status
+    })
 
     // Verificar si ya existe una cola para esta sucursal
     const existingQueue = await getReplacementQueue(originalOrder.fromBranchId)
+    console.log("🔍 DEBUG [createReplacementItem] - Cola existente:", existingQueue ? `Sí (${existingQueue.id})` : "No")
     
     if (existingQueue) {
       // Agregar a cola existente
-      const updatedItems = [...existingQueue.items, { ...replacementItem, id: `${Date.now()}-${Math.random()}` }]
+      const newItemWithId = { ...replacementItem, id: `${Date.now()}-${Math.random()}` }
+      const cleanedNewItem = removeUndefinedFields(newItemWithId)
+      const updatedItems = [...existingQueue.items, cleanedNewItem]
+      
+      console.log("🔍 DEBUG [createReplacementItem] - Agregando a cola existente:", {
+        queueId: existingQueue.id,
+        totalItemsAntes: existingQueue.items.length,
+        totalItemsDespues: updatedItems.length,
+        nuevoItem: cleanedNewItem
+      })
       
       await updateDoc(doc(db, "apps/controld/replacementQueues", existingQueue.id), {
         items: updatedItems,
         updatedAt: Timestamp.now()
       })
       
+      console.log("✅ DEBUG [createReplacementItem] - Item agregado exitosamente a cola:", existingQueue.id)
       return existingQueue.id
     } else {
       // Crear nueva cola
+      const newItemWithId = { ...replacementItem, id: `${Date.now()}-${Math.random()}` }
+      const cleanedNewItem = removeUndefinedFields(newItemWithId) as ReplacementItem
       const newQueue: Omit<ReplacementQueue, "id"> = {
         branchId: originalOrder.fromBranchId,
         branchName: originalOrder.fromBranchName,
-        items: [{ ...replacementItem, id: `${Date.now()}-${Math.random()}` }],
+        items: [cleanedNewItem],
         status: "pending",
         createdAt: Timestamp.now(),
-        updatedAt: Timestamp.now(),
-        autoMergeEnabled: true,
-        maxWaitDays: 3
+        updatedAt: Timestamp.now()
       }
       
-      const docRef = await addDoc(collection(db, "apps/controld/replacementQueues"), newQueue)
+      console.log("🔍 DEBUG [createReplacementItem] - Creando nueva cola:", {
+        branchId: newQueue.branchId,
+        branchName: newQueue.branchName,
+        itemsLength: newQueue.items.length
+      })
+      
+      console.log("🔍 DEBUG [createReplacementItem] - newQueue.items[0] campos:", {
+        id: cleanedNewItem.id,
+        productId: cleanedNewItem.productId,
+        productName: cleanedNewItem.productName,
+        quantity: cleanedNewItem.quantity,
+        unit: cleanedNewItem.unit,
+        reason: cleanedNewItem.reason,
+        originalOrderId: cleanedNewItem.originalOrderId,
+        originalOrderNumber: cleanedNewItem.originalOrderNumber,
+        reportedBy: cleanedNewItem.reportedBy,
+        reportedByName: cleanedNewItem.reportedByName,
+        status: cleanedNewItem.status
+      })
+      
+      // Verificar campos undefined antes de guardar
+      const checkUndefined = (obj: any, path = '', depth = 0): string[] => {
+        if (depth > 3) return [] // Evitar recursión infinita
+        const undefinedFields: string[] = []
+        for (const [key, value] of Object.entries(obj)) {
+          const currentPath = path ? `${path}.${key}` : key
+          if (value === undefined) {
+            undefinedFields.push(currentPath)
+          } else if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value as any).toDate) {
+            undefinedFields.push(...checkUndefined(value, currentPath, depth + 1))
+          } else if (Array.isArray(value)) {
+            value.forEach((item, index) => {
+              if (item === undefined) {
+                undefinedFields.push(`${currentPath}[${index}]`)
+              } else if (item !== null && typeof item === 'object' && !(item as any).toDate) {
+                undefinedFields.push(...checkUndefined(item, `${currentPath}[${index}]`, depth + 1))
+              }
+            })
+          }
+        }
+        return undefinedFields
+      }
+      
+      const undefinedFields = checkUndefined(newQueue)
+      console.log("🔍 DEBUG [createReplacementItem] - Verificación de undefined completada")
+      if (undefinedFields.length > 0) {
+        console.error("❌ [createReplacementItem] Campos undefined encontrados:", undefinedFields)
+      } else {
+        console.log("✅ [createReplacementItem] No se encontraron campos undefined")
+      }
+      
+      // Limpiar campos undefined antes de guardar
+      const cleanedQueue = removeUndefinedFields(newQueue)
+      console.log("✅ [createReplacementItem] - Queue limpiada, guardando en Firestore...")
+      
+      const docRef = await addDoc(collection(db, "apps/controld/replacementQueues"), cleanedQueue)
+      console.log("✅ DEBUG [createReplacementItem] - Nueva cola creada con ID:", docRef.id)
       return docRef.id
     }
   } catch (error) {
-    console.error("Error al crear item de reposición:", error)
+    console.error("❌ ERROR [createReplacementItem]:", error)
     throw error
   }
 }
@@ -169,17 +281,23 @@ export async function mergeReplacementItems(
     })
     
     // Actualizar cola de reposiciones
-    const updatedItems = itemsToKeep.map(item => ({
-      ...item,
-      status: "merged" as ReplacementStatus,
-      mergedIntoOrderId: targetOrderId,
-      mergedAt: Timestamp.now()
-    }))
+    // Solo actualizar el status de los items que SÍ se fusionaron
+    const updatedItems = queue.items.map(item => {
+      if (itemsToMerge.includes(item.id)) {
+        return {
+          ...item,
+          status: "merged" as ReplacementStatus,
+          mergedIntoOrderId: targetOrderId,
+          mergedAt: Timestamp.now()
+        }
+      }
+      return item // Mantener el item sin cambios si no se fusionó
+    })
     
     await updateDoc(doc(db, "apps/controld/replacementQueues", queueId), {
       items: updatedItems,
       updatedAt: Timestamp.now(),
-      status: updatedItems.length === 0 ? "completed" : "in_queue"
+      status: updatedItems.filter(i => i.status === "pending").length === 0 ? "completed" : "in_queue"
     })
     
   } catch (error) {
@@ -202,8 +320,10 @@ export async function createUrgentReplacementOrder(
     }
     
     const queue = queueDoc.data() as ReplacementQueue
+    // TODO: Implementar sistema de prioridades
+    // Por ahora, procesar todos los items pendientes
     const urgentItems = queue.items.filter(item => 
-      item.priority === "urgent" && item.status === "pending"
+      item.status === "pending"
     )
     
     if (urgentItems.length === 0) {
@@ -285,7 +405,7 @@ export async function checkAutoMergeOpportunities(branchId: string): Promise<str
 export async function processAutoMerge(branchId: string): Promise<void> {
   try {
     const queue = await getReplacementQueue(branchId)
-    if (!queue || !queue.autoMergeEnabled) {
+    if (!queue) {
       return
     }
     
@@ -296,8 +416,10 @@ export async function processAutoMerge(branchId: string): Promise<void> {
     
     // Fusionar con el primer pedido en draft
     const targetOrderId = draftOrders[0]
+    // TODO: Implementar sistema de prioridades
+    // Por ahora, procesar todos los items pendientes
     const normalItems = queue.items.filter(item => 
-      item.priority !== "urgent" && item.status === "pending"
+      item.status === "pending"
     )
     
     if (normalItems.length > 0) {

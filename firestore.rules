@@ -174,12 +174,13 @@ service cloud.firestore {
       
       // ===== NUEVAS REGLAS PARA SISTEMA DE REPOSICIONES =====
       
-      // Colas de reposición - branch puede crear/leer su propia cola, factory/admin/maxdev pueden leer todas
+      // Colas de reposición - branch y factory pueden crear/actualizar, todos pueden leer
       match /replacementQueues/{queueId} {
         allow read: if isAuthenticated() && (
           isBranch() || isFactory() || isMaxDev() || isAdmin()
         );
-        allow create: if isBranch() || isMaxDev() || isAdmin();
+        // Permitir a factory crear colas cuando niega productos
+        allow create: if isBranch() || isFactory() || isMaxDev() || isAdmin();
         allow update: if isBranch() || isFactory() || isMaxDev() || isAdmin();
         allow delete: if isMaxDev() || isAdmin();
       }
