@@ -3,26 +3,23 @@
 import { useState, useCallback, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { FileText, Package, Truck, Plus, Loader2 } from "lucide-react"
+import { FileText, Package, Truck, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { useTemplates } from "@/hooks/use-templates"
 import { useDraftOrders } from "@/hooks/use-draft-orders"
 import { useOrders } from "@/hooks/use-orders"
-import { TemplateCard } from "./template-card"
+import { useOrderEditor } from "@/hooks/use-order-editor"
+import { useOrderActions } from "@/hooks/use-order-actions"
 import { AssemblingOrdersTable } from "./assembling-orders-table"
 import { InTransitOrdersTable } from "./in-transit-orders-table"
 import { OrderOptionsDialog } from "./order-options-dialog"
+import { TemplatesTab } from "./templates-tab"
 import type { Order, Template } from "@/lib/types"
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, serverTimestamp } from "firebase/firestore"
+import { updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
-import { getCurrentDayOfWeek, getNextAllowedDay, isDayAllowed } from "@/lib/utils"
-import { createRemitMetadata } from "@/lib/remit-metadata-service"
-import { getReplacementQueue } from "@/lib/replacement-service"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import { getTemplateStatus } from "@/lib/template-status.service"
+import { loadPendingProducts } from "@/lib/order-operations.service"
 
 export function BranchDashboard() {
   const { user } = useAuth()
@@ -35,11 +32,10 @@ export function BranchDashboard() {
   const { orders: assemblingOrders, loading: assemblingLoading } = useOrders(user, "assembling")
   const { orders: inTransitOrders, loading: inTransitLoading } = useOrders(user, "in_transit")
   
-  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
-  const [editFormData, setEditFormData] = useState<{
-    items: { productId: string; productName: string; quantity: number; unit: string }[]
-    notes: string
-  }>({ items: [], notes: "" })
+  // Hooks personalizados para lógica de negocio
+  const orderEditor = useOrderEditor(user)
+  const orderActions = useOrderActions(user)
+  
   const [showOrderOptionsDialog, setShowOrderOptionsDialog] = useState<{
     template: Template | null
     lastSentOrder: Order | null
@@ -49,133 +45,51 @@ export function BranchDashboard() {
     lastSentOrder: null,
     isOpen: false
   })
-  
-  // Estados de loading para optimización
-  const [creatingOrder, setCreatingOrder] = useState(false)
-  const [savingOrder, setSavingOrder] = useState(false)
-  const [sendingOrder, setSendingOrder] = useState(false)
-
-  // Función para verificar si se puede editar un pedido enviado
-  const canEditSentOrder = useCallback((order: Order) => {
-    // Solo permitir edición si:
-    // - El pedido está en estado "sent" (enviado)
-    // - No ha sido aceptado por la fábrica aún
-    return order.status === 'sent' && !order.acceptedAt
-  }, [])
 
   // Memoizar cálculo de estado de plantilla
-  const getTemplateStatus = useCallback((template: Template) => {
-    const existingDraft = draftOrders.find(order => order.templateId === template.id)
-    
-    if (existingDraft) {
-      return {
-        status: 'draft' as const,
-        label: 'En Borrador',
-        color: 'bg-orange-200 text-orange-800'
-      }
-    }
-
-    // Buscar último pedido enviado de esta plantilla
-    const lastSentOrder = [...sentOrders, ...assemblingOrders, ...inTransitOrders].find(order => 
-      order.templateId === template.id && 
-      (order.status === 'sent' || order.status === 'assembling')
+  const calculateTemplateStatus = useCallback((template: Template) => {
+    return getTemplateStatus(
+      template,
+      draftOrders,
+      sentOrders,
+      assemblingOrders,
+      inTransitOrders
     )
+  }, [draftOrders, sentOrders, assemblingOrders, inTransitOrders])
 
-    if (lastSentOrder) {
-      const sentDate = lastSentOrder.sentAt?.toDate()
-      const hoursSinceSent = sentDate ? (Date.now() - sentDate.getTime()) / (1000 * 60 * 60) : 0
-      
-      if (canEditSentOrder(lastSentOrder)) {
-        return {
-          status: 'editable' as const,
-          label: 'Enviado (Editable)',
-          color: 'bg-yellow-200 text-yellow-800',
-          lastSentOrder: lastSentOrder,
-          hoursSinceSent: Math.floor(hoursSinceSent)
-        }
-      } else if (lastSentOrder.status === 'sent') {
-        return {
-          status: 'recently_sent' as const,
-          label: `Enviado hace ${Math.floor(hoursSinceSent)}h`,
-          color: 'bg-blue-200 text-blue-800',
-          lastSentOrder: lastSentOrder
-        }
-      } else if (lastSentOrder.status === 'assembling') {
-        return {
-          status: 'accepted' as const,
-          label: 'Aceptado (Solo Agregar)',
-          color: 'bg-purple-200 text-purple-800',
-          lastSentOrder: lastSentOrder
-        }
-      }
-    }
-
-    const currentDayOfWeek = getCurrentDayOfWeek()
-    const isTodayAllowed = template.allowedSendDays?.includes(currentDayOfWeek) || false
-    
-    if (isTodayAllowed) {
-      return {
-        status: 'available' as const,
-        label: 'Disponible',
-        color: 'bg-green-200 text-green-800'
-      }
-    } else {
-      const nextDay = getNextAllowedDay(template.allowedSendDays || [])
-      return {
-        status: 'waiting' as const,
-        label: `Próximo: ${nextDay}`,
-        color: 'bg-blue-200 text-blue-800'
-      }
-    }
-  }, [draftOrders, sentOrders, assemblingOrders, inTransitOrders, canEditSentOrder])
-
-  const startEditing = useCallback((order: Order) => {
-    setEditingOrder(order)
-    setEditFormData({
-      items: order.items.map(item => ({
-        productId: item.productId,
-        productName: item.productName,
-        quantity: item.quantity,
-        unit: item.unit
-      })),
-      notes: order.notes || ""
-    })
+  // Función auxiliar para verificar si se puede editar un pedido enviado
+  const canEditSentOrder = useCallback((order: Order) => {
+    return order.status === 'sent' && !order.acceptedAt
   }, [])
 
   // Función para manejar clics en plantillas con diferentes estados
   const handleTemplateClick = useCallback(async (template: Template) => {
     if (!user || !user.branchId) return
 
-    const templateStatus = getTemplateStatus(template)
+    const templateStatus = calculateTemplateStatus(template)
 
     switch (templateStatus.status) {
       case 'draft':
         // Ya existe un borrador, cargar para edición
         const existingDraft = draftOrders.find(order => order.templateId === template.id)
         if (existingDraft) {
-          startEditing(existingDraft)
+          orderEditor.startEditing(existingDraft)
         }
         break
 
       case 'editable':
-        // Pedido enviado pero editable, abrir directamente la edición
-        if (templateStatus.lastSentOrder) {
-          startEditing(templateStatus.lastSentOrder)
-        }
-        break
-
       case 'recently_sent':
-        // Pedido enviado recientemente, abrir directamente la edición
+        // Pedido enviado, abrir edición
         if (templateStatus.lastSentOrder) {
-          startEditing(templateStatus.lastSentOrder)
+          orderEditor.startEditing(templateStatus.lastSentOrder)
         }
         break
 
       case 'accepted':
-        // Pedido aceptado, mostrar modal solo para pedido adicional
+        // Pedido aceptado, mostrar modal de opciones
         setShowOrderOptionsDialog({
           template,
-          lastSentOrder: templateStatus.lastSentOrder,
+          lastSentOrder: templateStatus.lastSentOrder || null,
           isOpen: true
         })
         break
@@ -183,333 +97,94 @@ export function BranchDashboard() {
       case 'available':
       case 'waiting':
         // Crear nuevo pedido normalmente
-        await createOrderFromTemplate(template)
+        await handleCreateFromTemplate(template)
         break
 
       default:
-        await createOrderFromTemplate(template)
+        await handleCreateFromTemplate(template)
         break
     }
-  }, [user, getTemplateStatus, draftOrders, startEditing])
+  }, [user, calculateTemplateStatus, draftOrders, orderEditor])
 
-  // Optimizar con useCallback para evitar recrear funciones
-  const createOrderFromTemplate = useCallback(async (template: Template) => {
+  // Crear pedido desde plantilla usando el hook
+  const handleCreateFromTemplate = useCallback(async (template: Template) => {
     if (!user || !user.branchId) return
 
-    try {
-      setCreatingOrder(true)
-      const destinationBranchId = template.destinationBranchIds[0]
-      if (!destinationBranchId) {
-        toast({
-          title: "Error",
-          description: "La plantilla no tiene destino configurado",
-          variant: "destructive",
-        })
-        return
-      }
-
-      // Optimización: Usar nombres por defecto para evitar consultas innecesarias
-      const fromBranchName = user.name
-      const toBranchName = "Fábrica"
-
-      const tempOrder: Order = {
-        id: `temp-${Date.now()}`,
-        orderNumber: `ORD-${Date.now()}`,
-        fromBranchId: user.branchId!,
-        fromBranchName: fromBranchName,
-        toBranchId: destinationBranchId,
-        toBranchName: toBranchName,
-        status: "draft",
-        items: template.items.map((item) => ({
-          id: `${Date.now()}-${item.productId}`,
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unit: item.unit,
-          status: "pending" as const,
-        })),
-        createdAt: serverTimestamp() as any,
-        createdBy: user.id,
-        createdByName: user.name,
-        templateId: template.id,
-        allowedSendDays: template.allowedSendDays || [],
-      }
-
-      // Optimización: Cargar productos pendientes de forma asíncrona para no bloquear la UI
-      let pendingProducts: { [productId: string]: number } = {}
-      
-      // Cargar productos pendientes en paralelo sin bloquear la creación del pedido
-      const loadPendingProducts = async () => {
-        try {
-          const replacementQueue = await getReplacementQueue(user.branchId!)
-          if (replacementQueue && replacementQueue.items) {
-            replacementQueue.items
-              .filter(item => item.status === "pending")
-              .forEach(item => {
-                pendingProducts[item.productId] = (pendingProducts[item.productId] || 0) + item.quantity
-              })
-          }
-        } catch (error) {
-          console.warn("Error al cargar productos pendientes:", error)
-        }
-      }
-      
-      // Ejecutar en paralelo sin esperar
-      loadPendingProducts()
-
-      setEditFormData({
+    await orderActions.createFromTemplate(template, async (order, pendingProducts) => {
+      // Pre-llenar cantidades con productos pendientes
+      orderEditor.setEditFormData({
         items: template.items.map((item) => {
           const pendingQuantity = pendingProducts[item.productId] || 0
           return {
             productId: item.productId,
             productName: item.productName,
-            quantity: pendingQuantity, // Pre-llenar con cantidad pendiente
+            quantity: pendingQuantity,
             unit: item.unit,
           }
         }),
         notes: ""
       })
 
-      setEditingOrder(tempOrder)
-
-      const pendingCount = template.items.filter(item => pendingProducts[item.productId] > 0).length
-      const message = pendingCount > 0 
-        ? `Se cargaron los productos de "${template.name}". ${pendingCount} productos tienen cantidades pendientes pre-llenadas.`
-        : `Se cargaron los productos de "${template.name}". Ajusta las cantidades y guarda el pedido.`
-      
-      toast({
-        title: "Plantilla cargada",
-        description: message,
-      })
-
-    } catch (error) {
-      console.error("[v0] Error al cargar plantilla:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo cargar la plantilla",
-        variant: "destructive",
-      })
-    } finally {
-      setCreatingOrder(false)
-    }
-  }, [user, toast])
-
-  const sendDraftOrder = useCallback(async (order: Order) => {
-    if (!user) return
-
-    console.log("🔍 [DEBUG] Order object before sending:", order)
-    console.log("🔍 [DEBUG] Order ID:", order.id)
-    console.log("🔍 [DEBUG] parentOrderId exists?", !!order.parentOrderId)
-    console.log("🔍 [DEBUG] parentOrderId value:", order.parentOrderId)
-
-    // Verificar si el ID es temporal (empieza con 'temp-')
-    if (order.id.startsWith('temp-')) {
-      toast({
-        title: "Error",
-        description: "Este pedido tiene un ID temporal. Por favor, cancela y crea un nuevo pedido adicional.",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      setSendingOrder(true)
-      if (order.allowedSendDays && order.allowedSendDays.length > 0 && !isDayAllowed(order.allowedSendDays)) {
-        toast({
-          title: "Error",
-          description: "Hoy no es un día permitido para enviar este pedido",
-          variant: "destructive",
-        })
-        return
-      }
-      
-      const updateData: any = {
-        status: "sent",
-        sentAt: new Date(),
-        sentBy: user.id,
-        sentByName: user.name
-      }
-
-      // Preservar parentOrderId si existe (para pedidos adicionales)
-      if (order.parentOrderId) {
-        updateData.parentOrderId = order.parentOrderId
-      }
-
-      await updateDoc(doc(db, "apps/controld/orders", order.id), updateData)
-
-      await createRemitMetadata({
-        ...order,
-        status: "sent"
-      }, user)
-
-      // Limpiar el estado de edición después de enviar
-      setEditingOrder(null)
-      setEditFormData({ items: [], notes: "" })
-
-      toast({
-        title: "Pedido enviado",
-        description: `El pedido ${order.orderNumber} fue enviado correctamente`,
-      })
-    } catch (error) {
-      console.error("Error al enviar pedido:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo enviar el pedido",
-        variant: "destructive",
-      })
-    } finally {
-      setSendingOrder(false)
-    }
-  }, [user, toast])
-
-  // Función para crear pedido adicional
-  const createAdditionalOrder = useCallback(async (template: Template, parentOrder: Order) => {
-    if (!user || !user.branchId) return
-
-    // Simplemente crear un pedido nuevo normal (sin parentOrderId)
-    await createOrderFromTemplate(template)
-    
-    toast({
-      title: "Nuevo pedido creado",
-      description: `Se creó un nuevo pedido desde la plantilla "${template.name}".`,
+      orderEditor.setEditingOrder(order)
     })
-  }, [user, toast, createOrderFromTemplate])
+  }, [user, orderActions, orderEditor])
 
-  // Función para reemplazar pedido
-  const replaceOrder = useCallback(async (template: Template, orderToCancel: Order) => {
-    if (!user) return
+  // Wrapper para sendDraftOrder que limpia estado después de enviar
+  const handleSendOrder = useCallback(async (order: Order) => {
+    await orderActions.sendDraftOrder(order)
+    // Limpiar estado de edición después de enviar exitosamente
+    orderEditor.cancelEditing()
+  }, [orderActions, orderEditor])
 
-    try {
-      // Confirmar cancelación
-      const confirmed = window.confirm(
-        `¿Estás seguro de que deseas cancelar el pedido ${orderToCancel.orderNumber} y crear uno nuevo?\n\nEsta acción no se puede deshacer.`
-      )
-
-      if (!confirmed) return
-
-      // Cancelar pedido original
-      await updateDoc(doc(db, "apps/controld/orders", orderToCancel.id), {
-        status: "cancelled",
-        cancelledAt: new Date(),
-        cancelledBy: user.id,
-        cancelledByName: user.name,
-        cancelReason: "Reemplazado por nuevo pedido desde plantilla"
-      })
-
-      // Crear nuevo pedido de reemplazo
-      const destinationBranchId = template.destinationBranchIds[0]
-      if (!destinationBranchId) {
-        toast({
-          title: "Error",
-          description: "La plantilla no tiene destino configurado",
-          variant: "destructive",
-        })
-        return
-      }
-
-      const [fromBranchDoc, toBranchDoc] = await Promise.all([
-        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", user.branchId))),
-        getDocs(query(collection(db, "apps/controld/branches"), where("id", "==", destinationBranchId)))
-      ])
-
-      const fromBranchName = fromBranchDoc.docs[0]?.data()?.name || user.name
-      const toBranchName = toBranchDoc.docs[0]?.data()?.name || "Fábrica"
-
-      const replacementOrder: Order = {
-        id: `temp-${Date.now()}`,
-        orderNumber: `ORD-${Date.now()}`,
-        fromBranchId: user.branchId!,
-        fromBranchName: fromBranchName,
-        toBranchId: destinationBranchId,
-        toBranchName: toBranchName,
-        status: "draft",
+  // Crear pedido adicional
+  const handleCreateAdditional = useCallback(async (template: Template, parentOrder: Order) => {
+    await orderActions.createAdditionalOrder(template, parentOrder, (order) => {
+      orderEditor.setEditingOrder(order)
+      orderEditor.setEditFormData({
         items: template.items.map((item) => ({
-          id: `${Date.now()}-${item.productId}`,
           productId: item.productId,
           productName: item.productName,
-          quantity: item.quantity,
+          quantity: 0,
           unit: item.unit,
-          status: "pending" as const,
         })),
-        createdAt: serverTimestamp() as any,
-        createdBy: user.id,
-        createdByName: user.name,
-        templateId: template.id,
-        allowedSendDays: template.allowedSendDays || [],
-        parentOrderId: orderToCancel.id,
-        notes: `Pedido de reemplazo para ${orderToCancel.orderNumber}`,
-      }
+        notes: ""
+      })
+    })
+  }, [orderActions, orderEditor])
 
-      setEditFormData({
+  // Reemplazar pedido
+  const handleReplaceOrder = useCallback(async (template: Template, orderToCancel: Order) => {
+    await orderActions.replaceOrder(template, orderToCancel, (order) => {
+      orderEditor.setEditingOrder(order)
+      orderEditor.setEditFormData({
         items: template.items.map((item) => ({
           productId: item.productId,
           productName: item.productName,
-          quantity: 0, // Siempre empezar en 0
+          quantity: 0,
           unit: item.unit,
         })),
         notes: `Pedido de reemplazo para ${orderToCancel.orderNumber}`
       })
+    })
+  }, [orderActions, orderEditor])
 
-      setEditingOrder(replacementOrder)
-
-      toast({
-        title: "Pedido reemplazado",
-        description: `El pedido ${orderToCancel.orderNumber} fue cancelado y se creó uno nuevo de reemplazo.`,
-      })
-
-    } catch (error) {
-      console.error("Error al reemplazar pedido:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo reemplazar el pedido",
-        variant: "destructive",
-      })
-    }
-  }, [user, toast])
-
-  // Función para editar pedido enviado
-  const editSentOrder = useCallback(async (order: Order) => {
+  // Editar pedido enviado
+  const handleEditSentOrder = useCallback(async (order: Order) => {
     if (!user) return
 
-    try {
-      const confirmed = window.confirm(
-        `¿Estás seguro de que deseas editar el pedido ${order.orderNumber}?\n\n⚠️ Este pedido ya fue enviado a la fábrica. Los cambios pueden afectar el proceso de armado.`
-      )
+    const confirmed = window.confirm(
+      `¿Estás seguro de que deseas editar el pedido ${order.orderNumber}?\n\n⚠️ Este pedido ya fue enviado a la fábrica. Los cambios pueden afectar el proceso de armado.`
+    )
 
-      if (!confirmed) return
+    if (!confirmed) return
 
-      // Cargar el pedido existente para edición
-      setEditingOrder(order)
-      setEditFormData({
-        items: order.items.map(item => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantity,
-          unit: item.unit
-        })),
-        notes: order.notes || ""
-      })
+    orderEditor.startEditing(order)
 
-      toast({
-        title: "Pedido cargado para edición",
-        description: `Puedes modificar el pedido ${order.orderNumber}. Los cambios se guardarán como una nueva versión.`,
-      })
-
-    } catch (error) {
-      console.error("Error al cargar pedido para edición:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo cargar el pedido para edición",
-        variant: "destructive",
-      })
-    }
-  }, [user, toast])
-
-  const cancelEditing = useCallback(() => {
-    setEditingOrder(null)
-    setEditFormData({ items: [], notes: "" })
-    console.log("🔍 [DEBUG] Editing cancelled - state cleared")
-  }, [])
+    toast({
+      title: "Pedido cargado para edición",
+      description: `Puedes modificar el pedido ${order.orderNumber}. Los cambios se guardarán automáticamente.`,
+    })
+  }, [user, orderEditor, toast])
 
   // Función para eliminar plantilla personal
   const handleDeletePersonalTemplate = useCallback(async (templateId: string, templateName: string) => {
@@ -539,155 +214,6 @@ export function BranchDashboard() {
       })
     }
   }, [user, toast])
-
-  const updateItemQuantity = useCallback((itemIndex: number, newQuantity: number) => {
-    if (newQuantity < 0) return
-    setEditFormData(prev => {
-      const newItems = [...prev.items]
-      newItems[itemIndex] = { ...newItems[itemIndex], quantity: newQuantity }
-      return { ...prev, items: newItems }
-    })
-  }, [])
-
-  const updateNotes = useCallback((notes: string) => {
-    setEditFormData(prev => ({ ...prev, notes }))
-  }, [])
-
-  const saveChanges = useCallback(async () => {
-    if (!editingOrder) return
-
-    try {
-      setSavingOrder(true)
-      if (editingOrder.id.startsWith('temp-')) {
-        const updatedItems = editFormData.items.map(item => ({
-          ...item,
-          id: `${Date.now()}-${item.productId}`,
-          status: "pending" as const,
-        }))
-
-        const orderData = {
-          orderNumber: editingOrder.orderNumber,
-          fromBranchId: editingOrder.fromBranchId,
-          fromBranchName: editingOrder.fromBranchName,
-          toBranchId: editingOrder.toBranchId,
-          toBranchName: editingOrder.toBranchName,
-          status: "draft",
-          items: updatedItems,
-          notes: editFormData.notes,
-          createdAt: serverTimestamp(),
-          createdBy: user?.id,
-          createdByName: user?.name,
-          templateId: editingOrder.templateId,
-          allowedSendDays: editingOrder.allowedSendDays,
-        }
-
-        // Optimización: Usar batch write para operaciones atómicas
-        await addDoc(collection(db, "apps/controld/orders"), orderData)
-        
-        toast({
-          title: "Pedido creado",
-          description: "El pedido se creó correctamente",
-        })
-
-        setEditingOrder(null)
-        setEditFormData({ items: [], notes: "" })
-      } else {
-        const updatedItems = editFormData.items.map(item => ({
-          ...item,
-          id: `${Date.now()}-${item.productId}`,
-          status: "pending" as const,
-        }))
-
-        await updateDoc(doc(db, "apps/controld/orders", editingOrder.id), {
-          items: updatedItems,
-          notes: editFormData.notes
-        })
-
-        toast({
-          title: "Cambios guardados",
-          description: "El pedido se actualizó correctamente",
-        })
-
-        setEditingOrder(null)
-        setEditFormData({ items: [], notes: "" })
-      }
-    } catch (error) {
-      console.error("Error al guardar cambios:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron guardar los cambios",
-        variant: "destructive",
-      })
-    } finally {
-      setSavingOrder(false)
-    }
-  }, [editingOrder, editFormData, user, toast])
-
-  // Separar plantillas personales de las oficiales
-  const { personalTemplates, officialTemplates } = useMemo(() => {
-    const personal = templates.filter(t => t.type === "personal")
-    const official = templates.filter(t => t.type !== "personal")
-    return { personalTemplates: personal, officialTemplates: official }
-  }, [templates])
-
-  // Memoizar el renderizado de tarjetas de plantillas personales
-  const personalTemplateCards = useMemo(() => {
-    return personalTemplates.map((template) => {
-      const existingDraft = draftOrders.find(order => order.templateId === template.id)
-      const templateStatus = getTemplateStatus(template)
-      
-      return (
-        <TemplateCard
-          key={template.id}
-          template={template}
-          existingDraft={existingDraft || null}
-          templateStatus={templateStatus}
-          isEditing={editingOrder?.templateId === template.id}
-          editFormData={editFormData}
-          onCreateOrder={() => handleTemplateClick(template)}
-          onStartEditing={() => existingDraft && startEditing(existingDraft)}
-          onCancelEditing={cancelEditing}
-          onSendOrder={() => existingDraft && sendDraftOrder(existingDraft)}
-          onSaveChanges={saveChanges}
-          onUpdateQuantity={updateItemQuantity}
-          onUpdateNotes={updateNotes}
-          onDeleteTemplate={() => handleDeletePersonalTemplate(template.id, template.name)}
-          creatingOrder={creatingOrder}
-          savingOrder={savingOrder}
-          sendingOrder={sendingOrder}
-        />
-      )
-    })
-  }, [personalTemplates, draftOrders, editingOrder, editFormData, getTemplateStatus, handleTemplateClick, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes, handleDeletePersonalTemplate])
-
-  // Memoizar el renderizado de tarjetas de plantillas oficiales
-  const officialTemplateCards = useMemo(() => {
-    return officialTemplates.map((template) => {
-      const existingDraft = draftOrders.find(order => order.templateId === template.id)
-      const templateStatus = getTemplateStatus(template)
-      
-      return (
-        <TemplateCard
-          key={template.id}
-          template={template}
-          existingDraft={existingDraft || null}
-          templateStatus={templateStatus}
-          isEditing={editingOrder?.templateId === template.id}
-          editFormData={editFormData}
-          onCreateOrder={() => handleTemplateClick(template)}
-          onStartEditing={() => existingDraft && startEditing(existingDraft)}
-          onCancelEditing={cancelEditing}
-          onSendOrder={() => existingDraft && sendDraftOrder(existingDraft)}
-          onSaveChanges={saveChanges}
-          onUpdateQuantity={updateItemQuantity}
-          onUpdateNotes={updateNotes}
-          creatingOrder={creatingOrder}
-          savingOrder={savingOrder}
-          sendingOrder={sendingOrder}
-        />
-      )
-    })
-  }, [officialTemplates, draftOrders, editingOrder, editFormData, getTemplateStatus, handleTemplateClick, startEditing, cancelEditing, sendDraftOrder, saveChanges, updateItemQuantity, updateNotes])
 
   // Loading state
   const isLoading = templatesLoading || draftsLoading
@@ -734,73 +260,25 @@ export function BranchDashboard() {
         </TabsList>
 
         <TabsContent value="plantillas" className="mt-6">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">📋 Plantillas</h3>
-              <Button asChild>
-                <Link href="/dashboard/orders/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Crear pedido manual
-                </Link>
-              </Button>
-            </div>
-            
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Cargando plantillas...</span>
-              </div>
-            ) : (
-              <>
-                {/* Plantillas Oficiales */}
-                {officialTemplates.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-muted-foreground mb-3">
-                      🏢 Plantillas Oficiales
-                    </h4>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {officialTemplateCards}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Separador visual */}
-                {officialTemplates.length > 0 && personalTemplates.length > 0 && (
-                  <Separator className="my-6" />
-                )}
-                
-                {/* Plantillas Personales */}
-                {personalTemplates.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <h4 className="text-sm font-medium text-muted-foreground">
-                        👤 Mis Plantillas Personales
-                      </h4>
-                      <Badge variant="outline" className="text-xs">
-                        {personalTemplates.length}
-                      </Badge>
-                    </div>
-                    <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {personalTemplateCards}
-                    </div>
-                  </div>
-                )}
-
-                {/* Mensaje cuando no hay plantillas */}
-                {templates.length === 0 && (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No hay plantillas disponibles</h3>
-                      <p className="text-muted-foreground">
-                        El administrador aún no ha creado plantillas para tu sucursal. Puedes crear un pedido manual usando el botón de arriba.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
+          <TemplatesTab
+            templates={templates}
+            draftOrders={draftOrders}
+            loading={isLoading}
+            editingOrder={orderEditor.editingOrder}
+            editFormData={orderEditor.editFormData}
+            creatingOrder={orderActions.isCreating}
+            savingOrder={orderEditor.isSaving}
+            sendingOrder={orderActions.isSending}
+            getTemplateStatus={calculateTemplateStatus}
+            onTemplateClick={handleTemplateClick}
+            onStartEditing={orderEditor.startEditing}
+            onCancelEditing={orderEditor.cancelEditing}
+            onSendOrder={handleSendOrder}
+            onSaveChanges={orderEditor.saveChanges}
+            onUpdateQuantity={orderEditor.updateItemQuantity}
+            onUpdateNotes={orderEditor.updateNotes}
+            onDeleteTemplate={handleDeletePersonalTemplate}
+          />
         </TabsContent>
 
         <TabsContent value="armando" className="mt-6">
@@ -875,15 +353,15 @@ export function BranchDashboard() {
           isOpen={showOrderOptionsDialog.isOpen}
           onClose={() => setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })}
           onEditOrder={() => {
-            editSentOrder(showOrderOptionsDialog.lastSentOrder!)
+            handleEditSentOrder(showOrderOptionsDialog.lastSentOrder!)
             setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })
           }}
           onCreateAdditional={() => {
-            createAdditionalOrder(showOrderOptionsDialog.template!, showOrderOptionsDialog.lastSentOrder!)
+            handleCreateAdditional(showOrderOptionsDialog.template!, showOrderOptionsDialog.lastSentOrder!)
             setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })
           }}
           onReplaceOrder={() => {
-            replaceOrder(showOrderOptionsDialog.template!, showOrderOptionsDialog.lastSentOrder!)
+            handleReplaceOrder(showOrderOptionsDialog.template!, showOrderOptionsDialog.lastSentOrder!)
             setShowOrderOptionsDialog({ template: null, lastSentOrder: null, isOpen: false })
           }}
           canEdit={canEditSentOrder(showOrderOptionsDialog.lastSentOrder)}
