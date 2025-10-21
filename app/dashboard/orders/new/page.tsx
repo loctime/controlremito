@@ -1187,6 +1187,21 @@ function NewOrderContent() {
               </div>
             </CardHeader>
             <CardContent>
+              {formData.items.some(item => item.isPending) && (
+                <div className="mb-4 p-3 bg-blue-50 border-2 border-blue-300 rounded-lg flex items-start gap-3">
+                  <div className="mt-0.5">
+                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-800 mb-1">Productos con cantidades pendientes detectados</p>
+                    <p className="text-xs text-blue-700">
+                      Los productos marcados con <Badge className="bg-blue-500 text-white text-xs mx-1">🔄 Auto-completado (Pendiente)</Badge> tienen cantidades pre-llenadas de productos que fueron negados previamente por la fábrica.
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="space-y-3">
                 {formData.items.length === 0 ? (
                   <p className="text-center text-sm text-muted-foreground">
@@ -1194,8 +1209,8 @@ function NewOrderContent() {
                   </p>
                 ) : (
                   formData.items.map((item, index) => (
-                    <div key={index} className={`space-y-2 sm:space-y-0 p-3 border rounded-lg ${
-                      item.isPending ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
+                    <div key={index} className={`space-y-2 sm:space-y-0 p-3 border rounded-lg transition-all ${
+                      item.isPending ? 'bg-blue-50 border-blue-300 border-2 shadow-sm' : 'bg-gray-50'
                     }`}>
                       <div className="flex flex-col sm:flex-row gap-2">
                         <div className="flex-1">
@@ -1204,8 +1219,8 @@ function NewOrderContent() {
                               Producto <span className="text-red-500">*</span>
                             </Label>
                             {item.isPending && (
-                              <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
-                                🔄 Auto-completado
+                              <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
+                                🔄 Auto-completado (Pendiente)
                               </Badge>
                             )}
                           </div>
@@ -1234,7 +1249,7 @@ function NewOrderContent() {
                               value={item.quantity || 0}
                               onChange={(e) => updateItem(index, "quantity", Number(e.target.value) || 0)}
                               className={`w-24 sm:w-32 ${item.quantity < 0 ? "border-red-300 focus:border-red-500" : ""} ${
-                                item.isPending ? "border-blue-300 bg-blue-50" : ""
+                                item.isPending ? "border-blue-400 border-2 bg-blue-50 font-semibold text-blue-700" : ""
                               }`}
                               required
                             />
@@ -1253,8 +1268,13 @@ function NewOrderContent() {
                         </div>
                       </div>
                       {item.productName && (
-                        <div className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-                          ✓ {item.productName} - Cantidad: {item.quantity} {item.unit}
+                        <div className={`text-xs px-2 py-1 rounded ${
+                          item.isPending 
+                            ? 'text-blue-700 bg-blue-100 border border-blue-300' 
+                            : 'text-green-600 bg-green-50'
+                        }`}>
+                          {item.isPending ? '🔄' : '✓'} {item.productName} - Cantidad: {item.quantity} {item.unit}
+                          {item.isPending && <span className="font-semibold"> (Cantidad pendiente auto-completada)</span>}
                         </div>
                       )}
                     </div>

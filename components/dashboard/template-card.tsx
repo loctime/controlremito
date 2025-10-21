@@ -119,13 +119,14 @@ export const TemplateCard = memo(function TemplateCard({
               Productos ({existingDraft ? existingDraft.items.length : template.items.length}):
             </p>
             {pendingProducts.length > 0 && (
-              <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
-                <div className="flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  <span className="font-medium">Productos Pendientes</span>
+              <div className="mb-3 p-3 bg-blue-50 border-2 border-blue-300 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <span className="font-semibold text-blue-800 text-sm">🔄 Productos Pendientes Detectados</span>
                 </div>
-                <p className="text-blue-700 mt-1">
-                  Algunos productos de esta plantilla son reposiciones de faltantes anteriores.
+                <p className="text-blue-700 mt-1 text-xs">
+                  Esta plantilla contiene productos que fueron negados previamente por la fábrica. 
+                  Las cantidades se auto-completarán al crear el pedido.
                 </p>
               </div>
             )}
@@ -133,16 +134,16 @@ export const TemplateCard = memo(function TemplateCard({
               {(existingDraft ? existingDraft.items : template.items).slice(0, 3).map((item, index) => {
                 const isPending = pendingProducts.some(p => p.productId === item.productId)
                 return (
-                  <div key={index} className={`text-sm p-2 rounded ${isPending ? 'bg-blue-50 border border-blue-200' : ''}`}>
+                  <div key={index} className={`text-sm p-2 rounded transition-all ${isPending ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' : ''}`}>
                     <div className="flex items-center gap-2">
-                      <span className="font-medium">{item.productName}</span>
+                      <span className={`font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
                       {isPending && (
-                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
-                          🔄 Pendiente
+                        <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
+                          🔄 Auto-completado
                         </Badge>
                       )}
                     </div>
-                    <span className="text-muted-foreground ml-2">
+                    <span className={`ml-2 ${isPending ? 'text-blue-600 font-semibold' : 'text-muted-foreground'}`}>
                       {item.quantity} {item.unit}
                     </span>
                   </div>
@@ -235,19 +236,19 @@ export const TemplateCard = memo(function TemplateCard({
                       {editFormData.items.map((item, index) => {
                         const isPending = pendingProducts.some(p => p.productId === item.productId)
                         return (
-                          <div key={index} className={`flex items-center justify-between p-2 rounded ${
-                            isPending ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                          <div key={index} className={`flex items-center justify-between p-3 rounded transition-all ${
+                            isPending ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' : 'bg-gray-50'
                           }`}>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{item.productName}</span>
+                                <span className={`text-sm font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
                                 {isPending && (
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
                                     🔄 Auto-completado
                                   </Badge>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-500">({item.unit})</span>
+                              <span className={`text-xs ${isPending ? 'text-blue-600' : 'text-gray-500'}`}>({item.unit})</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
@@ -255,18 +256,18 @@ export const TemplateCard = memo(function TemplateCard({
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
-                                className="h-6 w-6 p-0"
+                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 -
                               </Button>
-                              <span className={`w-8 text-center text-sm ${isPending ? 'text-blue-600 font-semibold' : ''}`}>
+                              <span className={`w-8 text-center text-sm font-semibold ${isPending ? 'text-blue-600 bg-blue-100 px-2 py-1 rounded' : ''}`}>
                                 {item.quantity}
                               </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                                className="h-6 w-6 p-0"
+                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 +
                               </Button>
@@ -335,19 +336,19 @@ export const TemplateCard = memo(function TemplateCard({
                       {editFormData.items.map((item, index) => {
                         const isPending = pendingProducts.some(p => p.productId === item.productId)
                         return (
-                          <div key={index} className={`flex items-center justify-between p-2 rounded ${
-                            isPending ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                          <div key={index} className={`flex items-center justify-between p-3 rounded transition-all ${
+                            isPending ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' : 'bg-gray-50'
                           }`}>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{item.productName}</span>
+                                <span className={`text-sm font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
                                 {isPending && (
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
                                     🔄 Auto-completado
                                   </Badge>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-500">({item.unit})</span>
+                              <span className={`text-xs ${isPending ? 'text-blue-600' : 'text-gray-500'}`}>({item.unit})</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
@@ -355,18 +356,18 @@ export const TemplateCard = memo(function TemplateCard({
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
-                                className="h-6 w-6 p-0"
+                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 -
                               </Button>
-                              <span className={`w-8 text-center text-sm ${isPending ? 'text-blue-600 font-semibold' : ''}`}>
+                              <span className={`w-8 text-center text-sm font-semibold ${isPending ? 'text-blue-600 bg-blue-100 px-2 py-1 rounded' : ''}`}>
                                 {item.quantity}
                               </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                                className="h-6 w-6 p-0"
+                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 +
                               </Button>
@@ -435,19 +436,19 @@ export const TemplateCard = memo(function TemplateCard({
                       {editFormData.items.map((item, index) => {
                         const isPending = pendingProducts.some(p => p.productId === item.productId)
                         return (
-                          <div key={index} className={`flex items-center justify-between p-2 rounded ${
-                            isPending ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50'
+                          <div key={index} className={`flex items-center justify-between p-3 rounded transition-all ${
+                            isPending ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' : 'bg-gray-50'
                           }`}>
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="text-sm font-medium">{item.productName}</span>
+                                <span className={`text-sm font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
                                 {isPending && (
-                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs">
+                                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
                                     🔄 Auto-completado
                                   </Badge>
                                 )}
                               </div>
-                              <span className="text-xs text-gray-500">({item.unit})</span>
+                              <span className={`text-xs ${isPending ? 'text-blue-600' : 'text-gray-500'}`}>({item.unit})</span>
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
@@ -455,18 +456,18 @@ export const TemplateCard = memo(function TemplateCard({
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
-                                className="h-6 w-6 p-0"
+                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 -
                               </Button>
-                              <span className={`w-8 text-center text-sm ${isPending ? 'text-blue-600 font-semibold' : ''}`}>
+                              <span className={`w-8 text-center text-sm font-semibold ${isPending ? 'text-blue-600 bg-blue-100 px-2 py-1 rounded' : ''}`}>
                                 {item.quantity}
                               </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                                className="h-6 w-6 p-0"
+                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 +
                               </Button>
