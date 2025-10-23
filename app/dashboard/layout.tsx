@@ -7,19 +7,55 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu, Download } from "lucide-react"
+import { Package, FileText, Users, Settings, ClipboardList, Boxes, File, Menu, Download, Trash2 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useInstallPWA } from "@/hooks/use-install-pwa"
+import { clearMainCollections } from "@/lib/dev-utils"
+import { useToast } from "@/hooks/use-toast"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { useState } from "react"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, changeRole } = useAuth()
   const pathname = usePathname()
   const { isInstallable, isInstalled, installPWA } = useInstallPWA()
+  const { toast } = useToast()
+  const [isClearing, setIsClearing] = useState(false)
 
   const handleRoleChange = async (newRole: string) => {
     await changeRole(newRole)
+  }
+
+  const handleClearCollections = async () => {
+    setIsClearing(true)
+    try {
+      const result = await clearMainCollections()
+      
+      if (result.success) {
+        toast({
+          title: "✅ Colecciones eliminadas",
+          description: `Se eliminaron: ${Object.entries(result.details || {})
+            .map(([key, value]) => `${key} (${value} docs)`)
+            .join(", ")}`,
+        })
+      } else {
+        toast({
+          title: "❌ Error",
+          description: result.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "❌ Error",
+        description: error.message || "Error al eliminar colecciones",
+        variant: "destructive",
+      })
+    } finally {
+      setIsClearing(false)
+    }
   }
 
   const getRoleLabel = (role: string) => {
@@ -132,6 +168,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span className="hidden sm:inline">Instalar App</span>
               </Button>
             )}
+            
+            {/* Botón Limpiar Colecciones (solo desktop y en desarrollo) */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="destructive"
+                  size="sm"
+                  className="hidden md:inline-flex h-9"
+                  title="Limpiar colecciones de desarrollo"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Limpiar DB
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>⚠️ ¿Eliminar todas las colecciones?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción eliminará TODAS los documentos de las siguientes colecciones:
+                    <ul className="list-disc list-inside mt-2 space-y-1">
+                      <li><strong>orders</strong> (Pedidos)</li>
+                      <li><strong>delivery-notes</strong> (Remitos)</li>
+                      <li><strong>remit-metadata</strong> (Metadata de remitos)</li>
+                    </ul>
+                    <p className="mt-3 font-semibold text-destructive">
+                      Esta acción NO se puede deshacer.
+                    </p>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleClearCollections}
+                    disabled={isClearing}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    {isClearing ? "Eliminando..." : "Sí, eliminar todo"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             
             {/* Selector de rol para desarrollo */}
             <Select value={user?.role} onValueChange={handleRoleChange}>
