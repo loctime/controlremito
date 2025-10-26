@@ -23,6 +23,7 @@ const statusConfig: Record<string, {
   'in_transit': { label: 'En tránsito', variant: 'default', icon: '🚚' },
   'received': { label: 'Recibido', variant: 'default', icon: '✅' },
   'cancelled': { label: 'Cancelado', variant: 'destructive', icon: '❌' },
+  'ready': { label: 'Listo para retirar', variant: 'default', icon: '✓', className: 'bg-green-100 text-green-800' },
   
   // Estados de productos
   'ok': { label: 'OK', variant: 'default', icon: '✓', className: 'bg-green-100 text-green-800' },

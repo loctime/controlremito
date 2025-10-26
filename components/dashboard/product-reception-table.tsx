@@ -3,6 +3,7 @@
 import { Fragment } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { StatusBadge } from "@/components/ui/status-badge"
 import type { Order } from "@/lib/types"
 
 interface ItemQuantity {
@@ -81,15 +82,7 @@ export function ProductReceptionTable({
                       />
                     </td>
                     <td className="py-2 px-2 text-center">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        itemData.status === 'ok' ? 'bg-green-100 text-green-800' :
-                        itemData.status === 'no' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {itemData.status === 'ok' ? '✓ OK' :
-                         itemData.status === 'no' ? '✗ NO' :
-                         '⏳ Pendiente'}
-                      </span>
+                      <StatusBadge status={itemData.status} />
                     </td>
                     <td className="py-2 px-2 text-center">
                       {/* Solo mostrar botones si el producto no fue marcado como no disponible por la fábrica */}

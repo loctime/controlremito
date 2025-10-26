@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { FileText, Edit, Plus, Send, X, Save, AlertCircle, Trash2, Loader2 } from "lucide-react"
+import { FileText, Edit, Plus, Send, X, Save, AlertCircle, Trash2 } from "lucide-react"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import type { Template, Order } from "@/lib/types"
 import { isDayAllowed } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -159,7 +160,7 @@ export const TemplateCard = memo(function TemplateCard({
                   }
                 >
                   {sendingOrder ? (
-                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    <LoadingSpinner size="sm" />
                   ) : (
                     <Send className="mr-1 h-3 w-3" />
                   )}
@@ -238,7 +239,7 @@ export const TemplateCard = memo(function TemplateCard({
                       disabled={savingOrder}
                     >
                       {savingOrder ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        <LoadingSpinner size="sm" />
                       ) : (
                         <Save className="mr-1 h-3 w-3" />
                       )}
@@ -257,7 +258,7 @@ export const TemplateCard = memo(function TemplateCard({
                 disabled={creatingOrder}
               >
                 {creatingOrder ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <LoadingSpinner size="md" />
                 ) : (
                   <Plus className="mr-2 h-4 w-4" />
                 )}
@@ -342,7 +343,7 @@ export const TemplateCard = memo(function TemplateCard({
                       disabled={savingOrder}
                     >
                       {savingOrder ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        <LoadingSpinner size="sm" />
                       ) : (
                         <Save className="mr-1 h-3 w-3" />
                       )}
@@ -437,7 +438,7 @@ export const TemplateCard = memo(function TemplateCard({
                       disabled={savingOrder}
                     >
                       {savingOrder ? (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        <LoadingSpinner size="sm" />
                       ) : (
                         <Save className="mr-1 h-3 w-3" />
                       )}

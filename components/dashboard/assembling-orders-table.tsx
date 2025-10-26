@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, memo } from "react"
+import { memo } from "react"
 import React from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight } from "lucide-react"
+import { StatusBadge } from "@/components/ui/status-badge"
+import { useCollapsibleSet } from "@/hooks/use-collapsible"
 import type { Order, User } from "@/lib/types"
 import { OrderItemsDetail } from "./order-items-detail"
 
@@ -19,32 +21,8 @@ interface AssemblingOrdersTableProps {
 }
 
 export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery }: AssemblingOrdersTableProps) {
-  const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
-  const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set())
-
-  const toggleTemplateCollapse = (templateName: string) => {
-    setCollapsedTemplates(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(templateName)) {
-        newSet.delete(templateName)
-      } else {
-        newSet.add(templateName)
-      }
-      return newSet
-    })
-  }
-
-  const toggleOrderExpansion = (orderId: string) => {
-    setExpandedOrders(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(orderId)) {
-        newSet.delete(orderId)
-      } else {
-        newSet.add(orderId)
-      }
-      return newSet
-    })
-  }
+  const { isCollapsed: isTemplateCollapsed, toggle: toggleTemplateCollapse } = useCollapsibleSet()
+  const { isCollapsed: isOrderExpanded, toggle: toggleOrderExpansion } = useCollapsibleSet()
 
   const getOrderProgress = (order: OrderWithTemplate) => {
     // Solo considerar productos que realmente se pidieron (cantidad > 0)
@@ -78,7 +56,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                 className="flex items-center gap-2 flex-1"
                 onClick={() => toggleTemplateCollapse(templateName)}
               >
-                {collapsedTemplates.has(templateName) ? (
+                {isTemplateCollapsed(templateName) ? (
                   <ChevronRight className="h-4 w-4 text-gray-600" />
                 ) : (
                   <ChevronDown className="h-4 w-4 text-gray-600" />
@@ -92,7 +70,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
           </div>
           
           {/* Tabla - solo visible si no está colapsada */}
-          {!collapsedTemplates.has(templateName) && (
+          {!isTemplateCollapsed(templateName) && (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[300px]">
                 <thead>
@@ -121,7 +99,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                           <div className="flex items-center gap-2">
                             {user?.role === "factory" && (
                               <div className="p-1">
-                                {expandedOrders.has(order.id) ? (
+                                {isOrderExpanded(order.id) ? (
                                   <ChevronDown className="h-4 w-4 text-gray-600" />
                                 ) : (
                                   <ChevronRight className="h-4 w-4 text-gray-600" />
@@ -146,13 +124,9 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                         <td className="py-3 px-2">
                           <div className="text-sm">
                             {order.preparedAt ? (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 animate-pulse">
-                                ✓ Listo para retirar
-                              </span>
+                              <StatusBadge status="ready" className="animate-pulse" />
                             ) : (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                ⏳ En proceso
-                              </span>
+                              <StatusBadge status="pending" />
                             )}
                           </div>
                         </td>
@@ -200,7 +174,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                         )}
                       </tr>
                       {/* Detalle expandible del pedido */}
-                      {expandedOrders.has(order.id) && user?.role === "factory" && (
+                      {isOrderExpanded(order.id) && user?.role === "factory" && (
                         <tr>
                           <td colSpan={user?.role === "branch" ? 5 : 4} className="p-0">
                             <OrderItemsDetail

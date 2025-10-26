@@ -3,7 +3,8 @@
 import { useState, useCallback, memo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Clock, Package, Truck, Loader2 } from "lucide-react"
+import { Clock, Package, Truck } from "lucide-react"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
 import { useOrders } from "@/hooks/use-orders"
@@ -240,10 +241,7 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
               </div>
               
               {pendingLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
-                </div>
+                <LoadingSpinner text="Cargando pedidos..." size="lg" className="py-12" />
               ) : pendingOrders.length > 0 ? (
                 <OrdersTable 
                   orders={pendingOrders}
@@ -286,10 +284,7 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
             </div>
             
             {assemblingLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
-              </div>
+              <LoadingSpinner text="Cargando pedidos..." size="lg" className="py-12" />
             ) : assemblingOrders.length > 0 ? (
               <AssemblingOrdersTable 
                 orders={assemblingOrders}
@@ -322,10 +317,7 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
             </div>
             
             {inTransitLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Cargando pedidos...</span>
-              </div>
+              <LoadingSpinner text="Cargando pedidos..." size="lg" className="py-12" />
             ) : inTransitOrders.length > 0 ? (
               <InTransitOrdersTable orders={inTransitOrders} user={user} />
             ) : (

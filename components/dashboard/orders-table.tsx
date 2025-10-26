@@ -1,8 +1,9 @@
 "use client"
 
-import React, { useState, memo } from "react"
+import React, { memo } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, CheckCheck } from "lucide-react"
+import { useCollapsibleSet } from "@/hooks/use-collapsible"
 import type { Order } from "@/lib/types"
 
 interface OrderWithTemplate extends Order {
@@ -16,19 +17,7 @@ interface OrdersTableProps {
 }
 
 export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, onAcceptAll }: OrdersTableProps) {
-  const [collapsedTemplates, setCollapsedTemplates] = useState<Set<string>>(new Set())
-
-  const toggleTemplateCollapse = (templateName: string) => {
-    setCollapsedTemplates(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(templateName)) {
-        newSet.delete(templateName)
-      } else {
-        newSet.add(templateName)
-      }
-      return newSet
-    })
-  }
+  const { isCollapsed, toggle: toggleTemplateCollapse } = useCollapsibleSet()
 
   // Agrupar por plantilla y organizar por relación padre-hijo
   const groupedOrders = orders.reduce((groups, order) => {
@@ -83,7 +72,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                 className="flex items-center gap-2 flex-1"
                 onClick={() => toggleTemplateCollapse(templateName)}
               >
-                {collapsedTemplates.has(templateName) ? (
+                {isCollapsed(templateName) ? (
                   <ChevronRight className="h-4 w-4 text-gray-600" />
                 ) : (
                   <ChevronDown className="h-4 w-4 text-gray-600" />
@@ -108,7 +97,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
           </div>
           
           {/* Tabla - solo visible si no está colapsada */}
-          {!collapsedTemplates.has(templateName) && (
+          {!isCollapsed(templateName) && (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[300px]">
                 <thead>
