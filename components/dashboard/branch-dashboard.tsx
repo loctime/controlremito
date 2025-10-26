@@ -278,6 +278,7 @@ export function BranchDashboard() {
             onUpdateQuantity={orderEditor.updateItemQuantity}
             onUpdateNotes={orderEditor.updateNotes}
             onDeleteTemplate={handleDeletePersonalTemplate}
+            user={user}
           />
         </TabsContent>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -8,6 +8,7 @@ import { FileText, Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { TemplateCard } from "./template-card"
+import { getReplacementQueue } from "@/lib/replacement-service"
 import type { Order, Template, User } from "@/lib/types"
 import type { TemplateStatus } from "@/lib/template-status.service"
 
@@ -32,6 +33,7 @@ interface TemplatesTabProps {
   onUpdateQuantity: (itemIndex: number, newQuantity: number) => void
   onUpdateNotes: (notes: string) => void
   onDeleteTemplate: (templateId: string, templateName: string) => void
+  user: User | null
 }
 
 export function TemplatesTab({
@@ -51,8 +53,41 @@ export function TemplatesTab({
   onSaveChanges,
   onUpdateQuantity,
   onUpdateNotes,
-  onDeleteTemplate
+  onDeleteTemplate,
+  user
 }: TemplatesTabProps) {
+  // Estado para productos pendientes
+  const [pendingProducts, setPendingProducts] = useState<{ productId: string; productName: string; quantity: number; unit: string }[]>([])
+
+  // Cargar productos pendientes
+  useEffect(() => {
+    const loadPendingProducts = async () => {
+      if (!user?.branchId) return
+      
+      try {
+        const replacementQueue = await getReplacementQueue(user.branchId)
+        
+        if (replacementQueue && replacementQueue.items) {
+          const pendingItems = replacementQueue.items
+            .filter(item => item.status === "pending")
+            .map(item => ({
+              productId: item.productId,
+              productName: item.productName,
+              quantity: item.quantity,
+              unit: item.unit
+            }))
+          
+          setPendingProducts(pendingItems)
+          console.log("🔍 DEBUG - Productos pendientes cargados en TemplatesTab:", pendingItems)
+        }
+      } catch (error) {
+        console.warn("Error al cargar productos pendientes:", error)
+      }
+    }
+
+    loadPendingProducts()
+  }, [user?.branchId])
+
   // Separar plantillas personales de las oficiales
   const { personalTemplates, officialTemplates } = useMemo(() => {
     const personal = templates.filter(t => t.type === "personal")
@@ -74,6 +109,7 @@ export function TemplatesTab({
           templateStatus={templateStatus}
           isEditing={editingOrder?.templateId === template.id}
           editFormData={editFormData}
+          pendingProducts={pendingProducts}
           onCreateOrder={() => onTemplateClick(template)}
           onStartEditing={() => existingDraft && onStartEditing(existingDraft)}
           onCancelEditing={onCancelEditing}
@@ -93,6 +129,7 @@ export function TemplatesTab({
     draftOrders,
     editingOrder,
     editFormData,
+    pendingProducts,
     getTemplateStatus,
     onTemplateClick,
     onStartEditing,
@@ -121,6 +158,7 @@ export function TemplatesTab({
           templateStatus={templateStatus}
           isEditing={editingOrder?.templateId === template.id}
           editFormData={editFormData}
+          pendingProducts={pendingProducts}
           onCreateOrder={() => onTemplateClick(template)}
           onStartEditing={() => existingDraft && onStartEditing(existingDraft)}
           onCancelEditing={onCancelEditing}
@@ -139,6 +177,7 @@ export function TemplatesTab({
     draftOrders,
     editingOrder,
     editFormData,
+    pendingProducts,
     getTemplateStatus,
     onTemplateClick,
     onStartEditing,

@@ -113,49 +113,6 @@ export const TemplateCard = memo(function TemplateCard({
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {/* Solo mostrar detalles de productos en desktop */}
-          <div className="hidden sm:block">
-            <p className="text-sm font-medium text-muted-foreground mb-2">
-              Productos ({existingDraft ? existingDraft.items.length : template.items.length}):
-            </p>
-            {pendingProducts.length > 0 && (
-              <div className="mb-3 p-3 bg-blue-50 border-2 border-blue-300 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-blue-600" />
-                  <span className="font-semibold text-blue-800 text-sm">🔄 Productos Pendientes Detectados</span>
-                </div>
-                <p className="text-blue-700 mt-1 text-xs">
-                  Esta plantilla contiene productos que fueron negados previamente por la fábrica. 
-                  Las cantidades se auto-completarán al crear el pedido.
-                </p>
-              </div>
-            )}
-            <div className="space-y-1">
-              {(existingDraft ? existingDraft.items : template.items).slice(0, 3).map((item, index) => {
-                const isPending = pendingProducts.some(p => p.productId === item.productId)
-                return (
-                  <div key={index} className={`text-sm p-2 rounded transition-all ${isPending ? 'bg-blue-50 border-2 border-blue-300 shadow-sm' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
-                      {isPending && (
-                        <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
-                          🔄 Auto-completado
-                        </Badge>
-                      )}
-                    </div>
-                    <span className={`ml-2 ${isPending ? 'text-blue-600 font-semibold' : 'text-muted-foreground'}`}>
-                      {item.quantity} {item.unit}
-                    </span>
-                  </div>
-                )
-              })}
-              {(existingDraft ? existingDraft.items : template.items).length > 3 && (
-                <p className="text-sm text-muted-foreground">
-                  +{(existingDraft ? existingDraft.items : template.items).length - 3} productos más...
-                </p>
-              )}
-            </div>
-          </div>
 
           {/* En móvil, solo mostrar contador simple */}
           <div className="sm:hidden">
@@ -242,11 +199,6 @@ export const TemplateCard = memo(function TemplateCard({
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className={`text-sm font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
-                                {isPending && (
-                                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
-                                    🔄 Auto-completado
-                                  </Badge>
-                                )}
                               </div>
                               <span className={`text-xs ${isPending ? 'text-blue-600' : 'text-gray-500'}`}>({item.unit})</span>
                             </div>
@@ -342,11 +294,6 @@ export const TemplateCard = memo(function TemplateCard({
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className={`text-sm font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
-                                {isPending && (
-                                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
-                                    🔄 Auto-completado
-                                  </Badge>
-                                )}
                               </div>
                               <span className={`text-xs ${isPending ? 'text-blue-600' : 'text-gray-500'}`}>({item.unit})</span>
                             </div>
@@ -442,11 +389,6 @@ export const TemplateCard = memo(function TemplateCard({
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
                                 <span className={`text-sm font-medium ${isPending ? 'text-blue-800' : ''}`}>{item.productName}</span>
-                                {isPending && (
-                                  <Badge className="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold animate-pulse">
-                                    🔄 Auto-completado
-                                  </Badge>
-                                )}
                               </div>
                               <span className={`text-xs ${isPending ? 'text-blue-600' : 'text-gray-500'}`}>({item.unit})</span>
                             </div>
