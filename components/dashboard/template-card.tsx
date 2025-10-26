@@ -1,13 +1,11 @@
 "use client"
 
-import { memo, useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { memo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { FileText, Edit, Plus, Send, X, Save, AlertCircle, Trash2, Loader2 } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { Template, Order } from "@/lib/types"
 import { isDayAllowed } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -62,48 +60,6 @@ export const TemplateCard = memo(function TemplateCard({
   savingOrder = false,
   sendingOrder = false,
 }: TemplateCardProps) {
-  const { toast } = useToast()
-  const [showConfirmModal, setShowConfirmModal] = useState(false)
-  const [pendingItemToDecrease, setPendingItemToDecrease] = useState<{index: number, item: any} | null>(null)
-  const [confirmedProducts, setConfirmedProducts] = useState<Set<string>>(new Set())
-
-  // Función para manejar la disminución de cantidad con validación
-  const handleDecreaseQuantity = (index: number, currentQuantity: number, item: any) => {
-    const isPending = pendingProducts.some(p => p.productId === item.productId)
-    const productKey = `${template.id}-${item.productId}` // Clave única por template y producto
-    
-    // Si es un producto pendiente y el usuario no ha confirmado antes
-    if (isPending && currentQuantity > 0 && !confirmedProducts.has(productKey)) {
-      // Mostrar modal de confirmación para productos pendientes
-      setPendingItemToDecrease({ index, item })
-      setShowConfirmModal(true)
-      return
-    }
-    
-    // Proceder con la disminución normal (ya sea porque no es pendiente o porque ya fue confirmado)
-    onUpdateQuantity(index, currentQuantity - 1)
-  }
-
-  // Función para confirmar la disminución
-  const confirmDecrease = () => {
-    if (pendingItemToDecrease) {
-      // Marcar este producto como confirmado para este template
-      const productKey = `${template.id}-${pendingItemToDecrease.item.productId}`
-      setConfirmedProducts(prev => new Set(prev).add(productKey))
-      
-      // Proceder con la disminución
-      onUpdateQuantity(pendingItemToDecrease.index, pendingItemToDecrease.item.quantity - 1)
-    }
-    setShowConfirmModal(false)
-    setPendingItemToDecrease(null)
-  }
-
-  // Función para cancelar la disminución
-  const cancelDecrease = () => {
-    setShowConfirmModal(false)
-    setPendingItemToDecrease(null)
-  }
-
   return (
     <Card 
       className={`hover:shadow-lg transition-all ${
@@ -250,7 +206,7 @@ export const TemplateCard = memo(function TemplateCard({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDecreaseQuantity(index, item.quantity, item)}
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
                                 className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
@@ -345,7 +301,7 @@ export const TemplateCard = memo(function TemplateCard({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDecreaseQuantity(index, item.quantity, item)}
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
                                 className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
@@ -440,7 +396,7 @@ export const TemplateCard = memo(function TemplateCard({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => handleDecreaseQuantity(index, item.quantity, item)}
+                                onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
                                 className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
@@ -499,47 +455,6 @@ export const TemplateCard = memo(function TemplateCard({
           )}
         </div>
       </CardContent>
-
-      {/* Modal de confirmación para productos pendientes */}
-      <Dialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-500" />
-              Producto pendiente
-            </DialogTitle>
-            <DialogDescription className="text-left">
-              <strong>"{pendingItemToDecrease?.item.productName}"</strong> fue asignado automáticamente porque fue rechazado en el pedido anterior.
-            </DialogDescription>
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                ¿Estás seguro de que quieres disminuir la cantidad de este producto?
-              </p>
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                <p className="text-sm text-orange-800">
-                  💡 <strong>Tip:</strong> Puedes hacer clic en "Cancelar" si no quieres cambiar la cantidad.
-                </p>
-              </div>
-            </div>
-          </DialogHeader>
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button 
-              variant="outline" 
-              onClick={cancelDecrease}
-              className="w-full sm:w-auto"
-            >
-              Cancelar
-            </Button>
-            <Button 
-              variant="destructive" 
-              onClick={confirmDecrease}
-              className="w-full sm:w-auto"
-            >
-              Sí, disminuir cantidad
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </Card>
   )
 })
