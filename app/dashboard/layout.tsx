@@ -117,7 +117,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-muted/40">
-      <header className="sticky top-0 z-50 border-b bg-background">
+      <header className="sticky top-0 z-50 border-b bg-background safe-area-top">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <div className="flex items-center gap-2">
             {/* Menú móvil - Versión simple (no se muestra para sucursal) */}

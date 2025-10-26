@@ -4,8 +4,11 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/lib/auth-context"
-import { Toaster } from "@/components/ui/toaster"
+import { MobileToaster } from "@/components/ui/toast-mobile"
 import { Suspense } from "react"
+import { Providers } from "@/app/providers"
+import { ErrorBoundary } from "@/components/error-boundary"
+import { OfflineIndicator } from "@/components/mobile/offline-indicator"
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -64,10 +67,15 @@ export default function RootLayout({
       </head>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
         <Suspense fallback={null}>
-          <AuthProvider>
-            {children}
-            <Toaster />
-          </AuthProvider>
+          <Providers>
+            <ErrorBoundary>
+              <AuthProvider>
+                {children}
+                <MobileToaster />
+                <OfflineIndicator />
+              </AuthProvider>
+            </ErrorBoundary>
+          </Providers>
         </Suspense>
         <Analytics />
       </body>

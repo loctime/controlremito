@@ -212,6 +212,79 @@
     -ms-user-select: none;
     user-select: none;
   }
+  
+  /* Shimmer animation for skeleton loaders */
+  @keyframes shimmer {
+    0% { 
+      background-position: -1000px 0; 
+    }
+    100% { 
+      background-position: 1000px 0; 
+    }
+  }
+
+  .skeleton-loading {
+    animation: shimmer 2s infinite;
+    background: linear-gradient(
+      to right,
+      #f0f0f0 4%,
+      #e0e0e0 25%,
+      #f0f0f0 36%
+    );
+    background-size: 1000px 100%;
+  }
+  
+  /* Micro-interactions */
+  .button-press {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  .card-hover {
+    transition: all 0.2s ease;
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Smooth transitions for mobile */
+  * {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  
+  /* Safe areas para dispositivos con notch */
+  .safe-area-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+
+  .safe-area-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-area-left {
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+
+  .safe-area-right {
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  /* Header con safe area */
+  header {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Tab bar navigation safe area */
+  .mobile-nav {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+  }
+  
+  /* Full height con safe areas */
+  .min-h-screen-safe {
+    min-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
 }
 
 /* Agregando estilo para firmas */

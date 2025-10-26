@@ -2,11 +2,15 @@
   "name": "Remito Control",
   "short_name": "Remito",
   "description": "Aplicación para gestión de remitos y órdenes de entrega",
-  "start_url": "/",
+  "start_url": "/dashboard",
+  "id": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
   "orientation": "portrait-primary",
+  "scope": "/",
+  "lang": "es",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icon-72x72.png",
@@ -58,6 +62,29 @@
     }
   ],
   "categories": ["business", "productivity"],
+  "screenshots": [
+    {
+      "src": "/screenshots/mobile-dashboard.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Dashboard principal en móvil"
+    },
+    {
+      "src": "/screenshots/mobile-orders.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Lista de pedidos en móvil"
+    },
+    {
+      "src": "/screenshots/desktop-dashboard.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard en escritorio"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Nueva Orden",
@@ -67,12 +94,28 @@
       "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     },
     {
+      "name": "Ver Pedidos",
+      "short_name": "Pedidos",
+      "description": "Ver todos los pedidos",
+      "url": "/dashboard/orders",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Plantillas",
+      "short_name": "Plantillas",
+      "description": "Gestionar plantillas",
+      "url": "/dashboard/templates",
+      "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Remitos",
       "short_name": "Remitos",
       "description": "Ver remitos",
       "url": "/dashboard/delivery-notes",
       "icons": [{ "src": "/icon-192x192.png", "sizes": "192x192" }]
     }
-  ]
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
 }
 

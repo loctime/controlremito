@@ -6,9 +6,11 @@ interface OrderFormHeaderProps {
   editingOrderId: string | null
   saving: boolean
   lastSaved: Date | null
+  autoSaving?: boolean
+  autoLastSaved?: Date | null
 }
 
-export function OrderFormHeader({ editingOrderId, saving, lastSaved }: OrderFormHeaderProps) {
+export function OrderFormHeader({ editingOrderId, saving, lastSaved, autoSaving, autoLastSaved }: OrderFormHeaderProps) {
   return (
     <div className="mb-6">
       <Link href="/dashboard/orders">
@@ -33,8 +35,17 @@ export function OrderFormHeader({ editingOrderId, saving, lastSaved }: OrderForm
               <span>Guardando...</span>
             </div>
           )}
+          {autoSaving && !saving && (
+            <div className="flex items-center gap-1">
+              <div className="animate-pulse rounded-full h-2 w-2 bg-green-500"></div>
+              <span>Auto-guardando...</span>
+            </div>
+          )}
           {lastSaved && !saving && (
             <span>Guardado: {lastSaved.toLocaleTimeString()}</span>
+          )}
+          {autoLastSaved && !saving && !lastSaved && (
+            <span>Auto-guardado: {autoLastSaved.toLocaleTimeString()}</span>
           )}
         </div>
       </div>

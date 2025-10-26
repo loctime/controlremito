@@ -17,6 +17,7 @@ import { useTemplates } from "@/hooks/use-templates"
 import { useNewOrderForm } from "@/hooks/use-new-order-form"
 import { useOrderData } from "@/hooks/use-order-data"
 import { useOrderDetails } from "@/hooks/use-order-details"
+import { useAutoSave } from "@/hooks/use-auto-save"
 
 import { NewOrderService } from "@/lib/new-order.service"
 import { TemplateService } from "@/lib/template.service"
@@ -53,6 +54,17 @@ function NewOrderContent() {
     handleSaveAsTemplate,
     clearDraft,
   } = useNewOrderForm()
+
+  // Auto-save cada 3 segundos
+  const { isSaving: autoSaving, lastSaved: autoLastSaved } = useAutoSave(
+    formData,
+    async (data) => {
+      if (data.items.length > 0 && data.toBranchId) {
+        await DraftService.saveDraft(data, user!)
+      }
+    },
+    { delay: 3000 }
+  )
 
   // Cargar plantilla automáticamente si hay parámetro en URL
   useEffect(() => {
@@ -244,6 +256,8 @@ function NewOrderContent() {
           editingOrderId={editingOrderId}
           saving={saving}
           lastSaved={lastSaved}
+          autoSaving={autoSaving}
+          autoLastSaved={autoLastSaved}
         />
 
         <form onSubmit={handleFormSubmit} className="space-y-6">

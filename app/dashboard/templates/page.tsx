@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Search } from "lucide-react"
+import { Plus } from "lucide-react"
+import { SearchInput } from "@/components/ui/search-input"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -76,15 +77,11 @@ function TemplatesContent() {
         </div>
 
         <div className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Buscar plantillas..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+          <SearchInput
+            onSearch={setSearchTerm}
+            placeholder="Buscar plantillas..."
+            delay={300}
+          />
         </div>
 
         <div className="grid gap-4">
