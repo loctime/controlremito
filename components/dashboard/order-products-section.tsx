@@ -130,6 +130,8 @@ export function OrderProductsSection({
                       </Label>
                       <Input
                         type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         min="0"
                         placeholder="0"
                         value={item.quantity || 0}

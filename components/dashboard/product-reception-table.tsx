@@ -64,6 +64,8 @@ export function ProductReceptionTable({
                     <label className="text-sm font-medium text-gray-700">Cantidad Recibida</label>
                     <Input
                       type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       min="0"
                       max={item.assembledQuantity !== undefined ? item.assembledQuantity : item.quantity}
                       value={itemData.received}
@@ -174,6 +176,8 @@ export function ProductReceptionTable({
                     <td className="py-2 px-2 text-center">
                       <Input
                         type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         min="0"
                         max={item.assembledQuantity !== undefined ? item.assembledQuantity : item.quantity}
                         value={itemData.received}

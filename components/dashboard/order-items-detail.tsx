@@ -294,6 +294,8 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
                       <div className="flex items-center gap-1">
                         <Input
                           type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           min="0"
                           max={item.quantity}
                           value={customQuantities[item.id] ?? 0}

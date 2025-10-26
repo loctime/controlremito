@@ -49,7 +49,7 @@ export function DataTable<T>({
 
   return (
     <div className="overflow-x-auto">
-      <table className={cn("w-full", className)}>
+      <table className={cn("w-full min-w-0", className)}>
         <thead>
           <tr className={cn("border-b bg-gray-50", headerClassName)}>
             {columns.map((column) => (

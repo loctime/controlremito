@@ -69,9 +69,51 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
             </div>
           </div>
           
-          {/* Tabla - solo visible si no está colapsada */}
+          {/* Vista móvil - Cards */}
           {!isTemplateCollapsed(templateName) && (
-            <div className="overflow-x-auto">
+            <div className="block md:hidden space-y-3">
+              {templateOrders.map((order) => (
+                <div key={order.id} className="bg-white border rounded-lg p-4 shadow-sm">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h5 className="font-medium text-gray-900">
+                          {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
+                        </h5>
+                        <p className="text-sm text-gray-600">
+                          {order.items.filter(item => item.quantity > 0).length} productos
+                        </p>
+                      </div>
+                      <StatusBadge status={order.status} />
+                    </div>
+                    
+                    {user?.role === "branch" && (
+                      <div className="text-sm">
+                        <span className="text-gray-600">Aceptado por:</span>
+                        <span className="ml-1 font-medium">{order.acceptedByName || "Pendiente"}</span>
+                      </div>
+                    )}
+                    
+                    {(user?.role === "factory" || user?.role === "delivery") && (
+                      <div className="flex justify-end">
+                        <Button 
+                          size="sm" 
+                          className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                          onClick={() => onAcceptOrder(order)}
+                        >
+                          Aceptar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Vista desktop - Tabla */}
+          {!isTemplateCollapsed(templateName) && (
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full min-w-[300px]">
                 <thead>
                   <tr className="border-b bg-gray-50">

@@ -54,7 +54,50 @@ export function TemplateGroup({
       showCount={orders.length}
       countLabel={`pedido${orders.length !== 1 ? 's' : ''}`}
     >
-        <div className="overflow-x-auto">
+        <div className="block md:hidden space-y-3">
+          {orders.map((order) => (
+            <div key={order.id} className="bg-white border rounded-lg p-4 shadow-sm">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h5 className="font-medium text-gray-900">
+                      {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
+                    </h5>
+                    <p className="text-sm text-gray-600">{order.items.length} productos</p>
+                  </div>
+                  <StatusBadge status={order.status} />
+                </div>
+                
+                {user?.role === "branch" && (
+                  <>
+                    <div className="text-sm">
+                      <span className="text-gray-600">Delivery:</span>
+                      <span className="ml-1 font-medium">{order.deliveredByName || "Sin asignar"}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-gray-600">Tomado el:</span>
+                      <span className="ml-1 font-medium">
+                        {order.acceptedAt ? new Date(order.acceptedAt).toLocaleDateString() : "Pendiente"}
+                      </span>
+                    </div>
+                  </>
+                )}
+                
+                <div className="flex justify-end">
+                  <Button 
+                    size="sm" 
+                    className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                    onClick={() => onAcceptOrder(order)}
+                  >
+                    Aceptar
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full min-w-[300px]">
             <thead>
               <tr className="border-b bg-gray-50">
