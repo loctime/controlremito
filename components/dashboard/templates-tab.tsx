@@ -4,10 +4,12 @@ import { useMemo, useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { FileText, Plus, Loader2 } from "lucide-react"
+import { FileText, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { TemplateCard } from "./template-card"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { EmptyState } from "@/components/ui/empty-state"
 import { getReplacementQueue } from "@/lib/replacement-service"
 import type { Order, Template, User } from "@/lib/types"
 import type { TemplateStatus } from "@/lib/template-status.service"
@@ -192,12 +194,7 @@ export function TemplatesTab({
   ])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <span className="ml-2 text-muted-foreground">Cargando plantillas...</span>
-      </div>
-    )
+    return <LoadingSpinner text="Cargando plantillas..." size="lg" className="py-12" />
   }
 
   return (
@@ -248,15 +245,11 @@ export function TemplatesTab({
 
       {/* Mensaje cuando no hay plantillas */}
       {templates.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-8">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No hay plantillas disponibles</h3>
-            <p className="text-muted-foreground">
-              El administrador aún no ha creado plantillas para tu sucursal. Puedes crear un pedido manual usando el botón de arriba.
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon={FileText}
+          title="No hay plantillas disponibles"
+          description="El administrador aún no ha creado plantillas para tu sucursal. Puedes crear un pedido manual usando el botón de arriba."
+        />
       )}
     </div>
   )
