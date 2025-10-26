@@ -96,9 +96,58 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
             </div>
           </div>
           
-          {/* Tabla - solo visible si no está colapsada */}
+          {/* Vista móvil - Cards */}
           {!isCollapsed(templateName) && (
-            <div className="overflow-x-auto">
+            <div className="block md:hidden space-y-3">
+              {organizeOrdersByParent(templateOrders).map(({ order: parentOrder, children }) => (
+                <div key={parentOrder.id} className="space-y-2">
+                  {/* Card del pedido padre */}
+                  <div className="bg-white border rounded-lg p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex-1">
+                        <h5 className="font-medium text-gray-900">{parentOrder.fromBranchName}</h5>
+                        <p className="text-sm text-gray-600">{parentOrder.items.length} productos</p>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                        onClick={() => onAcceptOrder(parentOrder)}
+                      >
+                        Aceptar
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Cards de pedidos hijos */}
+                  {children.map((childOrder) => (
+                    <div key={childOrder.id} className="bg-blue-50 border-l-4 border-l-blue-300 rounded-lg p-4 ml-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-blue-600 font-medium">↳ {childOrder.fromBranchName}</span>
+                          </div>
+                          <p className="text-sm text-gray-600">{childOrder.items.length} productos</p>
+                          <p className="text-xs text-gray-500">Adicional a {parentOrder.orderNumber}</p>
+                        </div>
+                        <Button 
+                          size="sm" 
+                          className="bg-blue-600 hover:bg-blue-700 text-white min-h-[44px] px-4"
+                          onClick={() => onAcceptOrder(childOrder)}
+                        >
+                          Aceptar
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Vista desktop - Tabla */}
+          {!isCollapsed(templateName) && (
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full min-w-[300px]">
                 <thead>
                   <tr className="border-b bg-gray-50">

@@ -31,7 +31,7 @@ export function OrderBasicInfo({ formData, setFormData, branches, templates }: O
             value={formData.toBranchId}
             onValueChange={(value) => setFormData((prev: any) => ({ ...prev, toBranchId: value }))}
           >
-            <SelectTrigger className={!formData.toBranchId ? "border-red-300 focus:border-red-500" : ""}>
+            <SelectTrigger className={`min-h-[44px] touch-manipulation ${!formData.toBranchId ? "border-red-300 focus:border-red-500" : ""}`}>
               <SelectValue placeholder="Seleccionar destino" />
             </SelectTrigger>
             <SelectContent>
@@ -75,6 +75,7 @@ export function OrderBasicInfo({ formData, setFormData, branches, templates }: O
             value={formData.notes}
             onChange={(e) => setFormData((prev: any) => ({ ...prev, notes: e.target.value }))}
             rows={3}
+            className="min-h-[44px] touch-manipulation resize-none"
           />
         </div>
       </CardContent>

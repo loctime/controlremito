@@ -111,12 +111,12 @@ export function OrderProductsSection({
                         onUpdateItem(index, "isPending", false)
                       }
                     }}>
-                      <SelectTrigger className={!item.productId ? "border-red-300 focus:border-red-500" : ""}>
+                      <SelectTrigger className={`min-h-[44px] touch-manipulation ${!item.productId ? "border-red-300 focus:border-red-500" : ""}`}>
                         <SelectValue placeholder="Seleccionar producto" />
                       </SelectTrigger>
                       <SelectContent>
                         {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
+                          <SelectItem key={product.id} value={product.id} className="min-h-[44px] flex items-center">
                             {product.name} ({product.unit})
                           </SelectItem>
                         ))}
@@ -134,7 +134,7 @@ export function OrderProductsSection({
                         placeholder="0"
                         value={item.quantity || 0}
                         onChange={(e) => onUpdateItem(index, "quantity", Number(e.target.value) || 0)}
-                        className={`w-24 sm:w-32 ${item.quantity < 0 ? "border-red-300 focus:border-red-500" : ""} ${
+                        className={`w-24 sm:w-32 min-h-[44px] touch-manipulation text-center ${item.quantity < 0 ? "border-red-300 focus:border-red-500" : ""} ${
                           item.isPending ? "border-blue-400 border-2 bg-blue-50 font-semibold text-blue-700" : ""
                         }`}
                         required
@@ -146,7 +146,7 @@ export function OrderProductsSection({
                         variant="ghost" 
                         size="sm" 
                         onClick={() => onRemoveItem(index)}
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 min-h-[44px] min-w-[44px] touch-manipulation"
                       >
                         <X className="h-4 w-4" />
                       </Button>

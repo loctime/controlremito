@@ -124,12 +124,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {user?.role !== "branch" && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="md:hidden mr-2 border-2">
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Abrir menú</span>
-                  </Button>
+            <Button variant="outline" size="sm" className="md:hidden mr-2 border-2 min-h-[44px] min-w-[44px] touch-manipulation">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Abrir menú</span>
+            </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
+                <DropdownMenuContent align="start" className="w-64">
                   {filteredNavigation.map((item) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href
@@ -139,12 +139,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <Link
                           href={item.href}
                           className={cn(
-                            "flex items-center gap-2 cursor-pointer",
+                            "flex items-center gap-3 cursor-pointer min-h-[44px] touch-manipulation px-3 py-2",
                             isActive && "bg-accent"
                           )}
                         >
-                          <Icon className="h-4 w-4" />
-                          {mobileLabel}
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          <span className="text-sm font-medium">{mobileLabel}</span>
                         </Link>
                       </DropdownMenuItem>
                     )
@@ -162,7 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Button 
                 onClick={installPWA}
                 size="sm"
-                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white h-9"
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white min-h-[44px] touch-manipulation"
               >
                 <Download className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Instalar App</span>
@@ -227,7 +227,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <p className="text-sm font-medium truncate max-w-[150px]">{user?.name}</p>
               <p className="text-xs text-muted-foreground">{getRoleLabel(user?.role || "")}</p>
             </div>
-            <Button variant="outline" onClick={signOut} className="text-xs sm:text-sm h-9">
+            <Button variant="outline" onClick={signOut} className="text-xs sm:text-sm min-h-[44px] touch-manipulation">
               <span className="hidden sm:inline">Cerrar sesión</span>
               <span className="sm:hidden">Salir</span>
             </Button>
@@ -236,9 +236,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </header>
 
       {/* Menú horizontal para pantallas pequeñas */}
-      <div className="md:hidden border-b bg-background">
+      <div className="md:hidden border-b bg-background sticky top-16 z-40">
         <div className="container mx-auto px-4 py-2">
-          <nav className="flex gap-2 overflow-x-auto">
+          <nav className="flex gap-1 overflow-x-auto pb-1">
             {filteredNavigation.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
@@ -248,14 +248,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap",
+                    "flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] touch-manipulation flex-shrink-0",
                     isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
-                  {mobileLabel}
+                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm">{mobileLabel}</span>
                 </Link>
               )
             })}

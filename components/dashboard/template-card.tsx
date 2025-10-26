@@ -95,7 +95,7 @@ export const TemplateCard = memo(function TemplateCard({
                 variant="ghost"
                 size="sm"
                 onClick={onDeleteTemplate}
-                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 min-h-[44px] min-w-[44px] touch-manipulation"
                 title="Eliminar plantilla personal"
               >
                 <Trash2 className="h-4 w-4" />
@@ -129,7 +129,7 @@ export const TemplateCard = memo(function TemplateCard({
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="flex-1"
+                  className="flex-1 min-h-[44px] touch-manipulation"
                   onClick={isEditing ? onCancelEditing : onStartEditing}
                 >
                   {isEditing ? (
@@ -146,7 +146,7 @@ export const TemplateCard = memo(function TemplateCard({
                 </Button>
                 <Button 
                   size="sm" 
-                  className={`flex-1 ${
+                  className={`flex-1 min-h-[44px] touch-manipulation ${
                     existingDraft.allowedSendDays && !isDayAllowed(existingDraft.allowedSendDays)
                       ? 'opacity-50 cursor-not-allowed'
                       : ''
@@ -209,7 +209,7 @@ export const TemplateCard = memo(function TemplateCard({
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
-                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
+                                className={`h-6 w-6 p-0 min-h-[44px] min-w-[44px] touch-manipulation ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 -
                               </Button>
@@ -220,7 +220,7 @@ export const TemplateCard = memo(function TemplateCard({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
+                                className={`h-6 w-6 p-0 min-h-[44px] min-w-[44px] touch-manipulation ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 +
                               </Button>
@@ -234,7 +234,7 @@ export const TemplateCard = memo(function TemplateCard({
                   <div className="flex gap-2">
                     <Button 
                       onClick={onSaveChanges}
-                      className="flex-1"
+                      className="flex-1 min-h-[44px] touch-manipulation"
                       size="sm"
                       disabled={savingOrder}
                     >
@@ -254,7 +254,7 @@ export const TemplateCard = memo(function TemplateCard({
             <div className="space-y-3">
               <Button 
                 onClick={onCreateOrder}
-                className="w-full"
+                className="w-full min-h-[44px] touch-manipulation"
                 disabled={creatingOrder}
               >
                 {creatingOrder ? (
@@ -304,7 +304,7 @@ export const TemplateCard = memo(function TemplateCard({
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
-                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
+                                className={`h-6 w-6 p-0 min-h-[44px] min-w-[44px] touch-manipulation ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 -
                               </Button>
@@ -315,7 +315,7 @@ export const TemplateCard = memo(function TemplateCard({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
+                                className={`h-6 w-6 p-0 min-h-[44px] min-w-[44px] touch-manipulation ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 +
                               </Button>
@@ -330,7 +330,7 @@ export const TemplateCard = memo(function TemplateCard({
                     <Button 
                       onClick={onCancelEditing}
                       variant="outline"
-                      className="flex-1"
+                      className="flex-1 min-h-[44px] touch-manipulation"
                       size="sm"
                     >
                       <X className="mr-1 h-3 w-3" />
@@ -338,7 +338,7 @@ export const TemplateCard = memo(function TemplateCard({
                     </Button>
                     <Button 
                       onClick={onSaveChanges}
-                      className="flex-1"
+                      className="flex-1 min-h-[44px] touch-manipulation"
                       size="sm"
                       disabled={savingOrder}
                     >
@@ -358,7 +358,7 @@ export const TemplateCard = memo(function TemplateCard({
             <div className="space-y-3">
               <Button 
                 onClick={onCreateOrder}
-                className="w-full"
+                className="w-full min-h-[44px] touch-manipulation"
               >
                 <Plus className="mr-2 h-4 w-4" />
                 <span className="hidden sm:inline">Ver opciones</span>
@@ -399,7 +399,7 @@ export const TemplateCard = memo(function TemplateCard({
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity - 1)}
                                 disabled={item.quantity <= 0}
-                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
+                                className={`h-6 w-6 p-0 min-h-[44px] min-w-[44px] touch-manipulation ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 -
                               </Button>
@@ -410,7 +410,7 @@ export const TemplateCard = memo(function TemplateCard({
                                 variant="outline"
                                 size="sm"
                                 onClick={() => onUpdateQuantity(index, item.quantity + 1)}
-                                className={`h-6 w-6 p-0 ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
+                                className={`h-6 w-6 p-0 min-h-[44px] min-w-[44px] touch-manipulation ${isPending ? 'border-blue-300 hover:bg-blue-100' : ''}`}
                               >
                                 +
                               </Button>
@@ -425,7 +425,7 @@ export const TemplateCard = memo(function TemplateCard({
                     <Button 
                       onClick={onCancelEditing}
                       variant="outline"
-                      className="flex-1"
+                      className="flex-1 min-h-[44px] touch-manipulation"
                       size="sm"
                     >
                       <X className="mr-1 h-3 w-3" />
@@ -433,7 +433,7 @@ export const TemplateCard = memo(function TemplateCard({
                     </Button>
                     <Button 
                       onClick={onSaveChanges}
-                      className="flex-1"
+                      className="flex-1 min-h-[44px] touch-manipulation"
                       size="sm"
                       disabled={savingOrder}
                     >

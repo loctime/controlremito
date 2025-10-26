@@ -30,7 +30,107 @@ export function ProductReceptionTable({
   return (
     <div className="bg-white p-4 rounded-lg border">
       <h4 className="font-semibold text-gray-900 mb-3">📋 Productos</h4>
-      <div className="overflow-x-auto">
+      
+      {/* Vista móvil - Cards */}
+      <div className="block md:hidden space-y-4">
+        {order.items.map((item) => {
+          const itemData = itemQuantities[item.id] || { received: 0, status: 'pending' as const }
+          return (
+            <div key={item.id} className={`border rounded-lg p-4 ${
+              itemData.status === 'no' ? 'bg-red-50 border-red-200' : 
+              itemData.status === 'ok' && itemData.received > 0 && itemData.received < item.quantity ? 'bg-blue-50 border-blue-200' : 'bg-gray-50'
+            }`}>
+              <div className="space-y-3">
+                <div>
+                  <h5 className="font-medium text-gray-900">{item.productName}</h5>
+                  <p className="text-sm text-gray-500">{item.unit}</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-600">Pedida:</span>
+                    <span className="ml-1 font-medium">{item.quantity}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Enviada:</span>
+                    <span className="ml-1 font-medium">
+                      {item.assembledQuantity !== undefined ? item.assembledQuantity : item.quantity}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Cantidad Recibida</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max={item.assembledQuantity !== undefined ? item.assembledQuantity : item.quantity}
+                      value={itemData.received}
+                      onChange={(e) => onUpdateReceivedQuantity(item.id, parseInt(e.target.value) || 0)}
+                      className="w-full text-center min-h-[44px] mt-1"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700">Estado:</span>
+                      <StatusBadge status={itemData.status} />
+                    </div>
+                    
+                    {/* Botones de acción */}
+                    {item.assembledQuantity !== 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                          onClick={() => onUpdateItemStatus(item.id, 'ok')}
+                        >
+                          OK
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-red-600 hover:bg-red-700 text-white min-h-[44px] px-4"
+                          onClick={() => onUpdateItemStatus(item.id, 'no')}
+                        >
+                          NO
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Comentario para productos marcados como NO */}
+                {itemData.status === 'no' && (
+                  <div className="bg-white p-3 rounded border border-red-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium text-red-800">📝 Motivo:</span>
+                    </div>
+                    <textarea
+                      value={itemData.comment || ''}
+                      onChange={(e) => onUpdateItemComment(item.id, e.target.value)}
+                      placeholder="Ej: Producto en mal estado, no llegó..."
+                      className="w-full p-2 border border-red-300 rounded text-sm resize-none min-h-[44px]"
+                      rows={2}
+                      required
+                    />
+                    {(!itemData.comment || itemData.comment.trim() === '') && (
+                      <p className="text-sm text-red-600 mt-2">
+                        ⚠️ Explica por qué no recibes este producto
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Vista desktop - Tabla */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b bg-gray-50">

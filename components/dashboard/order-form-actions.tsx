@@ -19,7 +19,7 @@ export function OrderFormActions({ loading, formData, onSaveAsTemplate }: OrderF
     <>
       <div className="flex flex-col sm:flex-row justify-end gap-2">
         <Link href="/dashboard/orders" className="w-full sm:w-auto">
-          <Button type="button" variant="outline" className="w-full">
+          <Button type="button" variant="outline" className="w-full min-h-[44px] touch-manipulation">
             Cancelar
           </Button>
         </Link>
@@ -28,14 +28,14 @@ export function OrderFormActions({ loading, formData, onSaveAsTemplate }: OrderF
           variant="secondary"
           onClick={onSaveAsTemplate}
           disabled={!formData.toBranchId || formData.items.length === 0 || formData.items.some(item => !item.productId)}
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto min-h-[44px] touch-manipulation"
         >
           📋 Crear plantilla con esta base
         </Button>
         <Button 
           type="submit" 
           disabled={loading || !isFormValid} 
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto min-h-[44px] touch-manipulation"
         >
           {loading ? (
             <>
