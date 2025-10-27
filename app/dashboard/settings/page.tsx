@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2, Save, X, User, PenTool, Building2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Save, X, User, PenTool, Building2, AlertTriangle } from "lucide-react"
 import { useEffect, useState, useRef } from "react"
 import { collection, addDoc, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -25,6 +25,7 @@ import { useAuth } from "@/lib/auth-context"
 import type { Branch } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { FirestoreDiagnostics } from "@/components/debug/firestore-diagnostics"
 
 function SettingsContent() {
   const { user } = useAuth()
@@ -286,7 +287,7 @@ function SettingsContent() {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-4">
-          <TabsList className={`grid w-full ${(user?.role === "admin" || user?.role === "maxdev") ? "grid-cols-3" : "grid-cols-2"}`}>
+          <TabsList className={`grid w-full ${(user?.role === "admin" || user?.role === "maxdev") ? "grid-cols-4" : "grid-cols-3"}`}>
             <TabsTrigger value="profile">
               <User className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Perfil</span>
@@ -294,6 +295,10 @@ function SettingsContent() {
             <TabsTrigger value="signature">
               <PenTool className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Firma</span>
+            </TabsTrigger>
+            <TabsTrigger value="diagnostics">
+              <AlertTriangle className="mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Diagnóstico</span>
             </TabsTrigger>
             {(user?.role === "admin" || user?.role === "maxdev") && (
               <TabsTrigger value="branches">
@@ -427,6 +432,44 @@ function SettingsContent() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* TAB DE DIAGNÓSTICO */}
+          <TabsContent value="diagnostics">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Diagnóstico del Sistema</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Herramientas para diagnosticar problemas de conectividad y configuración
+                </p>
+              </div>
+              
+              <FirestoreDiagnostics />
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Información del Sistema</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Navegador:</span>
+                    <span>{typeof window !== 'undefined' ? window.navigator.userAgent.split(' ').slice(-2).join(' ') : 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Modo:</span>
+                    <span>{process.env.NODE_ENV}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">PWA:</span>
+                    <span>{typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches ? 'Instalada' : 'No instalada'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Online:</span>
+                    <span>{typeof window !== 'undefined' && navigator.onLine ? 'Sí' : 'No'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* TAB DE SUCURSALES (solo para admin) */}

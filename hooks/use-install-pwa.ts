@@ -19,13 +19,8 @@ export function useInstallPWA() {
       return
     }
 
-    // MODO DESARROLLO: Forzar que aparezca el botón para testing
-    // Elimina estas líneas en producción si no quieres el botón en desarrollo
-    if (process.env.NODE_ENV === "development") {
-      setIsInstallable(true)
-      console.log("🔧 PWA en modo desarrollo - Botón visible para testing")
-      console.log("💡 Para ver funcionamiento real, ejecuta: pnpm build && pnpm start")
-    }
+    // MODO DESARROLLO: Solo mostrar si hay un prompt real
+    // No forzar isInstallable en desarrollo para evitar errores
 
     // Escuchar el evento beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
