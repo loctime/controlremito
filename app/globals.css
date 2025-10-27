@@ -134,11 +134,19 @@
   [role="button"], 
   input[type="button"], 
   input[type="submit"], 
-  input[type="reset"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+  
+  /* Links should be clickable and not interfere with navigation */
   a[href] {
     min-height: 44px;
     min-width: 44px;
     touch-action: manipulation;
+    pointer-events: auto;
+    cursor: pointer;
   }
   
   /* Better scrolling on mobile */
@@ -211,6 +219,52 @@
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+  }
+  
+  /* Ensure navigation links are always clickable */
+  nav a[href] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative;
+    z-index: 1;
+  }
+  
+  /* Fix for mobile navigation tabs */
+  .mobile-nav a[href] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Ensure dropdown menu items are clickable */
+  [role="menuitem"] a[href] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+  }
+  
+  /* Fix for Radix UI Tabs components */
+  [data-slot="tabs-trigger"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Ensure TabsList is clickable */
+  [data-slot="tabs-list"] {
+    pointer-events: auto !important;
+  }
+  
+  /* Fix for TabsTrigger hover and active states */
+  [data-slot="tabs-trigger"]:hover {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+  }
+  
+  [data-slot="tabs-trigger"][data-state="active"] {
+    pointer-events: auto !important;
+    cursor: pointer !important;
   }
   
   /* Shimmer animation for skeleton loaders */

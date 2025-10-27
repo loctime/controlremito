@@ -101,11 +101,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors relative z-10",
               isActive
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
+            style={{ pointerEvents: 'auto', cursor: 'pointer' }}
           >
             <Icon className="h-4 w-4" />
             {item.name}
@@ -139,9 +140,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                         <Link
                           href={item.href}
                           className={cn(
-                            "flex items-center gap-3 cursor-pointer min-h-[44px] touch-manipulation px-3 py-2",
+                            "flex items-center gap-3 cursor-pointer min-h-[44px] touch-manipulation px-3 py-2 relative z-10",
                             isActive && "bg-accent"
                           )}
+                          style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                         >
                           <Icon className="h-4 w-4 flex-shrink-0" />
                           <span className="text-sm font-medium">{mobileLabel}</span>
@@ -236,7 +238,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </header>
 
       {/* Menú horizontal para pantallas pequeñas */}
-      <div className="md:hidden border-b bg-background sticky top-16 z-40">
+      <div className="md:hidden border-b bg-background sticky top-16 z-40 mobile-nav">
         <div className="container mx-auto px-4 py-2">
           <nav className="flex gap-1 overflow-x-auto pb-1">
             {filteredNavigation.map((item) => {
@@ -248,11 +250,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] touch-manipulation flex-shrink-0",
+                    "flex items-center gap-2 rounded-lg px-3 py-3 text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] touch-manipulation flex-shrink-0 relative z-10",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80",
                   )}
+                  style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                 >
                   <Icon className="h-4 w-4 flex-shrink-0" />
                   <span className="text-xs sm:text-sm">{mobileLabel}</span>

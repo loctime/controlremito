@@ -3,6 +3,7 @@
 import { Fragment } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { StatusBadge } from "@/components/ui/status-badge"
 import { OrderDetailsView } from "./order-details-view"
 import { CollapsibleSection } from "./collapsible-section"
 import type { Order, User } from "@/lib/types"
@@ -83,15 +84,17 @@ export function TemplateGroup({
                   </>
                 )}
                 
-                <div className="flex justify-end">
-                  <Button 
-                    size="sm" 
-                    className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
-                    onClick={() => onAcceptOrder(order)}
-                  >
-                    Aceptar
-                  </Button>
-                </div>
+                {user?.role === "branch" && (
+                  <div className="flex justify-end">
+                    <Button 
+                      size="sm" 
+                      className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                      onClick={() => onMarkAsReceived(order.id)}
+                    >
+                      Marcar como Recibido
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

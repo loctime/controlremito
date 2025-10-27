@@ -96,13 +96,25 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                     
                     {(user?.role === "factory" || user?.role === "delivery") && (
                       <div className="flex justify-end">
-                        <Button 
-                          size="sm" 
-                          className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
-                          onClick={() => onAcceptOrder(order)}
-                        >
-                          Aceptar
-                        </Button>
+                        {user?.role === "factory" && onMarkAsReady && !order.preparedAt && (
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                            onClick={() => onMarkAsReady(order.id)}
+                            disabled={getOrderProgress(order) < 100}
+                          >
+                            ✓ Listo
+                          </Button>
+                        )}
+                        {user?.role === "delivery" && onTakeForDelivery && order.preparedAt && (
+                          <Button 
+                            size="sm" 
+                            className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                            onClick={() => onTakeForDelivery(order.id)}
+                          >
+                            🚚 Tomar
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
