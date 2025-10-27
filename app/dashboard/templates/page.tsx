@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Plus } from "lucide-react"
+import { Plus, Loader2 } from "lucide-react"
 import { SearchInput } from "@/components/ui/search-input"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { TemplateForm } from "@/components/dashboard/template-form"
 import { TemplateManagementCard } from "@/components/dashboard/template-management-card"
-import { useTemplates } from "@/hooks/use-templates"
+import { useTemplatesQuery, useProductsQuery, useBranchesQuery, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "@/hooks/use-templates-query"
 import type { Template } from "@/lib/types"
 
 function TemplatesContent() {
@@ -17,15 +17,15 @@ function TemplatesContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   
-  const {
-    templates,
-    products,
-    branches,
-    updating,
-    updateExistingTemplates,
-    saveTemplate,
-    deleteTemplate,
-  } = useTemplates()
+  // TanStack Query hooks
+  const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useTemplatesQuery()
+  const { data: products = [], isLoading: productsLoading } = useProductsQuery()
+  const { data: branches = [], isLoading: branchesLoading } = useBranchesQuery()
+  
+  // Mutations
+  const createTemplateMutation = useCreateTemplate()
+  const updateTemplateMutation = useUpdateTemplate()
+  const deleteTemplateMutation = useDeleteTemplate()
 
   const handleEdit = (template: Template) => {
     setEditingTemplate(template)
@@ -33,16 +33,26 @@ function TemplatesContent() {
   }
 
   const handleDelete = (templateId: string) => {
-    deleteTemplate(templateId)
+    deleteTemplateMutation.mutate(templateId)
   }
 
   const handleFormSubmit = async (templateData: Omit<Template, 'id'>, editingTemplate?: Template) => {
-    return await saveTemplate(templateData, editingTemplate)
+    if (editingTemplate) {
+      updateTemplateMutation.mutate({
+        templateId: editingTemplate.id,
+        templateData
+      })
+    } else {
+      createTemplateMutation.mutate(templateData)
+    }
+    return true // Las mutaciones manejan el éxito/error
   }
 
   const filteredTemplates = templates.filter((template) =>
     template.name.toLowerCase().includes(searchTerm.toLowerCase()),
   )
+
+  const isLoading = templatesLoading || productsLoading || branchesLoading
 
   return (
     <ProtectedRoute allowedRoles={["admin", "factory", "branch", "maxdev"]}>
@@ -56,11 +66,18 @@ function TemplatesContent() {
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
-                onClick={updateExistingTemplates}
-                disabled={updating}
+                onClick={() => window.location.reload()}
+                disabled={isLoading}
                 className="text-xs w-full sm:w-auto"
               >
-                {updating ? "Actualizando..." : "Actualizar plantillas"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  "Actualizar plantillas"
+                )}
               </Button>
               <Button 
                 onClick={() => {
@@ -68,6 +85,7 @@ function TemplatesContent() {
                   setIsDialogOpen(true)
                 }} 
                 className="w-full sm:w-auto"
+                disabled={isLoading}
               >
                 <Plus className="mr-2 h-4 w-4" />
                 Nueva plantilla
@@ -84,26 +102,42 @@ function TemplatesContent() {
           />
         </div>
 
-        <div className="grid gap-4">
-          {filteredTemplates.map((template) => (
-            <TemplateManagementCard
-              key={template.id}
-              template={template}
-              branches={branches}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-          ))}
-        </div>
-
-        {filteredTemplates.length === 0 && (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin mr-2" />
+            <span>Cargando plantillas...</span>
+          </div>
+        ) : templatesError ? (
           <Card>
             <CardContent className="text-center py-8">
-              <p className="text-muted-foreground">
-                {searchTerm ? "No se encontraron plantillas que coincidan con la búsqueda" : "No hay plantillas creadas"}
-              </p>
+              <p className="text-destructive mb-2">Error al cargar plantillas</p>
+              <p className="text-sm text-muted-foreground">Intenta recargar la página</p>
             </CardContent>
           </Card>
+        ) : (
+          <>
+            <div className="grid gap-4">
+              {filteredTemplates.map((template) => (
+                <TemplateManagementCard
+                  key={template.id}
+                  template={template}
+                  branches={branches}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                />
+              ))}
+            </div>
+
+            {filteredTemplates.length === 0 && (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    {searchTerm ? "No se encontraron plantillas que coincidan con la búsqueda" : "No hay plantillas creadas"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </>
         )}
 
         <TemplateForm

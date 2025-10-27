@@ -18,23 +18,24 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Edit, Trash2 } from "lucide-react"
-import { useEffect, useState } from "react"
-import { collection, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import type { User, Branch } from "@/lib/types"
-import { useToast } from "@/hooks/use-toast"
+import { useUsersQuery, useBranchesQuery, useUpdateUser, useChangeUserRole } from "@/hooks/use-users-query"
+import { Loader2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 function UsersContent() {
   const { user: currentUser, createUser } = useAuth()
-  const { toast } = useToast()
-  const [users, setUsers] = useState<User[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(false)
+  
+  // TanStack Query hooks
+  const { data: users = [], isLoading: usersLoading, error: usersError } = useUsersQuery()
+  const { data: branches = [], isLoading: branchesLoading } = useBranchesQuery()
+  const updateUserMutation = useUpdateUser()
+  const changeRoleMutation = useChangeUserRole()
   const [formData, setFormData] = useState<{
     email: string
     password: string
@@ -49,36 +50,11 @@ function UsersContent() {
     branchId: "",
   })
 
-  useEffect(() => {
-    fetchUsers()
-    fetchBranches()
-  }, [])
-
-  const fetchUsers = async () => {
-    try {
-      const snapshot = await getDocs(collection(db, "apps/controld/users"))
-      const usersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as User[]
-      setUsers(usersData.filter((u) => u.active))
-    } catch (error) {
-      console.error("[v0] Error al cargar usuarios:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los usuarios",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const fetchBranches = async () => {
-    try {
-      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
-      const snapshot = await getDocs(q)
-      const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
-      setBranches(branchesData)
-    } catch (error) {
-      console.error("[v0] Error al cargar sucursales:", error)
-    }
-  }
+  const isLoading = usersLoading || branchesLoading
+  const filteredUsers = users.filter((user) => user.active && 
+    (user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     user.email?.toLowerCase().includes(searchTerm.toLowerCase()))
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

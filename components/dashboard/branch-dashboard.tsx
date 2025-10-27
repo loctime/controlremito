@@ -7,9 +7,9 @@ import { FileText, Package, Truck } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { useTemplates } from "@/hooks/use-templates"
+import { useTemplatesQuery } from "@/hooks/use-templates-query"
 import { useDraftOrders } from "@/hooks/use-draft-orders"
-import { useOrders } from "@/hooks/use-orders"
+import { useOrdersQuery } from "@/hooks/use-orders-query"
 import { useOrderEditor } from "@/hooks/use-order-editor"
 import { useOrderActions } from "@/hooks/use-order-actions"
 import { AssemblingOrdersTable } from "./assembling-orders-table"
@@ -26,12 +26,12 @@ export function BranchDashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
   
-  // Hooks optimizados con loading/error states
-  const { templates, loading: templatesLoading } = useTemplates(user)
+  // TanStack Query hooks
+  const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useTemplatesQuery()
   const { draftOrders, loading: draftsLoading } = useDraftOrders(user, templates)
-  const { orders: sentOrders, loading: sentLoading } = useOrders(user, "sent")
-  const { orders: assemblingOrders, loading: assemblingLoading } = useOrders(user, "assembling")
-  const { orders: inTransitOrders, loading: inTransitLoading } = useOrders(user, "in_transit")
+  const { data: sentOrders = [], isLoading: sentLoading } = useOrdersQuery("sent")
+  const { data: assemblingOrders = [], isLoading: assemblingLoading } = useOrdersQuery("assembling")
+  const { data: inTransitOrders = [], isLoading: inTransitLoading } = useOrdersQuery("in_transit")
   
   // Hooks personalizados para lógica de negocio
   const orderEditor = useOrderEditor(user)

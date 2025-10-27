@@ -7,7 +7,7 @@ import { Clock, Package, Truck } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { useAuth } from "@/lib/auth-context"
 import { useToast } from "@/hooks/use-toast"
-import { useOrders } from "@/hooks/use-orders"
+import { useOrdersQuery, useAcceptOrder, useMarkOrderAsReady, useTakeOrderForDelivery } from "@/hooks/use-orders-query"
 import { OrdersTable } from "./orders-table"
 import { AssemblingOrdersTable } from "./assembling-orders-table"
 import { InTransitOrdersTable } from "./in-transit-orders-table"
@@ -25,9 +25,14 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   const { user } = useAuth()
   const { toast } = useToast()
   
-  const { orders: pendingOrders, loading: pendingLoading } = useOrders(user, "sent")
-  const { orders: assemblingOrders, loading: assemblingLoading } = useOrders(user, "assembling")
-  const { orders: inTransitOrders, loading: inTransitLoading } = useOrders(user, "in_transit")
+  const { data: pendingOrders = [], isLoading: pendingLoading } = useOrdersQuery("sent")
+  const { data: assemblingOrders = [], isLoading: assemblingLoading } = useOrdersQuery("assembling")
+  const { data: inTransitOrders = [], isLoading: inTransitLoading } = useOrdersQuery("in_transit")
+  
+  // TanStack Query mutations
+  const acceptOrderMutation = useAcceptOrder()
+  const markAsReadyMutation = useMarkOrderAsReady()
+  const takeForDeliveryMutation = useTakeOrderForDelivery()
   
   const [showAcceptConfirmation, setShowAcceptConfirmation] = useState(false)
   const [showAcceptAllConfirmation, setShowAcceptAllConfirmation] = useState(false)
@@ -40,35 +45,13 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   }, [])
 
   const acceptOrder = useCallback(async (orderId: string) => {
-    if (!user) return
-
-    try {
-      await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        status: "assembling",
-        acceptedAt: new Date(),
-        acceptedBy: user.id,
-        acceptedByName: user.name
-      })
-
-      // Agregar firma de aceptación al remit metadata
-      await updateRemitStatus(orderId, "assembling", user)
-
-      toast({
-        title: "Pedido aceptado",
-        description: "El pedido fue aceptado correctamente",
-      })
-
-      setShowAcceptConfirmation(false)
-      setOrderToAccept(null)
-    } catch (error) {
-      console.error("Error al aceptar pedido:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo aceptar el pedido",
-        variant: "destructive",
-      })
-    }
-  }, [user, toast])
+    acceptOrderMutation.mutate(orderId, {
+      onSuccess: () => {
+        setShowAcceptConfirmation(false)
+        setOrderToAccept(null)
+      }
+    })
+  }, [acceptOrderMutation])
 
   const showAcceptAllOrdersConfirmation = useCallback((orders: OrderWithTemplate[]) => {
     setOrdersToAcceptAll(orders)
@@ -76,93 +59,27 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   }, [])
 
   const acceptAllOrdersFromTemplate = useCallback(async (orders: OrderWithTemplate[]) => {
-    if (!user) return
-
-    try {
-      const updatePromises = orders.map(async order => {
-        await updateDoc(doc(db, "apps/controld/orders", order.id), {
-          status: "assembling",
-          acceptedAt: new Date(),
-          acceptedBy: user.id,
-          acceptedByName: user.name
+    // Aceptar todas las órdenes una por una usando la mutación
+    for (const order of orders) {
+      await new Promise((resolve) => {
+        acceptOrderMutation.mutate(order.id, {
+          onSuccess: resolve,
+          onError: resolve // Continuar aunque falle una
         })
-        // Agregar firma de aceptación al remit metadata
-        await updateRemitStatus(order.id, "assembling", user)
-      })
-
-      await Promise.all(updatePromises)
-
-      toast({
-        title: "Pedidos aceptados",
-        description: `${orders.length} pedidos fueron aceptados correctamente`,
-      })
-
-      setShowAcceptAllConfirmation(false)
-      setOrdersToAcceptAll([])
-    } catch (error) {
-      console.error("Error al aceptar pedidos:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron aceptar los pedidos",
-        variant: "destructive",
       })
     }
-  }, [user, toast])
+    
+    setShowAcceptAllConfirmation(false)
+    setOrdersToAcceptAll([])
+  }, [acceptOrderMutation])
 
   const markOrderAsReady = useCallback(async (orderId: string) => {
-    if (!user) return
-
-    try {
-      await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        preparedAt: new Date(),
-        preparedBy: user.id,
-        preparedByName: user.name
-      })
-
-      // Agregar firma de "listo" al remit metadata
-      await updateReadySignature(orderId, user)
-
-      toast({
-        title: "Pedido marcado como listo",
-        description: "El pedido está listo para ser enviado",
-      })
-    } catch (error) {
-      console.error("Error al marcar pedido como listo:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo marcar el pedido como listo",
-        variant: "destructive",
-      })
-    }
-  }, [user, toast])
+    markAsReadyMutation.mutate(orderId)
+  }, [markAsReadyMutation])
 
   const takeOrderForDelivery = useCallback(async (orderId: string) => {
-    if (!user) return
-
-    try {
-      await updateDoc(doc(db, "apps/controld/orders", orderId), {
-        status: "in_transit",
-        deliveredAt: new Date(),
-        deliveredBy: user.id,
-        deliveredByName: user.name
-      })
-
-      // Agregar firma de delivery al remit metadata
-      await updateRemitStatus(orderId, "in_transit", user)
-
-      toast({
-        title: "Pedido tomado para entrega",
-        description: "El pedido está en camino",
-      })
-    } catch (error) {
-      console.error("Error al tomar pedido para entrega:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo tomar el pedido para entrega",
-        variant: "destructive",
-      })
-    }
-  }, [user, toast])
+    takeForDeliveryMutation.mutate(orderId)
+  }, [takeForDeliveryMutation])
 
   const handleCancelAccept = useCallback(() => {
     setShowAcceptConfirmation(false)
