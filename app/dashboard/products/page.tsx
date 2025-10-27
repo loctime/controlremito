@@ -16,22 +16,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Search, Edit, Trash2, Upload, ClipboardPaste, Download } from "lucide-react"
-import { useEffect, useState } from "react"
-import { collection, addDoc, getDocs, updateDoc, doc, query, where, writeBatch } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { Plus, Search, Edit, Trash2, Upload, ClipboardPaste, Download, Loader2 } from "lucide-react"
+import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import type { Product } from "@/lib/types"
-import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import * as XLSX from "xlsx"
+import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useBulkImportProducts } from "@/hooks/use-products"
 
 function ProductsContent() {
   const { user } = useAuth()
-  const { toast } = useToast()
-  const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -45,67 +41,31 @@ function ProductsContent() {
   const [bulkActiveTab, setBulkActiveTab] = useState("paste")
   const [pastedData, setPastedData] = useState("")
   const [previewData, setPreviewData] = useState<Partial<Product>[]>([])
-  const [isImporting, setIsImporting] = useState(false)
 
-  useEffect(() => {
-    fetchProducts()
-  }, [])
-
-  const fetchProducts = async () => {
-    try {
-      const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
-      const snapshot = await getDocs(q)
-      const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
-      setProducts(productsData)
-    } catch (error) {
-      console.error("[v0] Error al cargar productos:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los productos",
-        variant: "destructive",
-      })
-    }
-  }
+  // TanStack Query hooks
+  const { data: products = [], isLoading, error } = useProducts()
+  const createProductMutation = useCreateProduct()
+  const updateProductMutation = useUpdateProduct()
+  const deleteProductMutation = useDeleteProduct()
+  const bulkImportMutation = useBulkImportProducts()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!user) return
 
-    try {
-      if (editingProduct) {
-        await updateDoc(doc(db, "apps/controld/products", editingProduct.id), {
-          ...formData,
-        })
-        toast({
-          title: "Producto actualizado",
-          description: "El producto se actualizó correctamente",
-        })
-      } else {
-        await addDoc(collection(db, "apps/controld/products"), {
-          ...formData,
-          createdAt: new Date(),
-          createdBy: user.id,
-          active: true,
-        })
-        toast({
-          title: "Producto creado",
-          description: "El producto se creó correctamente",
-        })
-      }
-
-      setIsDialogOpen(false)
-      setEditingProduct(null)
-      setFormData({ name: "", description: "", sku: "", unit: "" })
-      fetchProducts()
-    } catch (error) {
-      console.error("[v0] Error al guardar producto:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo guardar el producto",
-        variant: "destructive",
+    if (editingProduct) {
+      updateProductMutation.mutate({
+        productId: editingProduct.id,
+        productData: formData,
       })
+    } else {
+      createProductMutation.mutate(formData)
     }
+
+    setIsDialogOpen(false)
+    setEditingProduct(null)
+    setFormData({ name: "", description: "", sku: "", unit: "" })
   }
 
   const handleEdit = (product: Product) => {
@@ -121,22 +81,7 @@ function ProductsContent() {
 
   const handleDelete = async (productId: string) => {
     if (!confirm("¿Estás seguro de que deseas eliminar este producto?")) return
-
-    try {
-      await updateDoc(doc(db, "apps/controld/products", productId), { active: false })
-      toast({
-        title: "Producto eliminado",
-        description: "El producto se eliminó correctamente",
-      })
-      fetchProducts()
-    } catch (error) {
-      console.error("[v0] Error al eliminar producto:", error)
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el producto",
-        variant: "destructive",
-      })
-    }
+    deleteProductMutation.mutate(productId)
   }
 
   // Parsear datos pegados desde Excel
@@ -266,43 +211,13 @@ function ProductsContent() {
   const handleBulkImport = async () => {
     if (!user || previewData.length === 0) return
 
-    setIsImporting(true)
-    try {
-      // Usar batch para mejor performance
-      const batch = writeBatch(db)
-      const productsRef = collection(db, "apps/controld/products")
-
-      previewData.forEach((product) => {
-        const newDocRef = doc(productsRef)
-        batch.set(newDocRef, {
-          ...product,
-          createdAt: new Date(),
-          createdBy: user.id,
-          active: true,
-        })
-      })
-
-      await batch.commit()
-
-      toast({
-        title: "✅ Importación exitosa",
-        description: `Se importaron ${previewData.length} productos correctamente`,
-      })
-
-      setIsBulkDialogOpen(false)
-      setPastedData("")
-      setPreviewData([])
-      fetchProducts()
-    } catch (error) {
-      console.error("Error en importación masiva:", error)
-      toast({
-        title: "Error",
-        description: "Hubo un problema al importar algunos productos",
-        variant: "destructive",
-      })
-    } finally {
-      setIsImporting(false)
-    }
+    bulkImportMutation.mutate(previewData, {
+      onSuccess: () => {
+        setIsBulkDialogOpen(false)
+        setPastedData("")
+        setPreviewData([])
+      }
+    })
   }
 
   const filteredProducts = products.filter(
@@ -435,8 +350,15 @@ Producto 2	P002	litros	Descripción 2"
                         </TableBody>
                       </Table>
                     </div>
-                    <Button onClick={handleBulkImport} className="w-full" disabled={isImporting}>
-                      {isImporting ? "Importando..." : `Importar ${previewData.length} productos`}
+                    <Button 
+                      onClick={handleBulkImport} 
+                      className="w-full" 
+                      disabled={bulkImportMutation.isPending}
+                    >
+                      {bulkImportMutation.isPending && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      {bulkImportMutation.isPending ? "Importando..." : `Importar ${previewData.length} productos`}
                     </Button>
                   </div>
                 )}
@@ -503,7 +425,15 @@ Producto 2	P002	litros	Descripción 2"
                   <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit">{editingProduct ? "Actualizar" : "Crear"}</Button>
+                  <Button 
+                    type="submit" 
+                    disabled={createProductMutation.isPending || updateProductMutation.isPending}
+                  >
+                    {(createProductMutation.isPending || updateProductMutation.isPending) && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    {editingProduct ? "Actualizar" : "Crear"}
+                  </Button>
                 </div>
               </form>
             </DialogContent>
@@ -527,7 +457,17 @@ Producto 2	P002	litros	Descripción 2"
             </div>
           </CardHeader>
           <CardContent>
-            {filteredProducts.length === 0 ? (
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                <span>Cargando productos...</span>
+              </div>
+            ) : error ? (
+              <div className="text-center py-8">
+                <p className="text-destructive mb-2">Error al cargar productos</p>
+                <p className="text-sm text-muted-foreground">Intenta recargar la página</p>
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No hay productos disponibles</p>
             ) : (
               <>
@@ -549,8 +489,17 @@ Producto 2	P002	litros	Descripción 2"
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDelete(product.id)}
+                                disabled={deleteProductMutation.isPending}
+                              >
+                                {deleteProductMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                )}
                               </Button>
                             </div>
                           </div>
@@ -590,8 +539,17 @@ Producto 2	P002	litros	Descripción 2"
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDelete(product.id)}>
-                                <Trash2 className="h-4 w-4 text-destructive" />
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleDelete(product.id)}
+                                disabled={deleteProductMutation.isPending}
+                              >
+                                {deleteProductMutation.isPending ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                )}
                               </Button>
                             </div>
                           </TableCell>
