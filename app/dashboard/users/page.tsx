@@ -211,12 +211,6 @@ function UsersContent() {
     return variants[role as keyof typeof variants] || ("secondary" as const)
   }
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
-
   return (
     <ProtectedRoute allowedRoles={["admin", "maxdev"]}>
       <div>
