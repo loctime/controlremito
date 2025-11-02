@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Order, Template, User } from "@/lib/types"
+import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
 
 interface UseDraftOrdersReturn {
   draftOrders: Order[]
@@ -25,7 +26,7 @@ export function useDraftOrders(user: User | null, templates: Template[]): UseDra
     setError(null)
 
     try {
-      const ordersRef = collection(db, "apps/controld/orders")
+      const ordersRef = collection(db, ORDERS_COLLECTION)
       const q = query(
         ordersRef,
         where("fromBranchId", "==", user.branchId),
@@ -45,7 +46,7 @@ export function useDraftOrders(user: User | null, templates: Template[]): UseDra
               const template = templates.find(t => t.id === draft.templateId)
               if (template && template.allowedSendDays) {
                 console.log("🔧 [DEBUG] Arreglando borrador sin días permitidos:", draft.id)
-                await updateDoc(doc(db, "apps/controld/orders", draft.id), {
+                await updateDoc(doc(db, ORDERS_COLLECTION, draft.id), {
                   allowedSendDays: template.allowedSendDays
                 })
                 draft.allowedSendDays = template.allowedSendDays

@@ -3,6 +3,7 @@ import { collection, query, where, onSnapshot, getDocs } from "firebase/firestor
 import { db } from "@/lib/firebase"
 import type { Order, Template } from "@/lib/types"
 import type { User } from "@/lib/types"
+import { ORDERS_COLLECTION, TEMPLATES_COLLECTION } from "@/lib/firestore-paths"
 
 export interface OrderWithTemplate extends Order {
   templateName: string
@@ -30,7 +31,7 @@ export function useOrders(user: User | null, status: Order["status"]): UseOrders
     setError(null)
 
     try {
-      const ordersRef = collection(db, "apps/controld/orders")
+      const ordersRef = collection(db, ORDERS_COLLECTION)
       let q = query(ordersRef, where("status", "==", status))
 
       // Filtrar según el rol
@@ -58,7 +59,7 @@ export function useOrders(user: User | null, status: Order["status"]): UseOrders
             }
             
             for (const chunk of chunks) {
-              const templatesRef = collection(db, "apps/controld/templates")
+              const templatesRef = collection(db, TEMPLATES_COLLECTION)
               const templatesQuery = query(templatesRef, where("__name__", "in", chunk))
               const templatesSnapshot = await getDocs(templatesQuery)
               

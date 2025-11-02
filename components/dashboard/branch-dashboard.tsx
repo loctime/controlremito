@@ -21,6 +21,7 @@ import { updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getTemplateStatus } from "@/lib/template-status.service"
 import { loadPendingProducts } from "@/lib/order-operations.service"
+import { TEMPLATES_COLLECTION } from "@/lib/firestore-paths"
 
 export function BranchDashboard() {
   const { user } = useAuth()
@@ -198,7 +199,7 @@ export function BranchDashboard() {
     if (!confirmed) return
 
     try {
-      await updateDoc(doc(db, "apps/controld/templates", templateId), {
+      await updateDoc(doc(db, TEMPLATES_COLLECTION, templateId), {
         active: false
       })
 

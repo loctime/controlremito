@@ -1,6 +1,7 @@
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Branch, User, OrderFormData } from "./types"
+import { ORDERS_COLLECTION } from "./firestore-paths"
 
 export interface CreateOrderParams {
   formData: OrderFormData
@@ -72,11 +73,11 @@ export class NewOrderService {
 
       if (editingOrderId) {
         // Actualizar pedido existente
-        await updateDoc(doc(db, "apps/controld/orders", editingOrderId), orderData)
+        await updateDoc(doc(db, ORDERS_COLLECTION, editingOrderId), orderData)
         orderId = editingOrderId
       } else {
         // Crear nuevo pedido
-        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        const docRef = await addDoc(collection(db, ORDERS_COLLECTION), orderData)
         orderId = docRef.id
       }
 

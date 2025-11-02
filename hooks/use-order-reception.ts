@@ -6,6 +6,7 @@ import type { Order, User } from "@/lib/types"
 import { updateRemitStatus } from "@/lib/remit-metadata-service"
 import { createDeliveryNote } from "@/lib/delivery-note-service"
 import { createReplacementItem } from "@/lib/replacement-service"
+import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
 
 interface ItemQuantity {
   received: number
@@ -49,7 +50,7 @@ export function useOrderReception(user: User | null) {
       }, {} as Record<string, ItemQuantity>)
 
       // Obtener el pedido completo antes de actualizar
-      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+      const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId))
       if (!orderDoc.exists()) {
         throw new Error("Pedido no encontrado")
       }
@@ -57,7 +58,7 @@ export function useOrderReception(user: User | null) {
       const currentOrder = { id: orderDoc.id, ...orderDoc.data() } as Order
 
       // Actualizar el pedido en Firestore
-      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+      await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
         status: "received",
         receivedAt: new Date(),
         receivedBy: user.id,

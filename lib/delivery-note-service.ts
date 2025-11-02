@@ -2,6 +2,7 @@ import { collection, addDoc, Timestamp } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Order, User, DeliveryNote, OrderItem, Signature } from "./types"
 import { getRemitMetadata } from "./remit-metadata-service"
+import { DELIVERY_NOTES_COLLECTION } from "./firestore-paths"
 
 /**
  * Limpiar objeto removiendo campos undefined recursivamente
@@ -206,7 +207,7 @@ export async function createDeliveryNote(
 
     // Guardar en Firestore
     const docRef = await addDoc(
-      collection(db, "apps/controld/deliveryNotes"),
+      collection(db, DELIVERY_NOTES_COLLECTION),
       cleanedData
     )
 

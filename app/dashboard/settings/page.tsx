@@ -24,6 +24,7 @@ import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Branch } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { USERS_COLLECTION, BRANCHES_COLLECTION } from "@/lib/firestore-paths"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FirestoreDiagnostics } from "@/components/debug/firestore-diagnostics"
 
@@ -78,7 +79,7 @@ function SettingsContent() {
     if (!user) return
     
     try {
-      const userRef = doc(db, "apps/controld/users", user.id)
+      const userRef = doc(db, USERS_COLLECTION, user.id)
       await updateDoc(userRef, {
         "signature.fullName": profileData.fullName,
         "signature.position": profileData.position,
@@ -161,7 +162,7 @@ function SettingsContent() {
     try {
       const signatureData = canvas.toDataURL("image/png")
       
-      const userRef = doc(db, "apps/controld/users", user.id)
+      const userRef = doc(db, USERS_COLLECTION, user.id)
       await updateDoc(userRef, {
         "signature.signatureImage": signatureData,
         "signature.fullName": profileData.fullName,
@@ -190,7 +191,7 @@ function SettingsContent() {
   
   const fetchBranches = async () => {
     try {
-      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
+      const q = query(collection(db, BRANCHES_COLLECTION), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
       setBranches(branchesData)
@@ -211,7 +212,7 @@ function SettingsContent() {
 
     try {
       if (editingBranch) {
-        await updateDoc(doc(db, "apps/controld/branches", editingBranch.id), {
+        await updateDoc(doc(db, BRANCHES_COLLECTION, editingBranch.id), {
           name: branchFormData.name,
           address: branchFormData.address,
           type: branchFormData.type,
@@ -221,7 +222,7 @@ function SettingsContent() {
           description: "La sucursal se actualizó correctamente",
         })
       } else {
-        await addDoc(collection(db, "apps/controld/branches"), {
+        await addDoc(collection(db, BRANCHES_COLLECTION), {
           ...branchFormData,
           createdAt: new Date(),
           active: true,
@@ -260,7 +261,7 @@ function SettingsContent() {
     if (!confirm("¿Estás seguro de que deseas eliminar esta sucursal?")) return
 
     try {
-      await updateDoc(doc(db, "apps/controld/branches", branchId), { active: false })
+      await updateDoc(doc(db, BRANCHES_COLLECTION, branchId), { active: false })
       toast({
         title: "Sucursal eliminada",
         description: "La sucursal se eliminó correctamente",

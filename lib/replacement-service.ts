@@ -21,6 +21,7 @@ import type {
   User,
   OrderItem
 } from "./types"
+import { REPLACEMENT_QUEUES_COLLECTION, ORDERS_COLLECTION } from "./firestore-paths"
 
 /**
  * Helper para eliminar campos undefined de un objeto antes de guardarlo en Firestore
@@ -109,7 +110,7 @@ export async function createReplacementItem(
         nuevoItem: cleanedNewItem
       })
       
-      await updateDoc(doc(db, "apps/controld/replacementQueues", existingQueue.id), {
+      await updateDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, existingQueue.id), {
         items: updatedItems,
         updatedAt: Timestamp.now()
       })
@@ -184,7 +185,7 @@ export async function createReplacementItem(
       const cleanedQueue = removeUndefinedFields(newQueue)
       console.log("✅ [createReplacementItem] - Queue limpiada, guardando en Firestore...")
       
-      const docRef = await addDoc(collection(db, "apps/controld/replacementQueues"), cleanedQueue)
+      const docRef = await addDoc(collection(db, REPLACEMENT_QUEUES_COLLECTION), cleanedQueue)
       console.log("✅ DEBUG [createReplacementItem] - Nueva cola creada con ID:", docRef.id)
       return docRef.id
     }
@@ -200,7 +201,7 @@ export async function createReplacementItem(
 export async function getReplacementQueue(branchId: string): Promise<ReplacementQueue | null> {
   try {
     const q = query(
-      collection(db, "apps/controld/replacementQueues"),
+      collection(db, REPLACEMENT_QUEUES_COLLECTION),
       where("branchId", "==", branchId),
       where("status", "in", ["pending", "in_queue"])
     )
@@ -225,7 +226,7 @@ export async function getReplacementQueue(branchId: string): Promise<Replacement
 export async function getAllReplacementQueues(): Promise<ReplacementQueue[]> {
   try {
     const q = query(
-      collection(db, "apps/controld/replacementQueues"),
+      collection(db, REPLACEMENT_QUEUES_COLLECTION),
       orderBy("createdAt", "desc")
     )
     
@@ -247,13 +248,13 @@ export async function mergeReplacementItems(
   user: User
 ): Promise<void> {
   try {
-    const queueDoc = await getDoc(doc(db, "apps/controld/replacementQueues", queueId))
+    const queueDoc = await getDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queueId))
     if (!queueDoc.exists()) {
       throw new Error("Cola de reposiciones no encontrada")
     }
     
     const queue = queueDoc.data() as ReplacementQueue
-    const orderDoc = await getDoc(doc(db, "apps/controld/orders", targetOrderId))
+    const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, targetOrderId))
     if (!orderDoc.exists()) {
       throw new Error("Pedido no encontrado")
     }
@@ -275,7 +276,7 @@ export async function mergeReplacementItems(
     }))
     
     // Actualizar pedido con nuevos items
-    await updateDoc(doc(db, "apps/controld/orders", targetOrderId), {
+    await updateDoc(doc(db, ORDERS_COLLECTION, targetOrderId), {
       items: [...order.items, ...newOrderItems],
       notes: `${order.notes || ""}\n\n[REPOSICIÓN] Items agregados automáticamente: ${itemsToMergeData.map(i => i.productName).join(", ")}`
     })
@@ -294,7 +295,7 @@ export async function mergeReplacementItems(
       return item // Mantener el item sin cambios si no se fusionó
     })
     
-    await updateDoc(doc(db, "apps/controld/replacementQueues", queueId), {
+    await updateDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queueId), {
       items: updatedItems,
       updatedAt: Timestamp.now(),
       status: updatedItems.filter(i => i.status === "pending").length === 0 ? "completed" : "in_queue"
@@ -314,7 +315,7 @@ export async function createUrgentReplacementOrder(
   user: User
 ): Promise<string> {
   try {
-    const queueDoc = await getDoc(doc(db, "apps/controld/replacementQueues", queueId))
+    const queueDoc = await getDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queueId))
     if (!queueDoc.exists()) {
       throw new Error("Cola de reposiciones no encontrada")
     }
@@ -353,7 +354,7 @@ export async function createUrgentReplacementOrder(
       parentOrderId: urgentItems[0].originalOrderId
     }
     
-    const orderRef = await addDoc(collection(db, "apps/controld/orders"), newOrder)
+    const orderRef = await addDoc(collection(db, ORDERS_COLLECTION), newOrder)
     
     // Marcar items como fusionados
     const updatedItems = queue.items.map(item => {
@@ -368,7 +369,7 @@ export async function createUrgentReplacementOrder(
       return item
     })
     
-    await updateDoc(doc(db, "apps/controld/replacementQueues", queueId), {
+    await updateDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queueId), {
       items: updatedItems,
       updatedAt: Timestamp.now()
     })
@@ -386,7 +387,7 @@ export async function createUrgentReplacementOrder(
 export async function checkAutoMergeOpportunities(branchId: string): Promise<string[]> {
   try {
     const q = query(
-      collection(db, "apps/controld/orders"),
+      collection(db, ORDERS_COLLECTION),
       where("fromBranchId", "==", branchId),
       where("status", "==", "draft")
     )
@@ -445,7 +446,7 @@ export async function markReplacementItemCompleted(
   user: User
 ): Promise<void> {
   try {
-    const queueDoc = await getDoc(doc(db, "apps/controld/replacementQueues", queueId))
+    const queueDoc = await getDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queueId))
     if (!queueDoc.exists()) {
       throw new Error("Cola de reposiciones no encontrada")
     }
@@ -464,7 +465,7 @@ export async function markReplacementItemCompleted(
       return item
     })
     
-    await updateDoc(doc(db, "apps/controld/replacementQueues", queueId), {
+    await updateDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queueId), {
       items: updatedItems,
       updatedAt: Timestamp.now()
     })

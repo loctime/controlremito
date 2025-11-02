@@ -1,0 +1,51 @@
+// ========= CONTROLREMITO (remitos) =========
+
+match /apps/controlRemito {
+  match /users/{userId} {
+    allow read: if isAuth();
+    allow create, update: if isAuth();
+    allow delete: if isAdmin();
+  }
+  
+  match /branches/{branchId} {
+    allow read: if isAuth();
+    allow create, update, delete: if isAdmin();
+  }
+  
+  match /products/{productId} {
+    allow read: if isAuth();
+    allow create: if isAdmin() || isFactory();
+    allow update, delete: if isAdmin();
+  }
+  
+  match /orders/{orderId} {
+    allow read, create, update: if isAuth();
+    allow delete: if isAdmin();
+  }
+  
+  match /deliveryNotes/{noteId} {
+    allow read, create, update: if isAuth();
+    allow delete: if isAdmin();
+  }
+  
+  match /templates/{templateId} {
+    allow read, create, update, delete: if isAuth();
+  }
+  
+  match /remit-metadata/{metadataId} {
+    allow read, create, update: if isAuth();
+    allow delete: if isAdmin();
+  }
+  
+  match /replacementQueues/{queueId} {
+    allow read, create, update: if isAuth();
+    allow delete: if isAdmin();
+  }
+}
+
+// Auditoría global
+match /audit/{auditId} {
+  allow read: if isAuth();
+  allow write: if isAdmin();
+}
+

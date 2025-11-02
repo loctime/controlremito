@@ -3,6 +3,7 @@ import { db } from "./firebase"
 import { createRemitMetadata } from "./remit-metadata-service"
 import { getReplacementQueue } from "./replacement-service"
 import type { Order, Template, User } from "./types"
+import { ORDERS_COLLECTION, BRANCHES_COLLECTION } from "./firestore-paths"
 
 export interface CreateOrderParams {
   template: Template
@@ -127,10 +128,10 @@ export async function saveOrder({
       allowedSendDays: order.allowedSendDays,
     }
 
-    await addDoc(collection(db, "apps/controld/orders"), orderData)
+    await addDoc(collection(db, ORDERS_COLLECTION), orderData)
   } else {
     // Actualizar pedido existente
-    await updateDoc(doc(db, "apps/controld/orders", order.id), {
+    await updateDoc(doc(db, ORDERS_COLLECTION, order.id), {
       items: updatedItems,
       notes: notes
     })
@@ -161,7 +162,7 @@ export async function sendOrder({
     updateData.parentOrderId = order.parentOrderId
   }
 
-  await updateDoc(doc(db, "apps/controld/orders", order.id), updateData)
+  await updateDoc(doc(db, ORDERS_COLLECTION, order.id), updateData)
 
   // Crear metadatos del remito
   await createRemitMetadata({
@@ -178,7 +179,7 @@ export async function cancelOrder(
   user: User,
   reason: string
 ): Promise<void> {
-  await updateDoc(doc(db, "apps/controld/orders", orderId), {
+  await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
     status: "cancelled",
     cancelledAt: new Date(),
     cancelledBy: user.id,
@@ -195,7 +196,7 @@ export async function getBranchNames(branchIds: string[]): Promise<{ [id: string
   
   if (branchIds.length === 0) return branchNames
 
-  const branchesRef = collection(db, "apps/controld/branches")
+  const branchesRef = collection(db, BRANCHES_COLLECTION)
   const branchQueries = branchIds.map(id => 
     getDocs(query(branchesRef, where("id", "==", id)))
   )

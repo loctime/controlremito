@@ -5,6 +5,7 @@ import { collection, addDoc, updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { getReplacementQueue } from "@/lib/replacement-service"
 import type { Branch, Product, Template, DayOfWeek, Order } from "@/lib/types"
+import { ORDERS_COLLECTION, TEMPLATES_COLLECTION } from "@/lib/firestore-paths"
 
 export interface OrderFormData {
   toBranchId: string
@@ -184,14 +185,14 @@ export function useNewOrderForm(): UseNewOrderFormReturn {
 
       if (draftOrderIdRef.current) {
         // Actualizar pedido existente
-        await updateDoc(doc(db, "apps/controld/orders", draftOrderIdRef.current), orderData)
+        await updateDoc(doc(db, ORDERS_COLLECTION, draftOrderIdRef.current), orderData)
         orderId = draftOrderIdRef.current
       } else {
         // Crear nuevo pedido en borrador
         orderData.orderNumber = `PED-${Date.now()}`
         orderData.createdAt = new Date()
         
-        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        const docRef = await addDoc(collection(db, ORDERS_COLLECTION), orderData)
         orderId = docRef.id
         draftOrderIdRef.current = orderId
       }
@@ -475,7 +476,7 @@ export function useNewOrderForm(): UseNewOrderFormReturn {
 
       if (editingOrderId) {
         // Actualizar pedido existente
-        await updateDoc(doc(db, "apps/controld/orders", editingOrderId), orderData)
+        await updateDoc(doc(db, ORDERS_COLLECTION, editingOrderId), orderData)
         
         toast({
           title: "✅ Pedido actualizado exitosamente",
@@ -483,7 +484,7 @@ export function useNewOrderForm(): UseNewOrderFormReturn {
         })
       } else {
         // Crear nuevo pedido
-        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        const docRef = await addDoc(collection(db, ORDERS_COLLECTION), orderData)
         
         toast({
           title: "✅ Pedido creado exitosamente",
@@ -604,7 +605,7 @@ export function useNewOrderForm(): UseNewOrderFormReturn {
         allowedSendDays: formData.allowedSendDays || []
       }
 
-      await addDoc(collection(db, "apps/controld/templates"), templateData)
+      await addDoc(collection(db, TEMPLATES_COLLECTION), templateData)
 
       toast({
         title: "✅ Plantilla personal creada",

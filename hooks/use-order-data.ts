@@ -3,6 +3,7 @@ import { collection, getDocs, query, where, doc, getDoc } from "firebase/firesto
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Branch, Product, Order } from "@/lib/types"
+import { BRANCHES_COLLECTION, PRODUCTS_COLLECTION, ORDERS_COLLECTION } from "@/lib/firestore-paths"
 
 export interface UseOrderDataReturn {
   branches: Branch[]
@@ -26,7 +27,7 @@ export function useOrderData(): UseOrderDataReturn {
 
   const fetchBranches = useCallback(async () => {
     try {
-      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
+      const q = query(collection(db, BRANCHES_COLLECTION), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
 
@@ -49,7 +50,7 @@ export function useOrderData(): UseOrderDataReturn {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
+      const q = query(collection(db, PRODUCTS_COLLECTION), where("active", "==", true))
       const snapshot = await getDocs(q)
       const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
       setProducts(productsData)
@@ -61,7 +62,7 @@ export function useOrderData(): UseOrderDataReturn {
   const loadExistingOrder = useCallback(async (orderId: string): Promise<Order | null> => {
     try {
       setLoading(true)
-      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+      const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId))
       
       if (orderDoc.exists()) {
         const orderData = orderDoc.data()

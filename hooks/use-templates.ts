@@ -4,6 +4,7 @@ import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Template, Product, Branch, DayOfWeek } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
+import { TEMPLATES_COLLECTION, PRODUCTS_COLLECTION, BRANCHES_COLLECTION } from "@/lib/firestore-paths"
 
 export function useTemplates() {
   const { user } = useAuth()
@@ -25,7 +26,7 @@ export function useTemplates() {
     if (!user) return
 
     try {
-      const templatesRef = collection(db, "apps/controld/templates")
+      const templatesRef = collection(db, TEMPLATES_COLLECTION)
       let templatesData: Template[] = []
 
       // Filtrar plantillas según el rol
@@ -73,7 +74,7 @@ export function useTemplates() {
             allowedSendDays: template.allowedSendDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
           }
           
-          await updateDoc(doc(db, "apps/controld/templates", template.id), updateData)
+          await updateDoc(doc(db, TEMPLATES_COLLECTION, template.id), updateData)
           updatedCount++
         }
       }
@@ -104,7 +105,7 @@ export function useTemplates() {
 
   const fetchProducts = async () => {
     try {
-      const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
+      const q = query(collection(db, PRODUCTS_COLLECTION), where("active", "==", true))
       const snapshot = await getDocs(q)
       const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
       setProducts(productsData)
@@ -115,7 +116,7 @@ export function useTemplates() {
 
   const fetchBranches = async () => {
     try {
-      const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
+      const q = query(collection(db, BRANCHES_COLLECTION), where("active", "==", true))
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
       setBranches(branchesData)
@@ -137,13 +138,13 @@ export function useTemplates() {
       }
 
       if (editingTemplate) {
-        await updateDoc(doc(db, "apps/controld/templates", editingTemplate.id), data)
+        await updateDoc(doc(db, TEMPLATES_COLLECTION, editingTemplate.id), data)
         toast({
           title: "Plantilla actualizada",
           description: "La plantilla se actualizó correctamente",
         })
       } else {
-        await addDoc(collection(db, "apps/controld/templates"), {
+        await addDoc(collection(db, TEMPLATES_COLLECTION), {
           ...data,
           createdAt: new Date(),
         })
@@ -170,7 +171,7 @@ export function useTemplates() {
     if (!confirm("¿Estás seguro de que deseas eliminar esta plantilla?")) return
 
     try {
-      await updateDoc(doc(db, "apps/controld/templates", templateId), { active: false })
+      await updateDoc(doc(db, TEMPLATES_COLLECTION, templateId), { active: false })
       toast({
         title: "Plantilla eliminada",
         description: "La plantilla se eliminó correctamente",

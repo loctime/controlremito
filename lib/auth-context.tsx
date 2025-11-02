@@ -16,6 +16,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db, googleProvider } from "./firebase"
 import type { User } from "./types"
+import { USERS_COLLECTION } from "./firestore-paths"
 
 interface AuthContextType {
   user: User | null
@@ -43,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (firebaseUser) {
         // Obtener datos adicionales del usuario desde Firestore
-        const userDoc = await getDoc(doc(db, "apps/controld/users", firebaseUser.uid))
+        const userDoc = await getDoc(doc(db, USERS_COLLECTION, firebaseUser.uid))
         if (userDoc.exists()) {
           setUser({ id: firebaseUser.uid, ...userDoc.data() } as User)
         } else {
@@ -72,12 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const user = result.user
 
     // Verificar si el usuario ya existe en Firestore
-    const userDoc = await getDoc(doc(db, "apps/controld/users", user.uid))
+    const userDoc = await getDoc(doc(db, USERS_COLLECTION, user.uid))
     
     if (!userDoc.exists()) {
       // Crear documento de usuario en Firestore con el rol especificado
       console.log("[Auth] Creando nuevo documento para usuario:", user.email, "con rol:", role)
-      await setDoc(doc(db, "apps/controld/users", user.uid), {
+      await setDoc(doc(db, USERS_COLLECTION, user.uid), {
         email: user.email,
         name: user.displayName || user.email?.split("@")[0] || "Usuario",
         role,
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = userDoc.data()
       if (!userData.active || !userData.role) {
         console.log("[Auth] Actualizando usuario existente:", user.email, "con rol:", role)
-        await setDoc(doc(db, "apps/controld/users", user.uid), {
+        await setDoc(doc(db, USERS_COLLECTION, user.uid), {
           email: user.email,
           name: user.displayName || userData.name || user.email?.split("@")[0] || "Usuario",
           role,
@@ -112,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const newUser = userCredential.user
 
     // Crear documento de usuario en Firestore
-    await setDoc(doc(db, "apps/controld/users", newUser.uid), {
+    await setDoc(doc(db, USERS_COLLECTION, newUser.uid), {
       email: newUser.email,
       name,
       role,
@@ -140,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const newUser = userCredential.user
 
       // Crear documento de usuario en Firestore con todos los datos proporcionados
-      await setDoc(doc(db, "apps/controld/users", newUser.uid), {
+      await setDoc(doc(db, USERS_COLLECTION, newUser.uid), {
         email: newUser.email,
         name: userData.name || "",
         role: userData.role || "branch",
@@ -173,11 +174,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const existingUser = userCredential.user
           
           // Verificar si ya existe el documento en Firestore
-          const userDoc = await getDoc(doc(db, "apps/controld/users", existingUser.uid))
+          const userDoc = await getDoc(doc(db, USERS_COLLECTION, existingUser.uid))
           
           if (userDoc.exists()) {
             // Si el documento ya existe, actualizar los datos
-            await setDoc(doc(db, "apps/controld/users", existingUser.uid), {
+            await setDoc(doc(db, USERS_COLLECTION, existingUser.uid), {
               email: existingUser.email,
               name: userData.name || userDoc.data().name || "",
               role: userData.role || "branch",
@@ -187,7 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }, { merge: true })
           } else {
             // Crear nuevo documento de usuario en Firestore
-            await setDoc(doc(db, "apps/controld/users", existingUser.uid), {
+            await setDoc(doc(db, USERS_COLLECTION, existingUser.uid), {
               email: existingUser.email,
               name: userData.name || "",
               role: userData.role || "branch",
@@ -216,12 +217,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const changeRole = async (role: string) => {
     if (!firebaseUser) return
     
-    await setDoc(doc(db, "apps/controld/users", firebaseUser.uid), {
+      await setDoc(doc(db, USERS_COLLECTION, firebaseUser.uid), {
       role,
     }, { merge: true })
     
     // Recargar los datos del usuario
-    const userDoc = await getDoc(doc(db, "apps/controld/users", firebaseUser.uid))
+    const userDoc = await getDoc(doc(db, USERS_COLLECTION, firebaseUser.uid))
     if (userDoc.exists()) {
       setUser({ id: firebaseUser.uid, ...userDoc.data() } as User)
     }

@@ -9,6 +9,7 @@ import { useEffect, useState } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { DeliveryNote } from "@/lib/types"
+import { DELIVERY_NOTES_COLLECTION } from "@/lib/firestore-paths"
 import { useToast } from "@/hooks/use-toast"
 import { useParams } from "next/navigation"
 import Link from "next/link"
@@ -31,7 +32,7 @@ function DeliveryNoteDetailContent() {
   const fetchNote = async () => {
     setLoading(true)
     try {
-      const noteDoc = await getDoc(doc(db, "apps/controld/deliveryNotes", noteId))
+      const noteDoc = await getDoc(doc(db, DELIVERY_NOTES_COLLECTION, noteId))
       if (noteDoc.exists()) {
         const noteData = { id: noteDoc.id, ...noteDoc.data() } as DeliveryNote
         setNote(noteData)

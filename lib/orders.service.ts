@@ -1,10 +1,11 @@
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Order, Template } from "./types"
+import { ORDERS_COLLECTION, TEMPLATES_COLLECTION } from "./firestore-paths"
 
 // Servicio para obtener órdenes por estado
 export const fetchOrdersByStatus = async (user: any, status: Order["status"]): Promise<Order[]> => {
-  const ordersRef = collection(db, "apps/controld/orders")
+  const ordersRef = collection(db, ORDERS_COLLECTION)
   let q = query(ordersRef, where("status", "==", status))
 
   // Filtrar según el rol
@@ -36,7 +37,7 @@ export const fetchOrdersWithTemplates = async (user: any, status: Order["status"
     }
     
     for (const chunk of chunks) {
-      const templatesRef = collection(db, "apps/controld/templates")
+      const templatesRef = collection(db, TEMPLATES_COLLECTION)
       const templatesQuery = query(templatesRef, where("__name__", "in", chunk))
       const templatesSnapshot = await getDocs(templatesQuery)
       
@@ -77,12 +78,12 @@ export const updateOrderStatus = async (orderId: string, status: Order["status"]
       break
   }
 
-  await updateDoc(doc(db, "apps/controld/orders", orderId), updateData)
+  await updateDoc(doc(db, ORDERS_COLLECTION, orderId), updateData)
 }
 
 // Servicio para marcar orden como lista
 export const markOrderAsReady = async (orderId: string, user: any): Promise<void> => {
-  await updateDoc(doc(db, "apps/controld/orders", orderId), {
+  await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
     preparedAt: new Date(),
     preparedBy: user.id,
     preparedByName: user.name

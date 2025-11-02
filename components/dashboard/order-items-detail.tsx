@@ -11,6 +11,7 @@ import type { OrderItem, User, Order } from "@/lib/types"
 import { doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { createReplacementItem } from "@/lib/replacement-service"
+import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
 
 interface OrderItemsDetailProps {
   orderId: string
@@ -35,7 +36,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
   useEffect(() => {
     const fetchOrderNotes = async () => {
       try {
-        const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+        const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId))
         if (orderDoc.exists()) {
           const orderData = orderDoc.data() as Order
           setOrderNotes(orderData.notes || "")
@@ -81,7 +82,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
       })
 
       // Actualizar en Firestore
-      const orderRef = doc(db, "apps/controld/orders", orderId)
+      const orderRef = doc(db, ORDERS_COLLECTION, orderId)
       await updateDoc(orderRef, {
         items: updatedItems
       })
@@ -186,7 +187,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
     
     setSaving(true)
     try {
-      await updateDoc(doc(db, "apps/controld/orders", orderId), {
+      await updateDoc(doc(db, ORDERS_COLLECTION, orderId), {
         assemblyNotes: assemblyNotes
       })
     } catch (error) {

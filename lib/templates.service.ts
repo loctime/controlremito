@@ -1,10 +1,11 @@
 import { collection, addDoc, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Template, Product, Branch } from "./types"
+import { TEMPLATES_COLLECTION, PRODUCTS_COLLECTION, BRANCHES_COLLECTION } from "./firestore-paths"
 
 // Servicio para obtener plantillas
 export const fetchTemplates = async (user: any): Promise<Template[]> => {
-  const templatesRef = collection(db, "apps/controld/templates")
+  const templatesRef = collection(db, TEMPLATES_COLLECTION)
   let templatesData: Template[] = []
 
   // Filtrar plantillas según el rol
@@ -33,14 +34,14 @@ export const fetchTemplates = async (user: any): Promise<Template[]> => {
 
 // Servicio para obtener productos
 export const fetchProducts = async (): Promise<Product[]> => {
-  const q = query(collection(db, "apps/controld/products"), where("active", "==", true))
+  const q = query(collection(db, PRODUCTS_COLLECTION), where("active", "==", true))
   const snapshot = await getDocs(q)
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
 }
 
 // Servicio para obtener sucursales
 export const fetchBranches = async (): Promise<Branch[]> => {
-  const q = query(collection(db, "apps/controld/branches"), where("active", "==", true))
+  const q = query(collection(db, BRANCHES_COLLECTION), where("active", "==", true))
   const snapshot = await getDocs(q)
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
 }
@@ -56,15 +57,15 @@ export const createTemplate = async (templateData: Omit<Template, 'id'>, userId:
     createdAt: new Date(),
   }
 
-  await addDoc(collection(db, "apps/controld/templates"), data)
+  await addDoc(collection(db, TEMPLATES_COLLECTION), data)
 }
 
 // Servicio para actualizar plantilla
 export const updateTemplate = async (templateId: string, templateData: Partial<Template>): Promise<void> => {
-  await updateDoc(doc(db, "apps/controld/templates", templateId), templateData)
+  await updateDoc(doc(db, TEMPLATES_COLLECTION, templateId), templateData)
 }
 
 // Servicio para eliminar plantilla (soft delete)
 export const deleteTemplate = async (templateId: string): Promise<void> => {
-  await updateDoc(doc(db, "apps/controld/templates", templateId), { active: false })
+  await updateDoc(doc(db, TEMPLATES_COLLECTION, templateId), { active: false })
 }

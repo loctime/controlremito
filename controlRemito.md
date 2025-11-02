@@ -115,7 +115,7 @@ El sistema utiliza **Firebase Authentication** con dos métodos:
 ### Control de acceso:
 - Los usuarios están vinculados a sucursales específicas mediante `branchId`
 - Las rutas están protegidas con el componente `<ProtectedRoute>`
-- Los datos en Firestore están estructurados bajo `apps/controld/` para multitenancy
+- Los datos en Firestore están estructurados bajo `apps/controlRemito/` para multitenancy
 - Las reglas de Firestore validan permisos por rol y sucursal
 
 ## 🔗 Integraciones
@@ -123,13 +123,13 @@ El sistema utiliza **Firebase Authentication** con dos métodos:
 ### Firebase Services:
 - **Authentication** - Login con Google y Email/Password
 - **Firestore** - Almacenamiento de datos en tiempo real con colecciones:
-  - `apps/controld/users` - Usuarios
-  - `apps/controld/branches` - Sucursales y fábricas
-  - `apps/controld/products` - Catálogo de productos
-  - `apps/controld/orders` - Pedidos
-  - `apps/controld/deliveryNotes` - Remitos
-  - `apps/controld/templates` - Plantillas de pedidos
-  - `apps/controld/remitMetadata` - Metadatos y firmas
+  - `apps/controlRemito/users` - Usuarios
+  - `apps/controlRemito/branches` - Sucursales y fábricas
+  - `apps/controlRemito/products` - Catálogo de productos
+  - `apps/controlRemito/orders` - Pedidos
+  - `apps/controlRemito/deliveryNotes` - Remitos
+  - `apps/controlRemito/templates` - Plantillas de pedidos
+  - `apps/controlRemito/remitMetadata` - Metadatos y firmas
 
 - **Storage** - Almacenamiento de PDFs generados
 
@@ -142,7 +142,7 @@ El sistema utiliza **Firebase Authentication** con dos métodos:
 **Uso Interno / SaaS Multiempresa**
 
 La aplicación está configurada como un sistema interno que puede escalarse a modelo SaaS:
-- Estructura de datos preparada para multitenancy (`apps/controld/`)
+- Estructura de datos preparada para multitenancy (`apps/controlRemito/`)
 - Cada empresa tendría su propio namespace en Firestore
 - Los usuarios admin pueden gestionar múltiples sucursales y fábricas
 - Sin límites de usuarios o pedidos actualmente

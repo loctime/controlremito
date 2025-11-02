@@ -24,15 +24,21 @@ import type { User, Branch } from "@/lib/types"
 import { useUsersQuery, useBranchesQuery, useUpdateUser, useChangeUserRole } from "@/hooks/use-users-query"
 import { Loader2 } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { doc, updateDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { USERS_COLLECTION } from "@/lib/firestore-paths"
+import { useToast } from "@/hooks/use-toast"
 
 function UsersContent() {
   const { user: currentUser, createUser } = useAuth()
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(false)
   
   // TanStack Query hooks
-  const { data: users = [], isLoading: usersLoading, error: usersError } = useUsersQuery()
+  const { data: users = [], isLoading: usersLoading, error: usersError, refetch: fetchUsers } = useUsersQuery()
   const { data: branches = [], isLoading: branchesLoading } = useBranchesQuery()
   const updateUserMutation = useUpdateUser()
   const changeRoleMutation = useChangeUserRole()
@@ -66,7 +72,7 @@ function UsersContent() {
     try {
       if (editingUser) {
         // Actualizar usuario existente
-        await updateDoc(doc(db, "apps/controld/users", editingUser.id), {
+        await updateDoc(doc(db, USERS_COLLECTION, editingUser.id), {
           name: formData.name,
           role: formData.role,
           branchId: formData.role === "branch" || formData.role === "factory" ? formData.branchId : null,
@@ -167,7 +173,7 @@ function UsersContent() {
     if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return
 
     try {
-      await updateDoc(doc(db, "apps/controld/users", userId), { active: false })
+      await updateDoc(doc(db, USERS_COLLECTION, userId), { active: false })
       toast({
         title: "Usuario eliminado",
         description: "El usuario se eliminó correctamente",

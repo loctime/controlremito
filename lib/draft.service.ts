@@ -1,6 +1,7 @@
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Branch, User, OrderFormData } from "./types"
+import { ORDERS_COLLECTION } from "./firestore-paths"
 
 export interface SaveDraftParams {
   formData: OrderFormData
@@ -64,14 +65,14 @@ export class DraftService {
 
       if (draftOrderId) {
         // Actualizar pedido existente
-        await updateDoc(doc(db, "apps/controld/orders", draftOrderId), orderData)
+        await updateDoc(doc(db, ORDERS_COLLECTION, draftOrderId), orderData)
         orderId = draftOrderId
       } else {
         // Crear nuevo pedido en borrador
         orderData.orderNumber = `PED-${Date.now()}`
         orderData.createdAt = new Date()
         
-        const docRef = await addDoc(collection(db, "apps/controld/orders"), orderData)
+        const docRef = await addDoc(collection(db, ORDERS_COLLECTION), orderData)
         orderId = docRef.id
       }
 

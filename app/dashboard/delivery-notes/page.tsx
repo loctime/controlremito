@@ -11,6 +11,7 @@ import { collection, getDocs, query, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { DeliveryNote } from "@/lib/types"
+import { DELIVERY_NOTES_COLLECTION } from "@/lib/firestore-paths"
 import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import Link from "next/link"
@@ -29,7 +30,7 @@ function DeliveryNotesContent() {
   const fetchDeliveryNotes = async () => {
     setLoading(true)
     try {
-      const q = query(collection(db, "apps/controld/deliveryNotes"), orderBy("createdAt", "desc"))
+      const q = query(collection(db, DELIVERY_NOTES_COLLECTION), orderBy("createdAt", "desc"))
       const snapshot = await getDocs(q)
       const notesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as DeliveryNote[]
       console.log("📄 [DEBUG] Remitos cargados:", notesData.length)

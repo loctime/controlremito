@@ -19,6 +19,7 @@ import { doc, updateDoc } from "firebase/firestore"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
+import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
 
 function OrdersContent() {
   const { user } = useAuth()
@@ -38,7 +39,7 @@ function OrdersContent() {
 
     setLoading(true)
     try {
-      const ordersRef = collection(db, "apps/controld/orders")
+      const ordersRef = collection(db, ORDERS_COLLECTION)
       let ordersData: Order[] = []
 
       // Filtrar según el rol
@@ -134,7 +135,7 @@ function OrdersContent() {
       }
 
       // Actualizar estado del pedido
-      await updateDoc(doc(db, "apps/controld/orders", order.id), {
+      await updateDoc(doc(db, ORDERS_COLLECTION, order.id), {
         status: "sent"
       })
 
@@ -165,7 +166,7 @@ function OrdersContent() {
     if (!user) return
 
     try {
-      await updateDoc(doc(db, "apps/controld/orders", order.id), {
+      await updateDoc(doc(db, ORDERS_COLLECTION, order.id), {
         status: "ready",
         acceptedAt: new Date(),
         acceptedBy: user.id,

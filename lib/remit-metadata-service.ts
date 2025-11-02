@@ -1,8 +1,7 @@
 import { doc, setDoc, getDoc, updateDoc, Timestamp } from "firebase/firestore"
 import { db } from "./firebase"
 import type { Order, User, RemitMetadata, OrderStatus, Signature } from "./types"
-
-const REMIT_METADATA_COLLECTION = "apps/controld/remit-metadata"
+import { REMIT_METADATA_COLLECTION } from "./firestore-paths"
 
 /**
  * Validar si una transición de estado es permitida

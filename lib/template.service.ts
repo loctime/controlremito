@@ -2,6 +2,7 @@ import { collection, addDoc } from "firebase/firestore"
 import { db } from "./firebase"
 import { getReplacementQueue } from "./replacement-service"
 import type { User, OrderFormData, Product, Template } from "./types"
+import { TEMPLATES_COLLECTION } from "./firestore-paths"
 
 export interface CreateTemplateParams {
   formData: OrderFormData
@@ -52,7 +53,7 @@ export class TemplateService {
         allowedSendDays: formData.allowedSendDays || []
       }
 
-      await addDoc(collection(db, "apps/controld/templates"), templateData)
+      await addDoc(collection(db, TEMPLATES_COLLECTION), templateData)
 
       return { success: true }
     } catch (error) {

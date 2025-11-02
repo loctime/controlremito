@@ -3,6 +3,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useToast } from "./use-toast"
 import type { Order } from "@/lib/types"
+import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
 
 export interface UseOrderDetailsReturn {
   orderDetails: Order | null
@@ -22,7 +23,7 @@ export function useOrderDetails(): UseOrderDetailsReturn {
   const loadOrderDetails = useCallback(async (orderId: string) => {
     try {
       setLoadingDetails(true)
-      const orderDoc = await getDoc(doc(db, "apps/controld/orders", orderId))
+      const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId))
       
       if (orderDoc.exists()) {
         const orderData = orderDoc.data()
