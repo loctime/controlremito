@@ -75,3 +75,6 @@ pnpm dev
 - Deshabilita temporalmente bloqueadores de anuncios
 - Verifica extensiones de privacidad
 - Intenta en ventana de incógnito
+
+
+
