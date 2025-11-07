@@ -14,9 +14,10 @@ interface AcceptOrderDialogProps {
   order: OrderWithTemplate | null
   onConfirm: () => void
   onCancel: () => void
+  isProcessing?: boolean
 }
 
-export function AcceptOrderDialog({ open, order, onConfirm, onCancel }: AcceptOrderDialogProps) {
+export function AcceptOrderDialog({ open, order, onConfirm, onCancel, isProcessing = false }: AcceptOrderDialogProps) {
   const itemsSolicited = order?.items.filter((item) => item.quantity > 0) ?? []
 
   return (
@@ -81,7 +82,7 @@ export function AcceptOrderDialog({ open, order, onConfirm, onCancel }: AcceptOr
           <Button variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button onClick={onConfirm} className="bg-green-600 hover:bg-green-700">
+          <Button onClick={onConfirm} className="bg-green-600 hover:bg-green-700" isLoading={isProcessing} loadingText="Aceptando...">
             <CheckCircle className="mr-2 h-4 w-4" />
             Aceptar Pedido
           </Button>
@@ -96,9 +97,10 @@ interface AcceptAllOrdersDialogProps {
   orders: OrderWithTemplate[]
   onConfirm: () => void
   onCancel: () => void
+  isProcessing?: boolean
 }
 
-export function AcceptAllOrdersDialog({ open, orders, onConfirm, onCancel }: AcceptAllOrdersDialogProps) {
+export function AcceptAllOrdersDialog({ open, orders, onConfirm, onCancel, isProcessing = false }: AcceptAllOrdersDialogProps) {
   const totalProductosSolicitados = orders.reduce((sum, order) => {
     const itemsSolicited = order.items.filter((item) => item.quantity > 0)
     return sum + itemsSolicited.length
@@ -163,7 +165,7 @@ export function AcceptAllOrdersDialog({ open, orders, onConfirm, onCancel }: Acc
           <Button variant="outline" onClick={onCancel}>
             Cancelar
           </Button>
-          <Button onClick={onConfirm} className="bg-green-600 hover:bg-green-700">
+          <Button onClick={onConfirm} className="bg-green-600 hover:bg-green-700" isLoading={isProcessing} loadingText="Procesando...">
             <CheckCheck className="mr-2 h-4 w-4" />
             Aceptar Todos ({orders.length})
           </Button>

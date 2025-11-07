@@ -42,6 +42,8 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   const [showAcceptAllConfirmation, setShowAcceptAllConfirmation] = useState(false)
   const [orderToAccept, setOrderToAccept] = useState<OrderWithTemplate | null>(null)
   const [ordersToAcceptAll, setOrdersToAcceptAll] = useState<OrderWithTemplate[]>([])
+  const [isAcceptingAll, setIsAcceptingAll] = useState(false)
+  const [acceptingAllTemplateName, setAcceptingAllTemplateName] = useState<string | null>(null)
 
   const showAcceptOrderConfirmation = useCallback((order: OrderWithTemplate) => {
     setOrderToAccept(order)
@@ -63,18 +65,25 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   }, [])
 
   const acceptAllOrdersFromTemplate = useCallback(async (orders: OrderWithTemplate[]) => {
+    if (orders.length === 0) return
+    setIsAcceptingAll(true)
+    setAcceptingAllTemplateName(orders[0].templateName)
     // Aceptar todas las órdenes una por una usando la mutación
-    for (const order of orders) {
-      await new Promise((resolve) => {
-        acceptOrderMutation.mutate(order.id, {
-          onSuccess: resolve,
-          onError: resolve // Continuar aunque falle una
+    try {
+      for (const order of orders) {
+        await new Promise<void>((resolve) => {
+          acceptOrderMutation.mutate(order.id, {
+            onSuccess: () => resolve(),
+            onError: () => resolve(), // Continuar aunque falle una
+          })
         })
-      })
+      }
+      setShowAcceptAllConfirmation(false)
+      setOrdersToAcceptAll([])
+    } finally {
+      setIsAcceptingAll(false)
+      setAcceptingAllTemplateName(null)
     }
-    
-    setShowAcceptAllConfirmation(false)
-    setOrdersToAcceptAll([])
   }, [acceptOrderMutation])
 
   const markOrderAsReady = useCallback(async (orderId: string) => {
@@ -98,6 +107,10 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
     setShowAcceptAllConfirmation(false)
     setOrdersToAcceptAll([])
   }, [])
+
+  const acceptingOrderId = acceptOrderMutation.isPending ? (acceptOrderMutation.variables as string | undefined) ?? null : null
+  const markingReadyOrderId = markAsReadyMutation.isPending ? (markAsReadyMutation.variables as string | undefined) ?? null : null
+  const takingOrderId = takeForDeliveryMutation.isPending ? (takeForDeliveryMutation.variables as string | undefined) ?? null : null
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -172,6 +185,9 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
                   orders={pendingOrders}
                   onAcceptOrder={showAcceptOrderConfirmation}
                   onAcceptAll={showAcceptAllOrdersConfirmation}
+                  acceptingOrderId={acceptingOrderId}
+                  isAcceptingAll={isAcceptingAll}
+                  acceptingAllTemplateName={acceptingAllTemplateName}
                 />
               ) : (
                 <Card>
@@ -217,6 +233,8 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
                 onMarkAsReady={markOrderAsReady}
                 onTakeForDelivery={takeOrderForDelivery}
                 onSaveProgress={saveOrderProgress}
+                markingReadyOrderId={markingReadyOrderId}
+                takingOrderId={takingOrderId}
               />
             ) : (
               <Card>
@@ -267,6 +285,7 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         order={orderToAccept}
         onConfirm={() => orderToAccept && acceptOrder(orderToAccept.id)}
         onCancel={handleCancelAccept}
+        isProcessing={!!orderToAccept && acceptingOrderId === orderToAccept.id}
       />
 
       <AcceptAllOrdersDialog
@@ -274,6 +293,7 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
         orders={ordersToAcceptAll}
         onConfirm={() => acceptAllOrdersFromTemplate(ordersToAcceptAll)}
         onCancel={handleCancelAcceptAll}
+        isProcessing={isAcceptingAll}
       />
     </div>
   )

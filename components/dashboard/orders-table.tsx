@@ -14,9 +14,12 @@ interface OrdersTableProps {
   orders: OrderWithTemplate[]
   onAcceptOrder: (order: OrderWithTemplate) => void
   onAcceptAll: (orders: OrderWithTemplate[]) => void
+  acceptingOrderId?: string | null
+  isAcceptingAll?: boolean
+  acceptingAllTemplateName?: string | null
 }
 
-export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, onAcceptAll }: OrdersTableProps) {
+export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, onAcceptAll, acceptingOrderId = null, isAcceptingAll = false, acceptingAllTemplateName = null }: OrdersTableProps) {
   const { isCollapsed, toggle: toggleTemplateCollapse } = useCollapsibleSet()
 
   // Agrupar por plantilla y organizar por relación padre-hijo
@@ -88,6 +91,8 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                     e.stopPropagation()
                     onAcceptAll(templateOrders)
                   }}
+                  isLoading={isAcceptingAll && acceptingAllTemplateName === templateName}
+                  disabled={isAcceptingAll}
                 >
                   <CheckCheck className="mr-1 h-3 w-3" />
                   Aceptar todas
@@ -112,6 +117,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                         size="sm" 
                         className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
                         onClick={() => onAcceptOrder(parentOrder)}
+                        isLoading={acceptingOrderId === parentOrder.id}
                       >
                         Aceptar
                       </Button>
@@ -134,6 +140,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                           size="sm" 
                           className="bg-blue-600 hover:bg-blue-700 text-white min-h-[44px] px-4"
                           onClick={() => onAcceptOrder(childOrder)}
+                          isLoading={acceptingOrderId === childOrder.id}
                         >
                           Aceptar
                         </Button>
@@ -173,6 +180,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                               size="sm" 
                               className="text-xs px-4 py-1 h-auto bg-green-600 hover:bg-green-700"
                               onClick={() => onAcceptOrder(parentOrder)}
+                              isLoading={acceptingOrderId === parentOrder.id}
                             >
                               Aceptar
                             </Button>
@@ -210,6 +218,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, onAcceptOrder, on
                                 size="sm" 
                                 className="text-xs px-4 py-1 h-auto bg-blue-600 hover:bg-blue-700"
                                 onClick={() => onAcceptOrder(childOrder)}
+                                isLoading={acceptingOrderId === childOrder.id}
                               >
                                 Aceptar
                               </Button>

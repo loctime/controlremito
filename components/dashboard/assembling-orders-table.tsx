@@ -18,9 +18,11 @@ interface AssemblingOrdersTableProps {
   onMarkAsReady?: (orderId: string) => void
   onTakeForDelivery?: (orderId: string) => void
   onSaveProgress?: (orderId: string) => Promise<void> | void
+  markingReadyOrderId?: string | null
+  takingOrderId?: string | null
 }
 
-export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery, onSaveProgress }: AssemblingOrdersTableProps) {
+export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery, onSaveProgress, markingReadyOrderId = null, takingOrderId = null }: AssemblingOrdersTableProps) {
   const { isCollapsed: isTemplateCollapsed, toggle: toggleTemplateCollapse } = useCollapsibleSet()
   const { isCollapsed: isOrderExpanded, toggle: toggleOrderExpansion } = useCollapsibleSet()
   const [savingOrders, setSavingOrders] = useState<Record<string, boolean>>({})
@@ -40,6 +42,8 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
 
   const isOrderSaving = (orderId: string) => !!savingOrders[orderId]
   const isOrderSaved = (orderId: string) => !!savedOrders[orderId]
+  const isOrderMarkingReady = (orderId: string) => markingReadyOrderId === orderId
+  const isOrderBeingTaken = (orderId: string) => takingOrderId === orderId
   const canMarkOrderAsReady = (order: OrderWithTemplate) => {
     const progressComplete = getOrderProgress(order) === 100
     if (!progressComplete) return false
@@ -135,8 +139,10 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                               className="min-h-[44px] px-4"
                               onClick={(event) => handleSaveProgress(order.id, event)}
                               disabled={isOrderSaving(order.id)}
+                              isLoading={isOrderSaving(order.id)}
+                              loadingText="Guardando..."
                             >
-                              {isOrderSaving(order.id) ? "Guardando..." : "Guardar avance"}
+                              Guardar avance
                             </Button>
                             {onMarkAsReady && (
                               <Button 
@@ -147,6 +153,8 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                   onMarkAsReady(order.id)
                                 }}
                                 disabled={!canMarkOrderAsReady(order)}
+                                isLoading={isOrderMarkingReady(order.id)}
+                                loadingText="Marcando..."
                               >
                                 ✓ Listo
                               </Button>
@@ -158,6 +166,8 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                             size="sm" 
                             className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
                             onClick={() => onTakeForDelivery(order.id)}
+                            isLoading={isOrderBeingTaken(order.id)}
+                            loadingText="Tomando..."
                           >
                             🚚 Tomar
                           </Button>
@@ -245,8 +255,10 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                       className="text-xs px-3 py-1 h-auto"
                                       onClick={(event) => handleSaveProgress(order.id, event)}
                                       disabled={isOrderSaving(order.id)}
+                                      isLoading={isOrderSaving(order.id)}
+                                      loadingText="Guardando..."
                                     >
-                                      {isOrderSaving(order.id) ? "Guardando..." : "Guardar avance"}
+                                      Guardar avance
                                     </Button>
                                     {onMarkAsReady && (
                                       <Button 
@@ -257,6 +269,8 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                           onMarkAsReady(order.id)
                                         }}
                                         disabled={!canMarkOrderAsReady(order)}
+                                        isLoading={isOrderMarkingReady(order.id)}
+                                        loadingText="Marcando..."
                                       >
                                         ✓ Listo
                                       </Button>
@@ -282,6 +296,8 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                       e.stopPropagation()
                                       onTakeForDelivery(order.id)
                                     }}
+                                    isLoading={isOrderBeingTaken(order.id)}
+                                    loadingText="Tomando..."
                                   >
                                     🚚 Tomar
                                   </Button>
