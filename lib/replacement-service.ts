@@ -221,6 +221,23 @@ export async function getReplacementQueue(branchId: string): Promise<Replacement
 }
 
 /**
+ * Elimina la cola de reposiciones de una sucursal.
+ */
+export async function clearReplacementQueue(branchId: string): Promise<void> {
+  try {
+    const queue = await getReplacementQueue(branchId)
+    if (!queue) {
+      return
+    }
+
+    await deleteDoc(doc(db, REPLACEMENT_QUEUES_COLLECTION, queue.id))
+  } catch (error) {
+    console.error("Error al limpiar cola de reposiciones:", error)
+    throw error
+  }
+}
+
+/**
  * Obtener todas las colas de reposiciones
  */
 export async function getAllReplacementQueues(): Promise<ReplacementQueue[]> {

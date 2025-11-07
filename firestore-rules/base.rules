@@ -21,6 +21,11 @@ function userRole() {
     ? get(/databases/$(db)/documents/apps/controlRemito/users/$(uid())).data.role
     : null;
 }
+function userBranchId() {
+  return isAuth() && userDocExists()
+    ? get(/databases/$(db)/documents/apps/controlRemito/users/$(uid())).data.branchId
+    : null;
+}
 
 // Helpers para CONTROL-STORE
 function isControlStoreMaxDev() { return controlStoreUserRole() == 'maxdev'; }

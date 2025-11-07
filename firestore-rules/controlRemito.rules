@@ -39,7 +39,7 @@ match /apps/controlRemito {
   
   match /replacementQueues/{queueId} {
     allow read, create, update: if isAuth();
-    allow delete: if isAdmin();
+    allow delete: if isAdmin() || (isAuth() && userBranchId() != null && resource.data.branchId == userBranchId());
   }
 }
 

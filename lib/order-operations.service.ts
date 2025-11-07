@@ -1,7 +1,7 @@
 import { collection, addDoc, updateDoc, doc, getDocs, query, where, serverTimestamp } from "firebase/firestore"
 import { db } from "./firebase"
 import { createRemitMetadata } from "./remit-metadata-service"
-import { getReplacementQueue } from "./replacement-service"
+import { getReplacementQueue, clearReplacementQueue } from "./replacement-service"
 import type { Order, Template, User } from "./types"
 import { ORDERS_COLLECTION, BRANCHES_COLLECTION } from "./firestore-paths"
 
@@ -169,6 +169,10 @@ export async function sendOrder({
     ...order,
     status: "sent"
   }, user)
+
+  if (order.fromBranchId) {
+    await clearReplacementQueue(order.fromBranchId)
+  }
 }
 
 /**
