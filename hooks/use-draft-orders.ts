@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { collection, query, where, onSnapshot, doc, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Order, Template, User } from "@/lib/types"
@@ -14,10 +14,16 @@ export function useDraftOrders(user: User | null, templates: Template[]): UseDra
   const [draftOrders, setDraftOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const templatesRef = useRef<Template[]>(templates)
+
+  useEffect(() => {
+    templatesRef.current = templates
+  }, [templates])
 
   useEffect(() => {
     if (!user || user.role !== "branch" || !user.branchId) {
       setLoading(false)
+      setDraftOrders([])
       return
     }
 
@@ -43,7 +49,7 @@ export function useDraftOrders(user: User | null, templates: Template[]): UseDra
           // Arreglar borradores que no tienen días permitidos
           for (const draft of draftOrdersData) {
             if (!draft.allowedSendDays || draft.allowedSendDays.length === 0) {
-              const template = templates.find(t => t.id === draft.templateId)
+              const template = templatesRef.current.find((t) => t.id === draft.templateId)
               if (template && template.allowedSendDays) {
                 console.log("🔧 [DEBUG] Arreglando borrador sin días permitidos:", draft.id)
                 await updateDoc(doc(db, ORDERS_COLLECTION, draft.id), {
@@ -85,7 +91,7 @@ export function useDraftOrders(user: User | null, templates: Template[]): UseDra
         setLoading(false)
       }
     }
-  }, [user?.id, user?.role, user?.branchId, templates])
+  }, [user?.id, user?.role, user?.branchId])
 
   return { draftOrders, loading, error }
 }
