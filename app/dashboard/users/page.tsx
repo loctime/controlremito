@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Search, Edit, Trash2 } from "lucide-react"
+import { Plus, Search, Edit, Trash2, Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import type { User, Branch } from "@/lib/types"
@@ -37,6 +37,7 @@ function UsersContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   
   // TanStack Query hooks
   const { data: users = [], isLoading: usersLoading, error: usersError, refetch: fetchUsers } = useUsersQuery()
@@ -266,14 +267,25 @@ function UsersContent() {
                 {!editingUser && (
                   <div className="space-y-2">
                     <Label htmlFor="password">Contraseña *</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      required
-                      minLength={6}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        required
+                        minLength={6}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                        aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       Mínimo 6 caracteres. Si el email ya existe en Firebase Auth (de otra app), usa la contraseña correcta del usuario existente.
                     </p>
