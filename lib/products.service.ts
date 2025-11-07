@@ -11,7 +11,10 @@ export const fetchProducts = async (): Promise<Product[]> => {
 }
 
 // Servicio para crear producto
-export const createProduct = async (productData: Omit<Product, "id">, userId: string): Promise<void> => {
+export const createProduct = async (
+  productData: Omit<Product, "id" | "createdAt" | "createdBy" | "active">,
+  userId: string,
+): Promise<void> => {
   await addDoc(collection(db, PRODUCTS_COLLECTION), {
     ...productData,
     createdAt: new Date(),

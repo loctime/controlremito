@@ -50,6 +50,7 @@ export interface Product {
   name: string
   description?: string
   sku?: string
+  category?: string
   unit: string // unidad de medida (kg, unidades, litros, etc)
   createdAt: Timestamp
   createdBy: string

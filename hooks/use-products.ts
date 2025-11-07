@@ -21,7 +21,7 @@ export const useCreateProduct = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (productData: Omit<Product, "id">) => {
+    mutationFn: (productData: Omit<Product, "id" | "createdAt" | "createdBy" | "active">) => {
       if (!user) throw new Error('Usuario no autenticado')
       return createProduct(productData, user.id)
     },

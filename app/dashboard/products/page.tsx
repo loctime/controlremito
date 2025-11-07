@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Plus, Search, Edit, Trash2, Upload, ClipboardPaste, Download, Loader2 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import type { Product } from "@/lib/types"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -27,6 +27,29 @@ import * as XLSX from "xlsx"
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useBulkImportProducts } from "@/hooks/use-products"
 import { useToast } from "@/hooks/use-toast"
 
+const buildSkuFromFields = ({
+  name,
+  unit,
+  category,
+}: {
+  name: string
+  unit: string
+  category: string
+}) => {
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+
+  const parts = [category, name, unit].map((part) => normalize(part)).filter(Boolean)
+
+  return parts.join("-")
+}
+
 function ProductsContent() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -35,14 +58,37 @@ function ProductsContent() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [formData, setFormData] = useState({
     name: "",
+    unit: "",
+    category: "",
     description: "",
     sku: "",
-    unit: "",
   })
+  const [skuTouched, setSkuTouched] = useState(false)
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
   const [bulkActiveTab, setBulkActiveTab] = useState("paste")
   const [pastedData, setPastedData] = useState("")
   const [previewData, setPreviewData] = useState<Partial<Product>[]>([])
+
+  useEffect(() => {
+    if (skuTouched) return
+
+    setFormData((prev) => {
+      const generatedSku = buildSkuFromFields({
+        name: prev.name,
+        unit: prev.unit || "unidad",
+        category: prev.category,
+      })
+
+      if (generatedSku === prev.sku) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        sku: generatedSku,
+      }
+    })
+  }, [formData.name, formData.unit, formData.category, skuTouched])
 
   // TanStack Query hooks
   const { data: products = [], isLoading, error } = useProducts()
@@ -56,28 +102,39 @@ function ProductsContent() {
 
     if (!user) return
 
+    const preparedData = {
+      name: formData.name.trim(),
+      unit: formData.unit.trim() || "unidad",
+      category: formData.category.trim(),
+      description: formData.description.trim(),
+      sku: formData.sku.trim(),
+    }
+
     if (editingProduct) {
       updateProductMutation.mutate({
         productId: editingProduct.id,
-        productData: formData,
+        productData: preparedData,
       })
     } else {
-      createProductMutation.mutate(formData)
+      createProductMutation.mutate(preparedData)
     }
 
     setIsDialogOpen(false)
     setEditingProduct(null)
-    setFormData({ name: "", description: "", sku: "", unit: "" })
+    setFormData({ name: "", unit: "", category: "", description: "", sku: "" })
+    setSkuTouched(false)
   }
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product)
     setFormData({
       name: product.name,
+      unit: product.unit || "",
+      category: product.category || "",
       description: product.description || "",
       sku: product.sku || "",
-      unit: product.unit,
     })
+    setSkuTouched(Boolean(product.sku))
     setIsDialogOpen(true)
   }
 
@@ -98,12 +155,19 @@ function ProductsContent() {
       // Separar por tabuladores (Excel) o comas (CSV)
       const columns = line.split("\t").length > 1 ? line.split("\t") : line.split(",")
 
-      if (columns.length >= 2 && columns[0]?.trim()) {
+      const name = columns[0]?.trim()
+      if (name) {
+        const unit = columns[1]?.trim() || "unidad"
+        const category = columns[2]?.trim() || ""
+        const description = columns[3]?.trim() || ""
+        const sku = columns[4]?.trim() || ""
+
         parsedProducts.push({
-          name: columns[0]?.trim(),
-          sku: columns[1]?.trim() || "",
-          unit: columns[2]?.trim() || "unidades",
-          description: columns[3]?.trim() || "",
+          name,
+          unit,
+          category,
+          description,
+          sku: sku || buildSkuFromFields({ name, unit, category }),
         })
       }
     })
@@ -143,12 +207,19 @@ function ProductsContent() {
             if (index === 0 && line.toLowerCase().includes("nombre")) return
             const columns = line.split(",")
 
-            if (columns.length >= 2 && columns[0]?.trim()) {
+            const name = columns[0]?.trim()
+            if (name) {
+              const unit = columns[1]?.trim() || "unidad"
+              const category = columns[2]?.trim() || ""
+              const description = columns[3]?.trim() || ""
+              const sku = columns[4]?.trim() || ""
+
               parsedProducts.push({
-                name: columns[0]?.trim(),
-                sku: columns[1]?.trim() || "",
-                unit: columns[2]?.trim() || "unidades",
-                description: columns[3]?.trim() || "",
+                name,
+                unit,
+                category,
+                description,
+                sku: sku || buildSkuFromFields({ name, unit, category }),
               })
             }
           })
@@ -167,12 +238,21 @@ function ProductsContent() {
           jsonData.forEach((row, index) => {
             // Saltar encabezados
             if (index === 0) return
-            if (row.length >= 2 && row[0]) {
+            if (row[0]) {
+              const name = row[0]?.toString().trim() || ""
+              if (!name) return
+
+              const unit = row[1]?.toString().trim() || "unidad"
+              const category = row[2]?.toString().trim() || ""
+              const description = row[3]?.toString().trim() || ""
+              const sku = row[4]?.toString().trim() || ""
+
               parsedProducts.push({
-                name: row[0]?.toString().trim(),
-                sku: row[1]?.toString().trim() || "",
-                unit: row[2]?.toString().trim() || "unidades",
-                description: row[3]?.toString().trim() || "",
+                name,
+                unit,
+                category,
+                description,
+                sku: sku || buildSkuFromFields({ name, unit, category }),
               })
             }
           })
@@ -199,7 +279,7 @@ function ProductsContent() {
   // Descargar plantilla CSV
   const downloadTemplate = () => {
     const template =
-      "Nombre,SKU,Unidad,Descripción\nProducto Ejemplo 1,SKU001,kg,Descripción del producto\nProducto Ejemplo 2,SKU002,litros,Otra descripción"
+      "Nombre,Unidad,Categoría,Descripción,SKU\nProducto Ejemplo 1,kg,Alimentos,Descripción del producto,SKU001\nProducto Ejemplo 2,litros,Bebidas,Otra descripción,SKU002"
     const blob = new Blob([template], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -213,7 +293,23 @@ function ProductsContent() {
   const handleBulkImport = async () => {
     if (!user || previewData.length === 0) return
 
-    bulkImportMutation.mutate(previewData, {
+    const sanitizedProducts = previewData.map((product) => {
+      const name = product.name?.toString().trim() || ""
+      const unit = product.unit?.toString().trim() || "unidad"
+      const category = product.category?.toString().trim() || ""
+      const description = product.description?.toString().trim() || ""
+      const sku = product.sku?.toString().trim() || buildSkuFromFields({ name, unit, category })
+
+      return {
+        name,
+        unit,
+        category,
+        description,
+        sku,
+      }
+    })
+
+    bulkImportMutation.mutate(sanitizedProducts, {
       onSuccess: () => {
         setIsBulkDialogOpen(false)
         setPastedData("")
@@ -222,11 +318,14 @@ function ProductsContent() {
     })
   }
 
-  const filteredProducts = products.filter(
-    (product) =>
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.sku?.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const normalizedSearch = searchTerm.trim().toLowerCase()
+  const filteredProducts = normalizedSearch
+    ? products.filter((product) =>
+        product.name.toLowerCase().includes(normalizedSearch) ||
+        product.sku?.toLowerCase().includes(normalizedSearch) ||
+        product.category?.toLowerCase().includes(normalizedSearch),
+      )
+    : products
 
   return (
     <ProtectedRoute allowedRoles={["admin", "factory", "branch", "maxdev"]}>
@@ -270,12 +369,12 @@ function ProductsContent() {
                     <div className="space-y-2">
                       <Label>Copia y pega desde Excel (incluye encabezados)</Label>
                       <p className="text-sm text-muted-foreground">
-                        Columnas: <strong>Nombre | SKU | Unidad | Descripción</strong>
+                        Columnas: <strong>Nombre | Unidad | Categoría | Descripción | SKU</strong>
                       </p>
                       <Textarea
-                        placeholder="Nombre	SKU	Unidad	Descripción
-Producto 1	P001	kg	Descripción 1
-Producto 2	P002	litros	Descripción 2"
+                        placeholder="Nombre	Unidad	Categoría	Descripción	SKU
+Producto 1	kg	Alimentos	Descripción 1	P001
+Producto 2	unidades	Limpieza	Descripción 2	P002"
                         value={pastedData}
                         onChange={(e) => setPastedData(e.target.value)}
                         rows={8}
@@ -298,7 +397,7 @@ Producto 2	P002	litros	Descripción 2"
                       </div>
                       <Input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} />
                       <p className="text-sm text-muted-foreground">
-                        Formato: Nombre, SKU, Unidad, Descripción (en ese orden)
+                        Formato: Nombre, Unidad, Categoría, Descripción, SKU (en ese orden)
                       </p>
                     </div>
                   </TabsContent>
@@ -325,10 +424,11 @@ Producto 2	P002	litros	Descripción 2"
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-10">#</TableHead>
-                            <TableHead className="w-[30%]">Nombre</TableHead>
-                            <TableHead className="w-[20%]">SKU</TableHead>
-                            <TableHead className="w-[15%]">Unidad</TableHead>
-                            <TableHead className="w-[35%]">Descripción</TableHead>
+                            <TableHead className="w-[28%]">Nombre</TableHead>
+                            <TableHead className="w-[16%]">Unidad</TableHead>
+                            <TableHead className="w-[20%]">Categoría</TableHead>
+                            <TableHead className="w-[24%]">Descripción</TableHead>
+                            <TableHead className="w-[12%]">SKU</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -338,14 +438,17 @@ Producto 2	P002	litros	Descripción 2"
                               <TableCell className="font-medium truncate" title={product.name}>
                                 {product.name || "⚠️ Sin nombre"}
                               </TableCell>
-                              <TableCell className="truncate" title={product.sku}>
-                                {product.sku || "-"}
-                              </TableCell>
                               <TableCell className="truncate" title={product.unit}>
-                                {product.unit || "unidades"}
+                                {product.unit || "unidad"}
+                              </TableCell>
+                              <TableCell className="truncate" title={product.category}>
+                                {product.category || "-"}
                               </TableCell>
                               <TableCell className="truncate text-muted-foreground" title={product.description}>
                                 {product.description || "-"}
+                              </TableCell>
+                              <TableCell className="truncate" title={product.sku}>
+                                {product.sku || "-"}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -367,12 +470,23 @@ Producto 2	P002	litros	Descripción 2"
               </DialogContent>
             </Dialog>
 
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <Dialog
+              open={isDialogOpen}
+              onOpenChange={(open) => {
+                setIsDialogOpen(open)
+                if (!open) {
+                  setEditingProduct(null)
+                  setFormData({ name: "", unit: "", category: "", description: "", sku: "" })
+                  setSkuTouched(false)
+                }
+              }}
+            >
               <DialogTrigger asChild>
                 <Button
                   onClick={() => {
                     setEditingProduct(null)
-                    setFormData({ name: "", description: "", sku: "", unit: "" })
+                    setFormData({ name: "", unit: "", category: "", description: "", sku: "" })
+                    setSkuTouched(false)
                   }}
                   className="w-full sm:w-auto"
                 >
@@ -398,21 +512,21 @@ Producto 2	P002	litros	Descripción 2"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sku">SKU / Código</Label>
-                  <Input
-                    id="sku"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="unit">Unidad de medida *</Label>
+                  <Label htmlFor="unit">Unidad de medida</Label>
                   <Input
                     id="unit"
                     placeholder="ej: kg, unidades, litros"
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">Categoría</Label>
+                  <Input
+                    id="category"
+                    placeholder="ej: Alimentos, Limpieza"
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -421,6 +535,17 @@ Producto 2	P002	litros	Descripción 2"
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sku">SKU / Código</Label>
+                  <Input
+                    id="sku"
+                    value={formData.sku}
+                    onChange={(e) => {
+                      setSkuTouched(true)
+                      setFormData({ ...formData, sku: e.target.value })
+                    }}
                   />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -485,7 +610,16 @@ Producto 2	P002	litros	Descripción 2"
                               {product.sku && (
                                 <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
                               )}
-                              <Badge variant="secondary" className="text-xs">{product.unit}</Badge>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                <Badge variant="secondary" className="text-xs">
+                                  {product.unit || "unidad"}
+                                </Badge>
+                                {product.category && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {product.category}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             <div className="flex gap-2">
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
@@ -523,9 +657,10 @@ Producto 2	P002	litros	Descripción 2"
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nombre</TableHead>
-                        <TableHead>SKU</TableHead>
                         <TableHead>Unidad</TableHead>
+                        <TableHead>Categoría</TableHead>
                         <TableHead>Descripción</TableHead>
+                        <TableHead>SKU</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -533,9 +668,10 @@ Producto 2	P002	litros	Descripción 2"
                       {filteredProducts.map((product) => (
                         <TableRow key={product.id}>
                           <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>{product.sku || "-"}</TableCell>
-                          <TableCell>{product.unit}</TableCell>
+                          <TableCell>{product.unit || "unidad"}</TableCell>
+                          <TableCell>{product.category || "-"}</TableCell>
                           <TableCell>{product.description || "-"}</TableCell>
+                          <TableCell>{product.sku || "-"}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">
                               <Button variant="ghost" size="sm" onClick={() => handleEdit(product)}>
