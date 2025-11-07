@@ -25,9 +25,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import * as XLSX from "xlsx"
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, useBulkImportProducts } from "@/hooks/use-products"
+import { useToast } from "@/hooks/use-toast"
 
 function ProductsContent() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)

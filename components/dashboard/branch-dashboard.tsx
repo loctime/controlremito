@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileText, Package, Truck } from "lucide-react"
@@ -26,6 +27,7 @@ import { TEMPLATES_COLLECTION } from "@/lib/firestore-paths"
 export function BranchDashboard() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   
   // TanStack Query hooks
   const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useTemplatesQuery()
@@ -202,6 +204,7 @@ export function BranchDashboard() {
       await updateDoc(doc(db, TEMPLATES_COLLECTION, templateId), {
         active: false
       })
+      await queryClient.invalidateQueries({ queryKey: ["templates"] })
 
       toast({
         title: "Plantilla eliminada",
@@ -215,7 +218,7 @@ export function BranchDashboard() {
         variant: "destructive",
       })
     }
-  }, [user, toast])
+  }, [user, toast, queryClient])
 
   // Loading state
   const isLoading = templatesLoading || draftsLoading

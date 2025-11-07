@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Search, Edit, Trash2, Save, X, User, PenTool, Building2, AlertTriangle } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, useRef } from "react"
 import { collection, addDoc, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -31,6 +32,7 @@ import { FirestoreDiagnostics } from "@/components/debug/firestore-diagnostics"
 function SettingsContent() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
   
   // Estados para perfil
   const [profileData, setProfileData] = useState({
@@ -195,6 +197,7 @@ function SettingsContent() {
       const snapshot = await getDocs(q)
       const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
       setBranches(branchesData)
+      queryClient.setQueryData(["branches"], branchesData)
     } catch (error) {
       console.error("Error al cargar sucursales:", error)
       toast({
@@ -236,7 +239,8 @@ function SettingsContent() {
       setIsDialogOpen(false)
       setEditingBranch(null)
       setBranchFormData({ name: "", address: "", type: "branch" })
-      fetchBranches()
+      await fetchBranches()
+      await queryClient.invalidateQueries({ queryKey: ["branches"] })
     } catch (error) {
       console.error("Error al guardar sucursal:", error)
       toast({
@@ -266,7 +270,8 @@ function SettingsContent() {
         title: "Sucursal eliminada",
         description: "La sucursal se eliminó correctamente",
       })
-      fetchBranches()
+      await fetchBranches()
+      await queryClient.invalidateQueries({ queryKey: ["branches"] })
     } catch (error) {
       console.error("Error al eliminar sucursal:", error)
       toast({

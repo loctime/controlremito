@@ -11,11 +11,13 @@ import { TemplateForm } from "@/components/dashboard/template-form"
 import { TemplateManagementCard } from "@/components/dashboard/template-management-card"
 import { useTemplatesQuery, useProductsQuery, useBranchesQuery, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "@/hooks/use-templates-query"
 import type { Template } from "@/lib/types"
+import { useQueryClient } from "@tanstack/react-query"
 
 function TemplatesContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
+  const queryClient = useQueryClient()
   
   // TanStack Query hooks
   const { data: templates = [], isLoading: templatesLoading, error: templatesError } = useTemplatesQuery()
@@ -66,7 +68,13 @@ function TemplatesContent() {
             <div className="flex flex-col sm:flex-row gap-2">
               <Button
                 variant="outline"
-                onClick={() => window.location.reload()}
+                onClick={async () => {
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ["templates"] }),
+                    queryClient.invalidateQueries({ queryKey: ["products"] }),
+                    queryClient.invalidateQueries({ queryKey: ["branches"] }),
+                  ])
+                }}
                 disabled={isLoading}
                 className="text-xs w-full sm:w-auto"
               >

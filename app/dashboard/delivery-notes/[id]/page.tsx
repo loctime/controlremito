@@ -6,54 +6,32 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Download, FileText } from "lucide-react"
 import { useEffect, useState } from "react"
-import { doc, getDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import type { DeliveryNote } from "@/lib/types"
-import { DELIVERY_NOTES_COLLECTION } from "@/lib/firestore-paths"
 import { useToast } from "@/hooks/use-toast"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { generateDeliveryNotePDF, generateSimplifiedDeliveryNotePDF } from "@/lib/pdf-generator"
+import { useDeliveryNote } from "@/hooks/use-delivery-notes"
 
 function DeliveryNoteDetailContent() {
   const { toast } = useToast()
   const params = useParams()
   const noteId = params.id as string
 
-  const [note, setNote] = useState<DeliveryNote | null>(null)
-  const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
 
-  useEffect(() => {
-    fetchNote()
-  }, [noteId])
+  const { data: note, isLoading, isFetching, error } = useDeliveryNote(noteId)
 
-  const fetchNote = async () => {
-    setLoading(true)
-    try {
-      const noteDoc = await getDoc(doc(db, DELIVERY_NOTES_COLLECTION, noteId))
-      if (noteDoc.exists()) {
-        const noteData = { id: noteDoc.id, ...noteDoc.data() } as DeliveryNote
-        setNote(noteData)
-      } else {
-        toast({
-          title: "Error",
-          description: "No se encontró el remito",
-          variant: "destructive",
-        })
-      }
-    } catch (error) {
+  useEffect(() => {
+    if (error) {
       console.error("[v0] Error al cargar remito:", error)
       toast({
         title: "Error",
         description: "No se pudo cargar el remito",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [error, toast])
 
   const handleDownloadPDF = async () => {
     if (!note) return
@@ -111,7 +89,7 @@ function DeliveryNoteDetailContent() {
     })
   }
 
-  if (loading) {
+  if (isLoading || isFetching) {
     return (
       <ProtectedRoute>
         <div className="flex items-center justify-center py-12">
@@ -122,7 +100,19 @@ function DeliveryNoteDetailContent() {
   }
 
   if (!note) {
-    return null
+    return (
+      <ProtectedRoute>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-2">
+            <p className="text-lg font-semibold text-destructive">Remito no encontrado</p>
+            <p className="text-sm text-muted-foreground">Es posible que haya sido eliminado o que el enlace sea incorrecto.</p>
+            <Link href="/dashboard/delivery-notes">
+              <Button variant="outline" className="mt-2">Volver a remitos</Button>
+            </Link>
+          </div>
+        </div>
+      </ProtectedRoute>
+    )
   }
 
   return (

@@ -7,9 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Search, Eye, Send, CheckCircle, Clock, Package, Truck } from "lucide-react"
-import { useEffect, useState } from "react"
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import type { Order } from "@/lib/types"
 import { useToast } from "@/hooks/use-toast"
@@ -20,68 +18,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
+import { useOrdersList } from "@/hooks/use-orders-list"
+import { useQueryClient } from "@tanstack/react-query"
 
 function OrdersContent() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [orders, setOrders] = useState<Order[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("recibir")
 
-  useEffect(() => {
-    fetchOrders()
-  }, [user])
-
-  const fetchOrders = async () => {
-    if (!user) return
-
-    setLoading(true)
-    try {
-      const ordersRef = collection(db, ORDERS_COLLECTION)
-      let ordersData: Order[] = []
-
-      // Filtrar según el rol
-      if ((user.role === "branch" || user.role === "factory") && user.branchId) {
-        // Para branch y factory: obtener pedidos donde están como origen O destino
-        const qFrom = query(ordersRef, where("fromBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
-        const qTo = query(ordersRef, where("toBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
-
-        const [snapshotFrom, snapshotTo] = await Promise.all([getDocs(qFrom), getDocs(qTo)])
-
-        const ordersFrom = snapshotFrom.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-        const ordersTo = snapshotTo.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-
-        // Combinar y eliminar duplicados
-        const ordersMap = new Map<string, Order>()
-        ;[...ordersFrom, ...ordersTo].forEach((order) => ordersMap.set(order.id, order))
-        ordersData = Array.from(ordersMap.values()).sort(
-          (a, b) => (b.createdAt as any)?.seconds - (a.createdAt as any)?.seconds
-        )
-      } else if (user.role === "delivery") {
-        const q = query(ordersRef, where("status", "in", ["assembling", "in_transit", "received"]), orderBy("createdAt", "desc"))
-        const snapshot = await getDocs(q)
-        ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-      } else {
-        // admin o maxdev - ver todos
-        const q = query(ordersRef, orderBy("createdAt", "desc"))
-        const snapshot = await getDocs(q)
-        ordersData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
-      }
-
-      setOrders(ordersData)
-    } catch (error) {
-      console.error("[v0] Error al cargar pedidos:", error)
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los pedidos",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const queryClient = useQueryClient()
+  const { data: orders = [], isLoading, error } = useOrdersList()
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -150,8 +98,9 @@ function OrdersContent() {
         description: `El pedido ${order.orderNumber} fue enviado correctamente`,
       })
 
-      // Recargar la lista
-      fetchOrders()
+      await queryClient.invalidateQueries({ queryKey: ["orders-list"] })
+      await queryClient.invalidateQueries({ queryKey: ["orders"] })
+      await queryClient.invalidateQueries({ queryKey: ["delivery-notes"] })
     } catch (error) {
       console.error("Error al enviar pedido:", error)
       toast({
@@ -178,8 +127,9 @@ function OrdersContent() {
         description: `El pedido ${order.orderNumber} fue aceptado correctamente`,
       })
 
-      // Recargar la lista
-      fetchOrders()
+      await queryClient.invalidateQueries({ queryKey: ["orders-list"] })
+      await queryClient.invalidateQueries({ queryKey: ["orders"] })
+      await queryClient.invalidateQueries({ queryKey: ["delivery-notes"] })
     } catch (error) {
       console.error("Error al aceptar pedido:", error)
       toast({
@@ -257,8 +207,8 @@ function OrdersContent() {
             </TabsTrigger>
           </TabsList>
 
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
               <div className="flex flex-col gap-4 md:flex-row md:items-center">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -285,8 +235,13 @@ function OrdersContent() {
               </div>
             </CardHeader>
           <CardContent>
-            {loading ? (
+            {isLoading ? (
               <p className="text-center text-muted-foreground py-8">Cargando pedidos...</p>
+            ) : error ? (
+              <div className="text-center text-destructive py-8">
+                <p className="font-medium mb-1">Error al cargar pedidos</p>
+                <p className="text-sm text-muted-foreground">Intenta nuevamente más tarde.</p>
+              </div>
             ) : filteredOrders.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No hay pedidos disponibles</p>
             ) : (

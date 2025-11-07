@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from "react"
-import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore"
+import { useState, useCallback, useMemo } from "react"
+import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
 import type { Branch, Product, Order } from "@/lib/types"
-import { BRANCHES_COLLECTION, PRODUCTS_COLLECTION, ORDERS_COLLECTION } from "@/lib/firestore-paths"
+import { ORDERS_COLLECTION } from "@/lib/firestore-paths"
+import { useQuery } from "@tanstack/react-query"
+import { fetchBranches } from "@/lib/settings.service"
+import { fetchProducts } from "@/lib/products.service"
 
 export interface UseOrderDataReturn {
   branches: Branch[]
@@ -20,48 +23,42 @@ export interface UseOrderDataReturn {
  */
 export function useOrderData(): UseOrderDataReturn {
   const { user } = useAuth()
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [allBranches, setAllBranches] = useState<Branch[]>([])
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loadingExistingOrder, setLoadingExistingOrder] = useState(false)
 
-  const fetchBranches = useCallback(async () => {
-    try {
-      const q = query(collection(db, BRANCHES_COLLECTION), where("active", "==", true))
-      const snapshot = await getDocs(q)
-      const branchesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Branch[]
+  const branchesQuery = useQuery({
+    queryKey: ["branches"],
+    queryFn: fetchBranches,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+  })
 
-      // Guardar todas las sucursales sin filtrar
-      setAllBranches(branchesData)
+  const productsQuery = useQuery({
+    queryKey: ["products"],
+    queryFn: fetchProducts,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
 
-      // Filtrar: si es sucursal, solo mostrar fábricas y otras sucursales (no la propia)
-      const filtered =
-        user?.role === "branch"
-          ? branchesData.filter((b) => b.id !== user.branchId)
-          : user?.role === "factory"
-            ? branchesData.filter((b) => b.type === "branch")
-            : branchesData
+  const allBranches = branchesQuery.data ?? []
+  const products = productsQuery.data ?? []
 
-      setBranches(filtered)
-    } catch (error) {
-      console.error("[v0] Error al cargar sucursales:", error)
+  const branches = useMemo(() => {
+    if (!user) return allBranches
+
+    if (user.role === "branch" && user.branchId) {
+      return allBranches.filter((branch) => branch.id !== user.branchId)
     }
-  }, [user])
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      const q = query(collection(db, PRODUCTS_COLLECTION), where("active", "==", true))
-      const snapshot = await getDocs(q)
-      const productsData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
-      setProducts(productsData)
-    } catch (error) {
-      console.error("[v0] Error al cargar productos:", error)
+    if (user.role === "factory") {
+      return allBranches.filter((branch) => branch.type === "branch")
     }
-  }, [])
+
+    return allBranches
+  }, [allBranches, user])
 
   const loadExistingOrder = useCallback(async (orderId: string): Promise<Order | null> => {
     try {
-      setLoading(true)
+      setLoadingExistingOrder(true)
       const orderDoc = await getDoc(doc(db, ORDERS_COLLECTION, orderId))
       
       if (orderDoc.exists()) {
@@ -73,25 +70,21 @@ export function useOrderData(): UseOrderDataReturn {
       console.error("Error al cargar pedido:", error)
       return null
     } finally {
-      setLoading(false)
+      setLoadingExistingOrder(false)
     }
   }, [])
-
-  // Cargar datos al inicializar
-  useEffect(() => {
-    if (user) {
-      fetchBranches()
-      fetchProducts()
-    }
-  }, [user, fetchBranches, fetchProducts])
 
   return {
     branches,
     allBranches,
     products,
-    loading,
-    fetchBranches,
-    fetchProducts,
+    loading: branchesQuery.isLoading || productsQuery.isLoading || loadingExistingOrder,
+    fetchBranches: async () => {
+      await branchesQuery.refetch()
+    },
+    fetchProducts: async () => {
+      await productsQuery.refetch()
+    },
     loadExistingOrder,
   }
 }

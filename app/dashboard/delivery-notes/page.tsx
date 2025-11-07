@@ -7,45 +7,34 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Search, Eye, RefreshCw } from "lucide-react"
 import { useEffect, useState } from "react"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
-import { db } from "@/lib/firebase"
-import { useAuth } from "@/lib/auth-context"
 import type { DeliveryNote } from "@/lib/types"
-import { DELIVERY_NOTES_COLLECTION } from "@/lib/firestore-paths"
 import { useToast } from "@/hooks/use-toast"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import Link from "next/link"
+import { useDeliveryNotes } from "@/hooks/use-delivery-notes"
 
 function DeliveryNotesContent() {
-  const { user } = useAuth()
   const { toast } = useToast()
-  const [deliveryNotes, setDeliveryNotes] = useState<DeliveryNote[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [loading, setLoading] = useState(true)
+
+  const {
+    data: deliveryNotes = [],
+    isLoading,
+    isFetching,
+    refetch,
+    error,
+  } = useDeliveryNotes()
 
   useEffect(() => {
-    fetchDeliveryNotes()
-  }, [])
-
-  const fetchDeliveryNotes = async () => {
-    setLoading(true)
-    try {
-      const q = query(collection(db, DELIVERY_NOTES_COLLECTION), orderBy("createdAt", "desc"))
-      const snapshot = await getDocs(q)
-      const notesData = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as DeliveryNote[]
-      console.log("📄 [DEBUG] Remitos cargados:", notesData.length)
-      setDeliveryNotes(notesData)
-    } catch (error) {
+    if (error) {
       console.error("❌ Error al cargar remitos:", error)
       toast({
         title: "Error",
         description: "No se pudieron cargar los remitos",
         variant: "destructive",
       })
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [error, toast])
 
   const formatDate = (timestamp: any) => {
     if (!timestamp) return "-"
@@ -58,6 +47,8 @@ function DeliveryNotesContent() {
       minute: "2-digit",
     })
   }
+
+  const isBusy = isLoading || isFetching
 
   const filteredNotes = deliveryNotes.filter(
     (note) =>
@@ -89,16 +80,21 @@ function DeliveryNotesContent() {
               <Button 
                 variant="outline" 
                 size="icon"
-                onClick={fetchDeliveryNotes}
-                disabled={loading}
+                onClick={() => refetch()}
+                disabled={isBusy}
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isBusy ? 'animate-spin' : ''}`} />
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {loading ? (
+            {isLoading ? (
               <p className="text-center text-muted-foreground py-8">Cargando remitos...</p>
+            ) : error ? (
+              <div className="text-center text-destructive py-8">
+                <p className="font-medium mb-1">Error al cargar remitos</p>
+                <p className="text-sm text-muted-foreground">Intenta nuevamente más tarde.</p>
+              </div>
             ) : filteredNotes.length === 0 ? (
               <div className="text-center py-8 space-y-2">
                 <p className="text-muted-foreground">

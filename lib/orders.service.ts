@@ -1,6 +1,6 @@
-import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore"
+import { collection, query, where, getDocs, updateDoc, doc, orderBy } from "firebase/firestore"
 import { db } from "./firebase"
-import type { Order, Template } from "./types"
+import type { Order, Template, User } from "./types"
 import { ORDERS_COLLECTION, TEMPLATES_COLLECTION } from "./firestore-paths"
 
 // Servicio para obtener órdenes por estado
@@ -55,6 +55,46 @@ export const fetchOrdersWithTemplates = async (user: any, status: Order["status"
       ? (templatesMap.get(order.templateId) || "Plantilla no encontrada")
       : "Sin plantilla"
   }))
+}
+
+// Servicio para obtener listado completo de órdenes según el rol del usuario
+export const fetchOrdersList = async (user: User | null): Promise<Order[]> => {
+  if (!user) return []
+
+  const ordersRef = collection(db, ORDERS_COLLECTION)
+
+  if ((user.role === "branch" || user.role === "factory") && user.branchId) {
+    const qFrom = query(ordersRef, where("fromBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
+    const qTo = query(ordersRef, where("toBranchId", "==", user.branchId), orderBy("createdAt", "desc"))
+
+    const [snapshotFrom, snapshotTo] = await Promise.all([getDocs(qFrom), getDocs(qTo)])
+
+    const ordersFrom = snapshotFrom.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+    const ordersTo = snapshotTo.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+
+    const ordersMap = new Map<string, Order>()
+    ;[...ordersFrom, ...ordersTo].forEach((order) => ordersMap.set(order.id, order))
+
+    return Array.from(ordersMap.values()).sort((a, b) => {
+      const aDate = (a.createdAt as any)?.seconds || 0
+      const bDate = (b.createdAt as any)?.seconds || 0
+      return bDate - aDate
+    })
+  }
+
+  if (user.role === "delivery") {
+    const q = query(
+      ordersRef,
+      where("status", "in", ["assembling", "in_transit", "received"]),
+      orderBy("createdAt", "desc")
+    )
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
+  }
+
+  const q = query(ordersRef, orderBy("createdAt", "desc"))
+  const snapshot = await getDocs(q)
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Order[]
 }
 
 // Servicio para actualizar estado de orden
