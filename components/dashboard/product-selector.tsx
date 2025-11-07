@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Search, Plus } from "lucide-react"
+import type { CheckedState } from "@radix-ui/react-checkbox"
+import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -42,6 +43,34 @@ export function ProductSelector({
       product.sku?.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  const allFilteredSelected =
+    filteredProducts.length > 0 &&
+    filteredProducts.every((product) => selectedProductIds.has(product.id))
+  const someFilteredSelected = filteredProducts.some((product) =>
+    selectedProductIds.has(product.id),
+  )
+
+  const handleToggleSelectAll = (checked: CheckedState) => {
+    if (filteredProducts.length === 0 || checked === "indeterminate") {
+      return
+    }
+
+    if (checked) {
+      filteredProducts.forEach((product) => {
+        if (!selectedProductIds.has(product.id)) {
+          onProductToggle(product.id)
+        }
+      })
+      return
+    }
+
+    filteredProducts.forEach((product) => {
+      if (selectedProductIds.has(product.id)) {
+        onProductToggle(product.id)
+      }
+    })
+  }
+
   const handleAddProducts = () => {
     const selectedCount = selectedProductIds.size
     if (selectedCount === 0) {
@@ -63,15 +92,15 @@ export function ProductSelector({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto overflow-x-hidden p-6 sm:p-8">
         <DialogHeader>
           <DialogTitle>Seleccionar productos</DialogTitle>
           <DialogDescription>
             Selecciona los productos que quieres incluir en la plantilla
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4">
+
+        <div className="space-y-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
@@ -82,14 +111,26 @@ export function ProductSelector({
             />
           </div>
 
-          <div className="max-h-96 overflow-y-auto border rounded">
-            <Table>
+          <div className="max-h-80 overflow-y-auto overflow-x-hidden border rounded">
+            <Table className="text-sm">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12">Seleccionar</TableHead>
-                  <TableHead>Producto</TableHead>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Unidad</TableHead>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={
+                        allFilteredSelected
+                          ? true
+                          : someFilteredSelected
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={handleToggleSelectAll}
+                      aria-label="Seleccionar todos los productos visibles"
+                    />
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Producto</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SKU</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unidad</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -101,9 +142,9 @@ export function ProductSelector({
                         onCheckedChange={() => onProductToggle(product.id)}
                       />
                     </TableCell>
-                    <TableCell>{product.name}</TableCell>
-                    <TableCell>{product.sku || "-"}</TableCell>
-                    <TableCell>{product.unit}</TableCell>
+                    <TableCell className="max-w-[16rem] whitespace-normal break-words text-sm">{product.name}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{product.sku || "-"}</TableCell>
+                    <TableCell className="text-sm">{product.unit}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
