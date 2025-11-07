@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Search, Edit, Trash2, Save, X, User, PenTool, Building2, AlertTriangle } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState, useRef } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { collection, addDoc, getDocs, updateDoc, doc, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/auth-context"
@@ -29,10 +30,22 @@ import { USERS_COLLECTION, BRANCHES_COLLECTION } from "@/lib/firestore-paths"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FirestoreDiagnostics } from "@/components/debug/firestore-diagnostics"
 
+type TabValue = "profile" | "signature" | "diagnostics" | "branches"
+
+const DEFAULT_TAB: TabValue = "profile"
+const DEFAULT_BRANCH_FORM = {
+  name: "",
+  address: "",
+  type: "branch" as "factory" | "branch",
+}
+
 function SettingsContent() {
   const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
   
   // Estados para perfil
   const [profileData, setProfileData] = useState({
@@ -51,10 +64,18 @@ function SettingsContent() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
-  const [branchFormData, setBranchFormData] = useState({
-    name: "",
-    address: "",
-    type: "branch" as "factory" | "branch",
+  const [branchFormData, setBranchFormData] = useState(DEFAULT_BRANCH_FORM)
+
+  const canAccessBranches = user?.role === "admin" || user?.role === "maxdev"
+
+  const [activeTab, setActiveTab] = useState<TabValue>(() => {
+    const tabParam = searchParams?.get("tab") as TabValue | null
+    if (tabParam === "branches" && !canAccessBranches) {
+      return DEFAULT_TAB
+    }
+    return tabParam && ["profile", "signature", "diagnostics", "branches"].includes(tabParam)
+      ? tabParam
+      : DEFAULT_TAB
   })
 
   useEffect(() => {
@@ -74,6 +95,66 @@ function SettingsContent() {
       }
     }
   }, [user])
+
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab") as TabValue | null
+
+    let nextTab: TabValue = DEFAULT_TAB
+
+    if (tabParam && ["profile", "signature", "diagnostics", "branches"].includes(tabParam)) {
+      if (tabParam === "branches" && !canAccessBranches) {
+        nextTab = DEFAULT_TAB
+      } else {
+        nextTab = tabParam
+      }
+    }
+
+    setActiveTab((prev) => (prev === nextTab ? prev : nextTab))
+  }, [searchParams, canAccessBranches])
+
+  useEffect(() => {
+    if (!canAccessBranches) return
+
+    const shouldOpenBranchDialog = searchParams?.get("createBranch") === "1"
+
+    if (activeTab === "branches" && shouldOpenBranchDialog) {
+      if (!isDialogOpen) {
+        setEditingBranch(null)
+        setBranchFormData(DEFAULT_BRANCH_FORM)
+        setIsDialogOpen(true)
+      }
+
+      const params = new URLSearchParams(searchParams ? searchParams.toString() : "")
+      params.delete("createBranch")
+      const queryString = params.toString()
+      router.replace(`${pathname}${queryString ? `?${queryString}` : ""}`, { scroll: false })
+    }
+  }, [activeTab, searchParams, canAccessBranches, isDialogOpen, router, pathname])
+
+  const handleTabChange = (value: string) => {
+    const nextValue = value as TabValue
+
+    if (nextValue === "branches" && !canAccessBranches) {
+      return
+    }
+
+    setActiveTab(nextValue)
+
+    const params = new URLSearchParams(searchParams ? searchParams.toString() : "")
+
+    if (nextValue === DEFAULT_TAB) {
+      params.delete("tab")
+    } else {
+      params.set("tab", nextValue)
+    }
+
+    if (nextValue !== "branches") {
+      params.delete("createBranch")
+    }
+
+    const queryString = params.toString()
+    router.replace(`${pathname}${queryString ? `?${queryString}` : ""}`, { scroll: false })
+  }
 
   // ============= FUNCIONES DE PERFIL Y FIRMA =============
   
@@ -238,7 +319,7 @@ function SettingsContent() {
 
       setIsDialogOpen(false)
       setEditingBranch(null)
-      setBranchFormData({ name: "", address: "", type: "branch" })
+      setBranchFormData(DEFAULT_BRANCH_FORM)
       await fetchBranches()
       await queryClient.invalidateQueries({ queryKey: ["branches"] })
     } catch (error) {
@@ -292,7 +373,7 @@ function SettingsContent() {
           <p className="text-muted-foreground">Gestiona tu perfil, firma y configuración del sistema</p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className={`grid w-full ${(user?.role === "admin" || user?.role === "maxdev") ? "grid-cols-4" : "grid-cols-3"}`}>
             <TabsTrigger value="profile">
               <User className="mr-2 h-4 w-4" />

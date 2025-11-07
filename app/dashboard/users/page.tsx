@@ -2,6 +2,7 @@
 
 import type React from "react"
 
+import Link from "next/link"
 import { ProtectedRoute } from "@/components/protected-route"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -298,21 +299,30 @@ function UsersContent() {
                 {(formData.role === "branch" || formData.role === "factory") && (
                   <div className="space-y-2">
                     <Label htmlFor="branchId">Sucursal / Fábrica *</Label>
-                    <Select
-                      value={formData.branchId}
-                      onValueChange={(value) => setFormData({ ...formData, branchId: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar sucursal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {branches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {branches.length === 0 ? (
+                      <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground space-y-3">
+                        <p>No hay sucursales activas. Crea una para poder asignarla a este usuario.</p>
+                        <Button asChild size="sm" className="w-fit">
+                          <Link href="/dashboard/settings?tab=branches&createBranch=1">Crear sucursal</Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <Select
+                        value={formData.branchId}
+                        onValueChange={(value) => setFormData({ ...formData, branchId: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar sucursal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {branches.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name} ({branch.type === "factory" ? "Fábrica" : "Sucursal"})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
                 )}
                 <div className="flex justify-end gap-2">
