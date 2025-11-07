@@ -61,7 +61,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signInWithGoogle = async () => {
-    await signInWithPopup(auth, googleProvider)
+    console.log("[Auth] Iniciando sesión con Google...")
+    try {
+      await signInWithPopup(auth, googleProvider)
+      console.log("[Auth] Sesión iniciada exitosamente")
+    } catch (error) {
+      console.error("[Auth] Error en signInWithGoogle:", error)
+      throw error
+    }
   }
 
   const signInWithEmail = async (email: string, password: string) => {

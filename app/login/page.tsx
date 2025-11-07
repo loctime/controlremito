@@ -44,6 +44,7 @@ export default function LoginPage() {
         description: "No se pudo iniciar sesión con Google. Por favor, intenta de nuevo.",
         variant: "destructive",
       })
+    } finally {
       setLoading(false)
     }
   }
