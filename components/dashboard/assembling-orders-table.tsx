@@ -1,7 +1,6 @@
 "use client"
 
-import { memo } from "react"
-import React from "react"
+import React, { memo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -18,11 +17,14 @@ interface AssemblingOrdersTableProps {
   user: User | null
   onMarkAsReady?: (orderId: string) => void
   onTakeForDelivery?: (orderId: string) => void
+  onSaveProgress?: (orderId: string) => Promise<void> | void
 }
 
-export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery }: AssemblingOrdersTableProps) {
+export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ orders, user, onMarkAsReady, onTakeForDelivery, onSaveProgress }: AssemblingOrdersTableProps) {
   const { isCollapsed: isTemplateCollapsed, toggle: toggleTemplateCollapse } = useCollapsibleSet()
   const { isCollapsed: isOrderExpanded, toggle: toggleOrderExpansion } = useCollapsibleSet()
+  const [savingOrders, setSavingOrders] = useState<Record<string, boolean>>({})
+  const [savedOrders, setSavedOrders] = useState<Record<string, number>>({})
 
   const getOrderProgress = (order: OrderWithTemplate) => {
     // Solo considerar productos que realmente se pidieron (cantidad > 0)
@@ -34,6 +36,33 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
     ).length
     
     return totalItems > 0 ? Math.round((processedItems / totalItems) * 100) : 0
+  }
+
+  const isOrderSaving = (orderId: string) => !!savingOrders[orderId]
+  const isOrderSaved = (orderId: string) => !!savedOrders[orderId]
+  const canMarkOrderAsReady = (order: OrderWithTemplate) => {
+    const progressComplete = getOrderProgress(order) === 100
+    if (!progressComplete) return false
+    if (!onSaveProgress) return true
+    return isOrderSaved(order.id)
+  }
+
+  const handleSaveProgress = async (orderId: string, event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.stopPropagation()
+    if (isOrderSaving(orderId)) return
+    try {
+      setSavingOrders(prev => ({ ...prev, [orderId]: true }))
+      await onSaveProgress?.(orderId)
+      setSavedOrders(prev => ({ ...prev, [orderId]: Date.now() }))
+    } catch (error) {
+      console.error("Error al guardar avance:", error)
+    } finally {
+      setSavingOrders(prev => {
+        const next = { ...prev }
+        delete next[orderId]
+        return next
+      })
+    }
   }
 
   // Agrupar por plantilla
@@ -72,20 +101,22 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
           {/* Vista móvil - Cards */}
           {!isTemplateCollapsed(templateName) && (
             <div className="block md:hidden space-y-3">
-              {templateOrders.map((order) => (
-                <div key={order.id} className="bg-white border rounded-lg p-4 shadow-sm">
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <h5 className="font-medium text-gray-900">
-                          {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
-                        </h5>
-                        <p className="text-sm text-gray-600">
-                          {order.items.filter(item => item.quantity > 0).length} productos
-                        </p>
+              {templateOrders.map((order) => {
+                const orderedItems = order.items.filter(item => item.quantity > 0)
+                return (
+                  <div key={order.id} className="bg-white border rounded-lg p-4 shadow-sm">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <h5 className="font-medium text-gray-900">
+                            {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
+                          </h5>
+                          <p className="text-sm text-gray-600">
+                            {orderedItems.length} producto{orderedItems.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <StatusBadge status={order.status} />
                       </div>
-                      <StatusBadge status={order.status} />
-                    </div>
                     
                     {user?.role === "branch" && (
                       <div className="text-sm">
@@ -95,16 +126,32 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                     )}
                     
                     {(user?.role === "factory" || user?.role === "delivery") && (
-                      <div className="flex justify-end">
-                        {user?.role === "factory" && onMarkAsReady && !order.preparedAt && (
-                          <Button 
-                            size="sm" 
-                            className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
-                            onClick={() => onMarkAsReady(order.id)}
-                            disabled={getOrderProgress(order) < 100}
-                          >
-                            ✓ Listo
-                          </Button>
+                      <div className="flex flex-col gap-2">
+                        {user?.role === "factory" && !order.preparedAt && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="min-h-[44px] px-4"
+                              onClick={(event) => handleSaveProgress(order.id, event)}
+                              disabled={isOrderSaving(order.id)}
+                            >
+                              {isOrderSaving(order.id) ? "Guardando..." : "Guardar avance"}
+                            </Button>
+                            {onMarkAsReady && (
+                              <Button 
+                                size="sm" 
+                                className="bg-green-600 hover:bg-green-700 text-white min-h-[44px] px-4"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  onMarkAsReady(order.id)
+                                }}
+                                disabled={!canMarkOrderAsReady(order)}
+                              >
+                                ✓ Listo
+                              </Button>
+                            )}
+                          </>
                         )}
                         {user?.role === "delivery" && onTakeForDelivery && order.preparedAt && (
                           <Button 
@@ -117,9 +164,10 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                         )}
                       </div>
                     )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -143,107 +191,128 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                   </tr>
                 </thead>
                 <tbody>
-                  {templateOrders.map((order) => (
-                    <React.Fragment key={order.id}>
-                      <tr 
-                        className={`border-b hover:bg-gray-50 ${order.preparedAt && user?.role === "delivery" ? "bg-green-50 border-green-200" : ""} ${user?.role === "factory" ? "cursor-pointer" : ""}`}
-                        onClick={user?.role === "factory" ? () => toggleOrderExpansion(order.id) : undefined}
-                      >
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-2">
-                            {user?.role === "factory" && (
-                              <div className="p-1">
-                                {isOrderExpanded(order.id) ? (
-                                  <ChevronDown className="h-4 w-4 text-gray-600" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                  {templateOrders.map((order) => {
+                    const orderedItems = order.items.filter(item => item.quantity > 0)
+                    return (
+                      <React.Fragment key={order.id}>
+                        <tr 
+                          className={`border-b hover:bg-gray-50 ${order.preparedAt && user?.role === "delivery" ? "bg-green-50 border-green-200" : ""} ${user?.role === "factory" ? "cursor-pointer" : ""}`}
+                          onClick={user?.role === "factory" ? () => toggleOrderExpansion(order.id) : undefined}
+                        >
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-2">
+                              {user?.role === "factory" && (
+                                <div className="p-1">
+                                  {isOrderExpanded(order.id) ? (
+                                    <ChevronDown className="h-4 w-4 text-gray-600" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-600" />
+                                  )}
+                                </div>
+                              )}
+                              <div className="text-sm font-medium text-gray-900">
+                                {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="text-sm text-gray-900">
+                              {orderedItems.length} producto{orderedItems.length !== 1 ? 's' : ''}
+                              {user?.role === "factory" && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Progreso: {getOrderProgress(order)}%
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-2">
+                            <div className="text-sm">
+                              {order.preparedAt ? (
+                                <StatusBadge status="ready" className="animate-pulse" />
+                              ) : (
+                                <StatusBadge status="pending" />
+                              )}
+                            </div>
+                          </td>
+                          {user?.role === "factory" && (
+                            <td className="py-3 px-2">
+                              <div className="flex justify-center gap-2">
+                                {!order.preparedAt && (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs px-3 py-1 h-auto"
+                                      onClick={(event) => handleSaveProgress(order.id, event)}
+                                      disabled={isOrderSaving(order.id)}
+                                    >
+                                      {isOrderSaving(order.id) ? "Guardando..." : "Guardar avance"}
+                                    </Button>
+                                    {onMarkAsReady && (
+                                      <Button 
+                                        size="sm" 
+                                        className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                        onClick={(event) => {
+                                          event.stopPropagation()
+                                          onMarkAsReady(order.id)
+                                        }}
+                                        disabled={!canMarkOrderAsReady(order)}
+                                      >
+                                        ✓ Listo
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                               </div>
-                            )}
-                            <div className="text-sm font-medium text-gray-900">
-                              {user?.role === "branch" ? order.toBranchName : order.fromBranchName}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="text-sm text-gray-900">
-                            {order.items.filter(item => item.quantity > 0).length} producto{order.items.filter(item => item.quantity > 0).length !== 1 ? 's' : ''}
-                            {user?.role === "factory" && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                Progreso: {getOrderProgress(order)}%
+                              {onSaveProgress && isOrderSaved(order.id) && (
+                                <div className="mt-1 text-center text-xs text-muted-foreground">
+                                  Cambios guardados
+                                </div>
+                              )}
+                            </td>
+                          )}
+                          {user?.role === "delivery" && (
+                            <td className="py-3 px-2">
+                              <div className="flex justify-center gap-2">
+                                {order.preparedAt && onTakeForDelivery && (
+                                  <Button 
+                                    size="sm" 
+                                    className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onTakeForDelivery(order.id)
+                                    }}
+                                  >
+                                    🚚 Tomar
+                                  </Button>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-2">
-                          <div className="text-sm">
-                            {order.preparedAt ? (
-                              <StatusBadge status="ready" className="animate-pulse" />
-                            ) : (
-                              <StatusBadge status="pending" />
-                            )}
-                          </div>
-                        </td>
-                        {user?.role === "factory" && (
-                          <td className="py-3 px-2">
-                            <div className="flex justify-center gap-2">
-                              {!order.preparedAt && onMarkAsReady && (
-                                <Button 
-                                  size="sm" 
-                                  className="text-xs px-3 py-1 h-auto bg-blue-600 hover:bg-blue-700"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onMarkAsReady(order.id)
-                                  }}
-                                  disabled={getOrderProgress(order) < 100}
-                                >
-                                  ✓ Listo
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {user?.role === "delivery" && (
-                          <td className="py-3 px-2">
-                            <div className="flex justify-center gap-2">
-                              {order.preparedAt && onTakeForDelivery && (
-                                <Button 
-                                  size="sm" 
-                                  className="text-xs px-3 py-1 h-auto bg-green-600 hover:bg-green-700"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    onTakeForDelivery(order.id)
-                                  }}
-                                >
-                                  🚚 Tomar
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        )}
-                        {user?.role === "branch" && (
-                          <td className="py-3 px-2">
-                            <div className="text-sm text-gray-900">{order.acceptedByName || "Sin asignar"}</div>
-                          </td>
-                        )}
-                      </tr>
-                      {/* Detalle expandible del pedido */}
-                      {isOrderExpanded(order.id) && user?.role === "factory" && (
-                        <tr>
-                          <td colSpan={user?.role === "branch" ? 5 : 4} className="p-0">
-                            <OrderItemsDetail
-                              orderId={order.id}
-                              items={order.items.filter(item => item.quantity > 0)}
-                              user={user}
-                              onItemsUpdated={() => {
-                                // No necesitamos recargar, el estado local se actualiza automáticamente
-                              }}
-                            />
-                          </td>
+                            </td>
+                          )}
+                          {user?.role === "branch" && (
+                            <td className="py-3 px-2">
+                              <div className="text-sm text-gray-900">{order.acceptedByName || "Sin asignar"}</div>
+                            </td>
+                          )}
                         </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+                        {/* Detalle expandible del pedido */}
+                        {isOrderExpanded(order.id) && user?.role === "factory" && (
+                          <tr>
+                            <td colSpan={4} className="p-0">
+                              <OrderItemsDetail
+                                orderId={order.id}
+                                items={orderedItems}
+                                user={user}
+                                onItemsUpdated={() => {
+                                  // No necesitamos recargar, el estado local se actualiza automáticamente
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

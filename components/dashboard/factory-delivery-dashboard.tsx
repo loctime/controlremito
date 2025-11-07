@@ -26,7 +26,11 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   const { toast } = useToast()
   
   const { data: pendingOrders = [], isLoading: pendingLoading } = useOrdersQuery("sent")
-  const { data: assemblingOrders = [], isLoading: assemblingLoading } = useOrdersQuery("assembling")
+  const { 
+    data: assemblingOrders = [], 
+    isLoading: assemblingLoading,
+    refetch: refetchAssemblingOrders
+  } = useOrdersQuery("assembling")
   const { data: inTransitOrders = [], isLoading: inTransitLoading } = useOrdersQuery("in_transit")
   
   // TanStack Query mutations
@@ -80,6 +84,10 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
   const takeOrderForDelivery = useCallback(async (orderId: string) => {
     takeForDeliveryMutation.mutate(orderId)
   }, [takeForDeliveryMutation])
+
+  const saveOrderProgress = useCallback(async (_orderId: string) => {
+    await refetchAssemblingOrders()
+  }, [refetchAssemblingOrders])
 
   const handleCancelAccept = useCallback(() => {
     setShowAcceptConfirmation(false)
@@ -208,6 +216,7 @@ export const FactoryDeliveryDashboard = memo(function FactoryDeliveryDashboard()
                 user={user}
                 onMarkAsReady={markOrderAsReady}
                 onTakeForDelivery={takeOrderForDelivery}
+                onSaveProgress={saveOrderProgress}
               />
             ) : (
               <Card>

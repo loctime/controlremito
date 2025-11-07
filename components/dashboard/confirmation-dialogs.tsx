@@ -17,6 +17,8 @@ interface AcceptOrderDialogProps {
 }
 
 export function AcceptOrderDialog({ open, order, onConfirm, onCancel }: AcceptOrderDialogProps) {
+  const itemsSolicited = order?.items.filter((item) => item.quantity > 0) ?? []
+
   return (
     <Dialog open={open} onOpenChange={onCancel}>
       <DialogContent className="max-w-md">
@@ -45,7 +47,7 @@ export function AcceptOrderDialog({ open, order, onConfirm, onCancel }: AcceptOr
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Productos:</span>
-                  <span className="font-medium">{order.items.length} items</span>
+                  <span className="font-medium">{itemsSolicited.length} items</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Número:</span>
@@ -54,19 +56,19 @@ export function AcceptOrderDialog({ open, order, onConfirm, onCancel }: AcceptOr
               </div>
             </div>
             
-            {order.items.length > 0 && (
+            {itemsSolicited.length > 0 && (
               <div className="bg-blue-50 p-4 rounded-lg">
                 <h5 className="font-medium text-blue-900 mb-2">Productos incluidos:</h5>
                 <div className="space-y-1 text-sm">
-                  {order.items.slice(0, 3).map((item, index) => (
+                  {itemsSolicited.slice(0, 3).map((item, index) => (
                     <div key={index} className="flex justify-between text-blue-800">
                       <span>{item.productName}</span>
                       <span>{item.quantity} {item.unit}</span>
                     </div>
                   ))}
-                  {order.items.length > 3 && (
+                  {itemsSolicited.length > 3 && (
                     <div className="text-blue-600 text-xs">
-                      +{order.items.length - 3} productos más...
+                      +{itemsSolicited.length - 3} productos más...
                     </div>
                   )}
                 </div>
@@ -97,6 +99,11 @@ interface AcceptAllOrdersDialogProps {
 }
 
 export function AcceptAllOrdersDialog({ open, orders, onConfirm, onCancel }: AcceptAllOrdersDialogProps) {
+  const totalProductosSolicitados = orders.reduce((sum, order) => {
+    const itemsSolicited = order.items.filter((item) => item.quantity > 0)
+    return sum + itemsSolicited.length
+  }, 0)
+
   return (
     <Dialog open={open} onOpenChange={onCancel}>
       <DialogContent className="max-w-lg">
@@ -126,7 +133,7 @@ export function AcceptAllOrdersDialog({ open, orders, onConfirm, onCancel }: Acc
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total de productos:</span>
                   <span className="font-medium">
-                    {orders.reduce((sum, order) => sum + order.items.length, 0)}
+                    {totalProductosSolicitados}
                   </span>
                 </div>
               </div>
@@ -135,15 +142,18 @@ export function AcceptAllOrdersDialog({ open, orders, onConfirm, onCancel }: Acc
             <div className="bg-blue-50 p-4 rounded-lg max-h-48 overflow-y-auto">
               <h5 className="font-medium text-blue-900 mb-2">Pedidos a aceptar:</h5>
               <div className="space-y-2 text-sm">
-                {orders.map((order) => (
-                  <div key={order.id} className="flex justify-between items-center text-blue-800 p-2 bg-white rounded">
-                    <div>
-                      <span className="font-medium">{order.fromBranchName}</span>
-                      <span className="text-blue-600 ml-2">({order.orderNumber})</span>
+                {orders.map((order) => {
+                  const itemsSolicited = order.items.filter((item) => item.quantity > 0)
+                  return (
+                    <div key={order.id} className="flex justify-between items-center text-blue-800 p-2 bg-white rounded">
+                      <div>
+                        <span className="font-medium">{order.fromBranchName}</span>
+                        <span className="text-blue-600 ml-2">({order.orderNumber})</span>
+                      </div>
+                      <span className="text-blue-600">{itemsSolicited.length} productos</span>
                     </div>
-                    <span className="text-blue-600">{order.items.length} productos</span>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </div>
