@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -18,15 +18,17 @@ interface OrderItemsDetailProps {
   items: OrderItem[]
   user: User | null
   onItemsUpdated?: () => void
+  canEditItems?: boolean
 }
 
-export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: OrderItemsDetailProps) {
+export function OrderItemsDetail({ orderId, items, user, onItemsUpdated, canEditItems }: OrderItemsDetailProps) {
   const [localItems, setLocalItems] = useState<OrderItem[]>(items)
   const [saving, setSaving] = useState(false)
   const [customQuantities, setCustomQuantities] = useState<Record<string, number>>({})
   const [orderNotes, setOrderNotes] = useState<string>("")
   const [assemblyNotes, setAssemblyNotes] = useState<string>("")
   const [loadingOrder, setLoadingOrder] = useState(true)
+  const isEditable = canEditItems ?? true
 
   useEffect(() => {
     setLocalItems(items)
@@ -54,7 +56,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
   }, [orderId])
 
   const updateItem = async (itemId: string, assembledQuantity: number | null) => {
-    if (!user) return
+    if (!user || !isEditable) return
 
     setSaving(true)
     try {
@@ -168,6 +170,28 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
     return { label: "Parcial", variant: "default" as const, icon: CheckCircle }
   }
 
+  const sortedItems = useMemo(() => {
+    return localItems
+      .map((item, index) => {
+        const isPending = item.assembledQuantity === undefined || item.assembledQuantity === null
+        const isUnavailable = item.assembledQuantity === 0
+        const priority = isPending ? 0 : isUnavailable ? 2 : 1
+
+        return {
+          item,
+          index,
+          priority,
+        }
+      })
+      .sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority
+        }
+        return a.index - b.index
+      })
+      .map(({ item }) => item)
+  }, [localItems])
+
   const handleCustomQuantity = (itemId: string, quantity: number) => {
     setCustomQuantities(prev => ({ ...prev, [itemId]: quantity }))
   }
@@ -183,7 +207,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
   }
 
   const saveAssemblyNotes = async () => {
-    if (!user) return
+    if (!user || !isEditable) return
     
     setSaving(true)
     try {
@@ -210,6 +234,16 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
         </div>
       </CardHeader>
       <CardContent>
+        {/* Mensaje de solo lectura */}
+        {!isEditable && (
+          <div className="mb-4 p-3 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-700 flex gap-2">
+            <AlertCircle className="h-4 w-4 text-gray-500 mt-0.5" />
+            <div>
+              Este pedido ya fue marcado como listo o está en camino. Los productos quedan en solo lectura.
+            </div>
+          </div>
+        )}
+
         {/* Comentarios del pedido original */}
         {orderNotes && (
           <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -237,12 +271,12 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
             onChange={(e) => setAssemblyNotes(e.target.value)}
             placeholder="Ej: Se cambió X producto por Y, falta stock de Z, etc..."
             className="min-h-[80px] mb-2 bg-white"
-            disabled={saving}
+            disabled={saving || !isEditable}
           />
           <Button
             size="sm"
             onClick={saveAssemblyNotes}
-            disabled={saving}
+            disabled={saving || !isEditable}
             className="bg-orange-600 hover:bg-orange-700"
           >
             {saving ? "Guardando..." : "Guardar comentarios"}
@@ -250,7 +284,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
         </div>
 
         <div className="space-y-3">
-          {localItems.map((item) => {
+          {sortedItems.map((item) => {
             const status = getItemStatus(item)
             const StatusIcon = status.icon
             
@@ -274,7 +308,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
                     {status.label}
                   </Badge>
                   
-                  {item.assembledQuantity === undefined || item.assembledQuantity === null ? (
+                  {isEditable && (item.assembledQuantity === undefined || item.assembledQuantity === null) ? (
                     <div className="flex gap-1">
                       <Button
                         size="sm"
@@ -319,7 +353,7 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
                         </Button>
                       </div>
                     </div>
-                  ) : (
+                  ) : isEditable && (
                     <Button
                       size="sm"
                       onClick={() => updateItem(item.id, null)}
@@ -328,6 +362,11 @@ export function OrderItemsDetail({ orderId, items, user, onItemsUpdated }: Order
                     >
                       Editar
                     </Button>
+                  )}
+                  {!isEditable && (
+                    <Badge variant="secondary" className="text-xs">
+                      Solo lectura
+                    </Badge>
                   )}
                 </div>
               </div>

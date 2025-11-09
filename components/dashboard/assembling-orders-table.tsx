@@ -319,6 +319,7 @@ export const AssemblingOrdersTable = memo(function AssemblingOrdersTable({ order
                                 orderId={order.id}
                                 items={orderedItems}
                                 user={user}
+                                canEditItems={order.status === "assembling" && !order.preparedAt}
                                 onItemsUpdated={() => {
                                   // No necesitamos recargar, el estado local se actualiza automáticamente
                                 }}

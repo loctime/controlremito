@@ -1,6 +1,6 @@
 "use client"
 
-import { Fragment } from "react"
+import { Fragment, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { StatusBadge } from "@/components/ui/status-badge"
@@ -27,13 +27,35 @@ export function ProductReceptionTable({
   onUpdateItemStatus,
   onUpdateItemComment,
 }: ProductReceptionTableProps) {
+  const sortedItems = useMemo(() => {
+    const statusPriority: Record<ItemQuantity["status"], number> = {
+      pending: 0,
+      ok: 1,
+      no: 2,
+    }
+
+    return order.items
+      .map((item, index) => ({
+        item,
+        index,
+        priority: statusPriority[itemQuantities[item.id]?.status ?? "pending"],
+      }))
+      .sort((a, b) => {
+        if (a.priority !== b.priority) {
+          return a.priority - b.priority
+        }
+        return a.index - b.index
+      })
+      .map(({ item }) => item)
+  }, [order.items, itemQuantities])
+
   return (
     <div className="bg-white p-4 rounded-lg border">
       <h4 className="font-semibold text-gray-900 mb-3">📋 Productos</h4>
       
       {/* Vista móvil - Cards */}
       <div className="block md:hidden space-y-4">
-        {order.items.map((item) => {
+        {sortedItems.map((item) => {
           const itemData = itemQuantities[item.id] || { received: 0, status: 'pending' as const }
           return (
             <div key={item.id} className={`border rounded-lg p-4 ${
@@ -145,7 +167,7 @@ export function ProductReceptionTable({
             </tr>
           </thead>
           <tbody>
-            {order.items.map((item) => {
+            {sortedItems.map((item) => {
               const itemData = itemQuantities[item.id] || { received: 0, status: 'pending' as const }
               return (
                 <Fragment key={item.id}>
